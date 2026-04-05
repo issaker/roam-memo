@@ -172,6 +172,12 @@ const PracticeOverlay = ({
     setCurrentIndex(0);
   }, [practiceData]);
 
+  // When selected tag changes, reset cardQueue and currentIndex
+  React.useEffect(() => {
+    setCardQueue(initialCardUids);
+    setCurrentIndex(0);
+  }, [selectedTag]);
+
   const onPracticeClick = React.useCallback(
     (gradeData) => {
       if (isDone) return;
