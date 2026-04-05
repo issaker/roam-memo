@@ -280,6 +280,7 @@ const PracticeOverlay = ({
         setRenderMode,
       }}
     >
+      <style>{mobileOverlayStyles}</style>
       {/* @ts-ignore */}
       <Dialog
         isOpen={isOpen}
@@ -383,6 +384,38 @@ const Dialog = styled(Blueprint.Dialog)`
 
   ${mediaQueries.xl} {
     width: 70vw;
+  }
+
+  /* Full-screen on mobile */
+  @media (max-width: 768px) {
+    max-height: 100vh;
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    border-radius: 0;
+  }
+`;
+
+const mobileOverlayStyles = `
+  @media (max-width: 768px) {
+    .bp3-overlay.bp3-overlay-open {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    .bp3-overlay .bp3-dialog-container {
+      position: static !important;
+      width: 100% !important;
+      height: 100% !important;
+      display: flex !important;
+      align-items: stretch !important;
+      justify-content: stretch !important;
+      margin: 0 !important;
+    }
   }
 `;
 
