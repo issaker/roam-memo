@@ -386,11 +386,11 @@ const Dialog = styled(Blueprint.Dialog)`
     width: 70vw;
   }
 
-  /* Full-screen on mobile */
+  /* Full-screen on mobile with bottom spacing for toolbar */
   @media (max-width: 768px) {
-    max-height: 100vh;
+    max-height: calc(100vh - 50px);
     width: 100vw;
-    height: 100vh;
+    height: calc(100vh - 50px);
     margin: 0;
     border-radius: 0;
   }
@@ -403,7 +403,7 @@ const mobileOverlayStyles = `
       top: 0 !important;
       left: 0 !important;
       width: 100vw !important;
-      height: 100vh !important;
+      height: calc(100vh - 50px) !important;
       margin: 0 !important;
       padding: 0 !important;
     }
