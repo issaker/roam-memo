@@ -299,13 +299,6 @@ const PracticeOverlay = ({
     };
   }, [isOpen]);
 
-  // Global blur on click to prevent tooltip flickering on mobile
-  const handleDialogClick = () => {
-    if (document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
-    }
-  };
-
   return (
     <MainContext.Provider
       value={{
@@ -332,7 +325,6 @@ const PracticeOverlay = ({
         className="pb-0 bg-white"
         canEscapeKeyClose={false}
       >
-        <div onClick={handleDialogClick} style={{ display: 'contents' }}>
         <Header
           className="bp3-dialog-header outline-none focus:outline-none focus-visible:outline-none"
           tagsList={tagsList}
@@ -412,7 +404,6 @@ const PracticeOverlay = ({
           currentCardData={currentCardData}
           onStartCrammingClick={onStartCrammingClick}
         />
-        </div>
       </Dialog>
     </MainContext.Provider>
   );
@@ -461,6 +452,10 @@ const mobileOverlayStyles = (isEditing: boolean) => `
       align-items: stretch !important;
       justify-content: stretch !important;
       margin: 0 !important;
+    }
+    /* Prevent tooltip flickering on mobile */
+    .bp3-popover {
+      display: none !important;
     }
   }
 `;
