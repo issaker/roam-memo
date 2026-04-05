@@ -308,7 +308,7 @@ const GradingControlsWrapper = ({
 
   const isFixedIntervalMode = reviewMode === ReviewModes.FixedInterval;
   return (
-    <div className="flex items-center justify-evenly w-full">
+    <div className="flex items-center flex-wrap justify-evenly gap-3 w-full">
       <button
         type="button"
         aria-label="上一页"
