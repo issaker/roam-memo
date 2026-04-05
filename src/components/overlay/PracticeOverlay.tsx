@@ -263,6 +263,42 @@ const PracticeOverlay = ({
   );
   Blueprint.useHotkeys(hotkeys);
 
+  // Detect editing state and adjust bottom spacing
+  const [isEditing, setIsEditing] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+
+    const handleFocusIn = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      // Check if the focused element is an input/textarea
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        setIsEditing(true);
+      }
+    };
+
+    const handleFocusOut = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+        // Small delay to check if another input gets focus
+        setTimeout(() => {
+          const activeElement = document.activeElement;
+          if (!activeElement || (activeElement.tagName !== 'INPUT' && activeElement.tagName !== 'TEXTAREA')) {
+            setIsEditing(false);
+          }
+        }, 100);
+      }
+    };
+
+    document.addEventListener('focusin', handleFocusIn);
+    document.addEventListener('focusout', handleFocusOut);
+
+    return () => {
+      document.removeEventListener('focusin', handleFocusIn);
+      document.removeEventListener('focusout', handleFocusOut);
+    };
+  }, [isOpen]);
+
   return (
     <MainContext.Provider
       value={{
@@ -280,9 +316,10 @@ const PracticeOverlay = ({
         setRenderMode,
       }}
     >
-      <style>{mobileOverlayStyles}</style>
+      <style>{mobileOverlayStyles(isEditing)}</style>
       {/* @ts-ignore */}
       <Dialog
+        $isEditing={isEditing}
         isOpen={isOpen}
         onClose={onCloseCallback}
         className="pb-0 bg-white"
@@ -372,7 +409,7 @@ const PracticeOverlay = ({
   );
 };
 
-const Dialog = styled(Blueprint.Dialog)`
+const Dialog = styled(Blueprint.Dialog)<{ $isEditing?: boolean }>`
   display: grid;
   grid-template-rows: 50px 1fr auto;
   max-height: 80vh;
@@ -388,22 +425,22 @@ const Dialog = styled(Blueprint.Dialog)`
 
   /* Full-screen on mobile */
   @media (max-width: 768px) {
-    max-height: 100vh;
+    max-height: ${({ $isEditing }) => ($isEditing ? 'calc(100vh - 40px)' : '100vh')};
     width: 100vw;
-    height: 100vh;
+    height: ${({ $isEditing }) => ($isEditing ? 'calc(100vh - 40px)' : '100vh')};
     margin: 0;
     border-radius: 0;
   }
 `;
 
-const mobileOverlayStyles = `
+const mobileOverlayStyles = (isEditing: boolean) => `
   @media (max-width: 768px) {
     .bp3-overlay.bp3-overlay-open {
       position: fixed !important;
       top: 0 !important;
       left: 0 !important;
       width: 100vw !important;
-      height: 100vh !important;
+      height: ${isEditing ? 'calc(100vh - 40px)' : '100vh'} !important;
       margin: 0 !important;
       padding: 0 !important;
     }
