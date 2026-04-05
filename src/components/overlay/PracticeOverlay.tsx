@@ -453,7 +453,7 @@ const mobileOverlayStyles = (isEditing: boolean) => `
       justify-content: stretch !important;
       margin: 0 !important;
     }
-    /* Prevent tooltip flickering on mobile */
+    /* Hide tooltips on mobile to prevent flickering */
     .bp3-popover {
       display: none !important;
     }
