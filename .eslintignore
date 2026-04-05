@@ -1,0 +1,6 @@
+# node_modules/
+/extension.js
+tailwind.config.js
+webpack.config.js
+changelog-setup.js
+jest.setup.ts
