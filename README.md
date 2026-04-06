@@ -59,9 +59,38 @@ Type "Memo: Start Review Session" in the command palette (`Cmd+P` / `Ctrl+P`).
 
 ## Recent Updates
 
+- **2025-04 Breadcrumbs persistence** — User's breadcrumb visibility preference is now saved to localStorage and restored on next session
 - **Mobile navigation buttons** — ◀ ▶ buttons in the footer for card navigation on all devices
 - **Focus fix** — Resolved focus loss when navigating between blocks with arrow keys or selecting text
 - **Forgot reinsertion** — Configurable reinsertion of "Forgot" cards into the current session queue (N cards later)
+
+## Development Notes
+
+### Build Configuration
+
+- Webpack UMD output with `library.type: 'umd'` (no `library.export` to avoid ES Module syntax issues)
+- Babel preset-env for ES5 compatibility
+- External dependencies: React, ReactDOM, BlueprintJS, ChronoNode
+
+### roam/js Loading
+
+This plugin supports loading via `[[roam/js]]` page:
+
+```javascript
+if (!window.roamMemoLoaded) {
+  window.roamMemoLoaded = true;
+  const script = document.createElement('script');
+  script.src = 'https://cdn.jsdelivr.net/gh/issaker/roam-memo@main/extension.js';
+  script.type = 'text/javascript';
+  script.onload = () => window.RoamMemo?.onload({ extensionAPI: window.roamAlphaAPI });
+  document.head.appendChild(script);
+}
+```
+
+**roam/js Limitations:**
+- Settings are persisted to the `roam/memo` page (not Roam Depot's settings panel)
+- Uses `window.roamAlphaAPI` instead of full `extensionAPI`
+- Settings dialog is accessible via gear icon in the practice overlay
 
 ## Bug Reports & Feature Requests
 
