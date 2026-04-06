@@ -67,29 +67,51 @@ export const saveSettingsToPage = async (dataPageTitle: string, settings: Settin
  */
 export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Settings | null> => {
   try {
-    // Check if the page exists
-    const queryResults = await window.roamAlphaAPI.q(
-      `[:find ?uid :in $ ?title :where [?page :node/title ?title] [?page :block/uid ?uid]]`,
-      dataPageTitle
-    );
-
-    if (!queryResults || queryResults.length === 0) {
+    // Use getOrCreatePage to get the page UID properly
+    const pageUid = await getOrCreatePage(dataPageTitle);
+    
+    if (!pageUid) {
       console.log('Memo: Settings page not found, using defaults');
       return null;
     }
 
-    // Get the settings block
-    const settingsBlockUid = await getChildBlock(queryResults[0][0], SETTINGS_BLOCK_NAME, {
-      exactMatch: true,
-    });
+    console.log('Memo: Found page with UID', pageUid);
 
-    if (!settingsBlockUid) {
+    // Get the settings block using proper block query
+    const settingsBlockQuery = `
+      [:find ?block_uid
+       :in $ ?page_uid ?block_string
+       :where
+       [?page :block/uid ?page_uid]
+       [?block :block/parents ?page]
+       [?block :block/string ?block_string]
+       [?block :block/uid ?block_uid]
+      ]
+    `;
+    
+    const settingsBlockResults = await window.roamAlphaAPI.q(
+      settingsBlockQuery,
+      pageUid,
+      SETTINGS_BLOCK_NAME
+    );
+
+    if (!settingsBlockResults || settingsBlockResults.length === 0) {
       console.log('Memo: Settings block not found, using defaults');
       return null;
     }
 
+    const settingsBlockUid = settingsBlockResults[0][0];
+    console.log('Memo: Found settings block with UID', settingsBlockUid);
+
     // Query for all settings child blocks
-    const settingsQuery = `[:find (pull ?b [:block/string]) :in $ ?parent :where [?b :block/parents ?parent]]`;
+    const settingsQuery = `
+      [:find (pull ?b [:block/string])
+       :in $ ?parent_uid
+       :where
+       [?parent :block/uid ?parent_uid]
+       [?b :block/parents ?parent]
+      ]
+    `;
     const results = await window.roamAlphaAPI.q(settingsQuery, settingsBlockUid);
 
     if (!results || results.length === 0) {
@@ -97,37 +119,45 @@ export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Setti
       return null;
     }
 
+    console.log('Memo: Found', results.length, 'settings blocks');
+
     // Parse settings from blocks
     const loadedSettings: Partial<Settings> = {};
     
     results.forEach((result: any) => {
-      const blockString = result[0]?.string;
-      if (blockString && blockString.includes('::')) {
-        const [key, ...valueParts] = blockString.split('::');
-        const value = valueParts.join('::').trim();
-        const trimmedKey = key.trim();
+      try {
+        const blockString = result[0]?.string;
+        if (blockString && blockString.includes('::')) {
+          const [key, ...valueParts] = blockString.split('::');
+          const value = valueParts.join('::').trim();
+          const trimmedKey = key.trim();
 
-        // Convert values to appropriate types
-        switch (trimmedKey) {
-          case 'tagsListString':
-            loadedSettings.tagsListString = value;
-            break;
-          case 'dataPageTitle':
-            loadedSettings.dataPageTitle = value;
-            break;
-          case 'dailyLimit':
-            loadedSettings.dailyLimit = Number(value) || 0;
-            break;
-          case 'rtlEnabled':
-            loadedSettings.rtlEnabled = value === 'true';
-            break;
-          case 'shuffleCards':
-            loadedSettings.shuffleCards = value === 'true';
-            break;
-          case 'forgotReinsertOffset':
-            loadedSettings.forgotReinsertOffset = Number(value) || 3;
-            break;
+          console.log('Memo: Loading setting', trimmedKey, '=', value);
+
+          // Convert values to appropriate types
+          switch (trimmedKey) {
+            case 'tagsListString':
+              loadedSettings.tagsListString = value;
+              break;
+            case 'dataPageTitle':
+              loadedSettings.dataPageTitle = value;
+              break;
+            case 'dailyLimit':
+              loadedSettings.dailyLimit = Number(value) || 0;
+              break;
+            case 'rtlEnabled':
+              loadedSettings.rtlEnabled = value === 'true';
+              break;
+            case 'shuffleCards':
+              loadedSettings.shuffleCards = value === 'true';
+              break;
+            case 'forgotReinsertOffset':
+              loadedSettings.forgotReinsertOffset = Number(value) || 3;
+              break;
+          }
         }
+      } catch (err) {
+        console.error('Memo: Error parsing setting block', result, err);
       }
     });
 
