@@ -106,10 +106,9 @@ export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Setti
     // Query for all settings child blocks
     const settingsQuery = `
       [:find (pull ?b [:block/string])
-       :in $ ?parent_uid
+       :in $ ?pu
        :where
-       [?parent :block/uid ?parent_uid]
-       [?b :block/parents ?parent]
+       [?b :block/parents [:block/uid ?pu]]
       ]
     `;
     const results = await window.roamAlphaAPI.q(settingsQuery, settingsBlockUid);
