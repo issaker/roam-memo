@@ -77,7 +77,6 @@ const PracticeOverlay = ({
   // Handle case where tag data hasn't loaded yet (e.g., when settings just changed)
   // Return null to prevent crash - component will re-render when data is available
   if (!todaySelectedTag) {
-    console.log('Memo: Tag data not yet available for', selectedTag, '- waiting for refresh');
     return null;
   }
   
@@ -171,14 +170,12 @@ const PracticeOverlay = ({
       const savedSettings = await loadSettingsFromPage('roam/memo');
       if (savedSettings) {
         setLocalSettings(savedSettings);
-        console.log('Memo: Loaded settings from page');
         
         // Sync with extensionAPI so useSettings hook can pick them up
         if (window.roamMemo && window.roamMemo.extensionAPI && window.roamMemo.extensionAPI.settings) {
           Object.entries(savedSettings).forEach(([key, value]) => {
             window.roamMemo.extensionAPI.settings.set(key, value);
           });
-          console.log('Memo: Synced settings with extensionAPI');
         }
       }
     };

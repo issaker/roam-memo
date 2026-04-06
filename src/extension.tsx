@@ -2,8 +2,6 @@ import ReactDOM from 'react-dom';
 import App from './app';
 import { FocusStyleManager } from '@blueprintjs/core';
 
-console.log('Memo: Initializing...');
-
 const container_id: string = 'roam-memo-wrapper';
 
 const createAndRenderContainer = () => {
@@ -64,7 +62,7 @@ function onload({ extensionAPI }: { extensionAPI: any }) {
   if (!compatibleExtensionAPI.settings.panel) {
     compatibleExtensionAPI.settings.panel = {
       create: () => {
-        console.log('Memo: Settings panel create called (roam/js mode)');
+        // Silently handle settings panel creation in roam/js mode
       },
     };
   }
@@ -78,7 +76,6 @@ function onload({ extensionAPI }: { extensionAPI: any }) {
   const container = createAndRenderContainer();
   if (container) {
     ReactDOM.render(<App />, container);
-    console.log('Memo: Initialized');
   } else {
     console.error('Memo: Failed to create container');
   }
@@ -90,7 +87,6 @@ function onunload() {
   if (container) {
     ReactDOM.unmountComponentAtNode(container);
     container.remove();
-    console.log('Memo: Unloaded');
   }
 }
 

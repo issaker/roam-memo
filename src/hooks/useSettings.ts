@@ -68,7 +68,6 @@ const useSettings = () => {
   // Listen for settings changes from roam/js mode
   React.useEffect(() => {
     const handleSettingsChange = (event: CustomEvent) => {
-      console.log('Memo: Settings changed event received', event.detail);
       // Reload all settings when any setting changes
       const allSettings = window.roamMemo.extensionAPI.settings.getAll() || {};
       const numbers = ['dailyLimit'];

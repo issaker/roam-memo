@@ -35,12 +35,10 @@ export const saveSettingsToPage = async (dataPageTitle: string, settings: Settin
         });
         
         if (existingBlockUid) {
-          console.log('Memo: Deleting existing setting', key, existingBlockUid);
           await window.roamAlphaAPI.deleteBlock({ block: { uid: existingBlockUid } });
         }
 
         // Create new block with updated value
-        console.log('Memo: Creating setting', key, value);
         await window.roamAlphaAPI.createBlock({
           location: { 'parent-uid': settingsBlockUid, order: -1 },
           block: {
@@ -54,7 +52,6 @@ export const saveSettingsToPage = async (dataPageTitle: string, settings: Settin
       }
     }
 
-    console.log('Memo: Settings saved to page', dataPageTitle);
     return true;
   } catch (error) {
     console.error('Memo: Failed to save settings', error);
@@ -71,11 +68,8 @@ export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Setti
     const pageUid = await getOrCreatePage(dataPageTitle);
     
     if (!pageUid) {
-      console.log('Memo: Settings page not found, using defaults');
       return null;
     }
-
-    console.log('Memo: Found page with UID', pageUid);
 
     // Use getChildBlock to find the settings block
     const settingsBlockUid = await getChildBlock(pageUid, SETTINGS_BLOCK_NAME, {
@@ -83,11 +77,8 @@ export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Setti
     });
 
     if (!settingsBlockUid) {
-      console.log('Memo: Settings block not found, using defaults');
       return null;
     }
-
-    console.log('Memo: Found settings block with UID', settingsBlockUid);
 
     // Query for all child blocks of the settings block
     // Use a simple query that doesn't pass UIDs as parameters in lookup ref position
@@ -104,11 +95,8 @@ export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Setti
     const results = window.roamAlphaAPI.q(childrenQuery);
     
     if (!results || results.length === 0) {
-      console.log('Memo: No settings found, using defaults');
       return null;
     }
-
-    console.log('Memo: Found', results.length, 'settings blocks');
 
     const loadedSettings: Partial<Settings> = {};
     
@@ -119,8 +107,6 @@ export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Setti
           const [keyPart, ...valueParts] = blockString.split('::');
           const key = keyPart.trim();
           const value = valueParts.join('::').trim();
-          
-          console.log('Memo: Loading setting', key, '=', value);
           
           // Convert values to appropriate types
           switch (key) {
@@ -149,7 +135,6 @@ export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Setti
       }
     }
 
-    console.log('Memo: Settings loaded from page', dataPageTitle, loadedSettings);
     
     // Merge with defaults to ensure all fields are present
     return {
