@@ -18,8 +18,12 @@ if (!window.roamMemoLoaded) {
   window.roamMemoLoaded = true;
   
   const script = document.createElement('script');
-  script.src = 'https://raw.githubusercontent.com/issaker/roam-memo/main/extension.js';
+  // 使用 jsDelivr CDN（推荐，正确处理 Content-Type）
+  script.src = 'https://cdn.jsdelivr.net/gh/issaker/roam-memo@main/extension.js';
+  // 或者使用 GitHub raw URL（可能被浏览器阻止）
+  // script.src = 'https://raw.githubusercontent.com/issaker/roam-memo/main/extension.js';
   script.type = 'text/javascript';
+  script.crossOrigin = 'anonymous';
   
   script.onload = function() {
     console.log('✅ Roam Memo loaded successfully');
@@ -28,8 +32,9 @@ if (!window.roamMemoLoaded) {
     }
   };
   
-  script.onerror = function() {
-    console.error('❌ Failed to load Roam Memo');
+  script.onerror = function(e) {
+    console.error('❌ Failed to load Roam Memo', e);
+    console.error('Please check your network connection or try using the offline method');
     window.roamMemoLoaded = false;
   };
   
