@@ -141,9 +141,20 @@ const PracticeOverlay = ({
 
   const [showAnswers, setShowAnswers] = React.useState(false);
   const [hasCloze, setHasCloze] = React.useState(true);
+  const [showSettings, setShowSettings] = React.useState(false);
 
   const shouldShowAnswerFirst =
     renderMode === RenderMode.AnswerFirst && hasBlockChildrenUids && !showAnswers;
+
+  // Local settings state for roam/js mode
+  const [localSettings, setLocalSettings] = React.useState({
+    tagsListString: 'memo',
+    dataPageTitle: 'roam/memo',
+    dailyLimit: 0,
+    rtlEnabled: false,
+    shuffleCards: false,
+    forgotReinsertOffset: 3,
+  });
 
   // Reset showAnswers state
   React.useEffect(() => {
@@ -336,6 +347,7 @@ const PracticeOverlay = ({
           showBreadcrumbs={showBreadcrumbs}
           setShowBreadcrumbs={setShowBreadcrumbs}
           isCramming={isCramming}
+          onSettingsClick={() => setShowSettings(true)}
         />
 
         <DialogBody
@@ -405,6 +417,135 @@ const PracticeOverlay = ({
           onStartCrammingClick={onStartCrammingClick}
         />
       </Dialog>
+
+      {/* Settings Dialog for roam/js mode */}
+      <Blueprint.Dialog
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        title="Memo Settings"
+        className="bp3-dark"
+        style={{ maxWidth: '500px' }}
+      >
+        <div className="bp3-dialog-body" style={{ padding: '20px', maxHeight: '70vh', overflowY: 'auto' }}>
+          <div style={{ marginBottom: '20px' }}>
+            <h5 style={{ margin: '0 0 10px 0' }}>Tag Pages (Decks)</h5>
+            <p style={{ fontSize: '12px', color: '#888', margin: '0 0 5px 0' }}>
+              Separate multiple decks with commas. Example: "memo, sr, 🐘, french exam"
+            </p>
+            <input
+              type="text"
+              className="bp3-input"
+              value={localSettings.tagsListString}
+              onChange={(e) => setLocalSettings({ ...localSettings, tagsListString: e.target.value })}
+              placeholder="memo"
+              style={{ width: '100%' }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <h5 style={{ margin: '0 0 10px 0' }}>Data Page Title</h5>
+            <p style={{ fontSize: '12px', color: '#888', margin: '0 0 5px 0' }}>
+              Name of page where we'll store all your data
+            </p>
+            <input
+              type="text"
+              className="bp3-input"
+              value={localSettings.dataPageTitle}
+              onChange={(e) => setLocalSettings({ ...localSettings, dataPageTitle: e.target.value })}
+              placeholder="roam/memo"
+              style={{ width: '100%' }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <h5 style={{ margin: '0 0 10px 0' }}>Daily Review Limit</h5>
+            <p style={{ fontSize: '12px', color: '#888', margin: '0 0 5px 0' }}>
+              Number of cards to review each day. 0 means no limit.
+            </p>
+            <input
+              type="number"
+              className="bp3-input"
+              value={localSettings.dailyLimit}
+              onChange={(e) => setLocalSettings({ ...localSettings, dailyLimit: Number(e.target.value) })}
+              placeholder="0"
+              style={{ width: '100%' }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                className="bp3-checkbox"
+                checked={localSettings.rtlEnabled}
+                onChange={(e) => setLocalSettings({ ...localSettings, rtlEnabled: e.target.checked })}
+                style={{ marginRight: '8px' }}
+              />
+              <span>Right-to-Left (RTL) Enabled</span>
+            </label>
+            <p style={{ fontSize: '12px', color: '#888', margin: '5px 0 0 0' }}>
+              Enable RTL for languages like Arabic, Hebrew, etc.
+            </p>
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                className="bp3-checkbox"
+                checked={localSettings.shuffleCards}
+                onChange={(e) => setLocalSettings({ ...localSettings, shuffleCards: e.target.checked })}
+                style={{ marginRight: '8px' }}
+              />
+              <span>Shuffle Cards</span>
+            </label>
+            <p style={{ fontSize: '12px', color: '#888', margin: '5px 0 0 0' }}>
+              Randomly shuffle the order of new and due cards during review.
+            </p>
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <h5 style={{ margin: '0 0 10px 0' }}>Reinsert "Forgot" Cards After N Cards</h5>
+            <p style={{ fontSize: '12px', color: '#888', margin: '0 0 5px 0' }}>
+              When you mark a card as "Forgot", it will be reinserted into the current review session N cards later. Set to 0 to disable.
+            </p>
+            <input
+              type="number"
+              className="bp3-input"
+              value={localSettings.forgotReinsertOffset}
+              onChange={(e) => setLocalSettings({ ...localSettings, forgotReinsertOffset: Number(e.target.value) })}
+              placeholder="3"
+              style={{ width: '100%' }}
+            />
+          </div>
+
+          <div style={{ padding: '10px', backgroundColor: '#fff3cd', borderRadius: '4px', fontSize: '12px' }}>
+            <strong>Note:</strong> These settings are not saved in roam/js mode. They will reset when you refresh the page. For persistent settings, use Roam Depot.
+          </div>
+        </div>
+
+        <div className="bp3-dialog-footer">
+          <div className="bp3-dialog-footer-actions">
+            <button
+              className="bp3-button bp3-intent-primary"
+              onClick={() => {
+                // Apply settings by reloading the page with new settings
+                // For now, just close the dialog
+                console.log('Applied settings:', localSettings);
+                setShowSettings(false);
+              }}
+            >
+              Apply & Close
+            </button>
+            <button
+              className="bp3-button"
+              onClick={() => setShowSettings(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </Blueprint.Dialog>
     </MainContext.Provider>
   );
 };
@@ -696,6 +837,7 @@ const Header = ({
   showBreadcrumbs,
   setShowBreadcrumbs,
   isCramming,
+  onSettingsClick,
 }) => {
   const { selectedTag, today, currentIndex } = useSafeContext(MainContext);
   const todaySelectedTag = today.tags[selectedTag];
@@ -728,6 +870,12 @@ const Header = ({
             </Tooltip>
           </div>
         )}
+        {/* Settings button for roam/js mode */}
+        <div onClick={onSettingsClick} className="px-1 cursor-pointer">
+          <Tooltip content="Settings" placement="left">
+            <Blueprint.Icon icon="cog" />
+          </Tooltip>
+        </div>
         <span data-testid="status-badge">
           <StatusBadge
             status={status}
