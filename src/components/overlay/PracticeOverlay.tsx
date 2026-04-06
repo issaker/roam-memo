@@ -163,7 +163,6 @@ const PracticeOverlay = ({
     rtlEnabled: false,
     shuffleCards: false,
     forgotReinsertOffset: 3,
-    breadcrumbsEnabled: false,
   });
 
   // Load settings from page on mount and sync with extensionAPI
@@ -185,11 +184,6 @@ const PracticeOverlay = ({
     };
     loadSettings();
   }, []);
-
-  // Update showBreadcrumbs when breadcrumbsEnabled setting changes
-  React.useEffect(() => {
-    setShowBreadcrumbs(localSettings.breadcrumbsEnabled);
-  }, [localSettings.breadcrumbsEnabled]);
 
   // Reset showAnswers state
   React.useEffect(() => {
@@ -295,14 +289,26 @@ const PracticeOverlay = ({
     width: 'auto',
   };
 
-  const [showBreadcrumbs, setShowBreadcrumbs] = React.useState(false);
+  const [showBreadcrumbs, setShowBreadcrumbs] = React.useState(() => {
+    // Load from localStorage, default to false
+    const saved = localStorage.getItem('roamMemo_showBreadcrumbs');
+    return saved === 'true';
+  });
+
+  // Wrapper function to persist breadcrumbs state
+  const toggleBreadcrumbs = () => {
+    const newState = !showBreadcrumbs;
+    setShowBreadcrumbs(newState);
+    localStorage.setItem('roamMemo_showBreadcrumbs', String(newState));
+  };
+
   const hotkeys = React.useMemo(
     () => [
       {
         combo: 'B',
         global: true,
         label: 'Show BreadCrumbs',
-        onKeyDown: () => setShowBreadcrumbs(!showBreadcrumbs),
+        onKeyDown: toggleBreadcrumbs,
       },
     ],
     [showBreadcrumbs]
@@ -551,22 +557,6 @@ const PracticeOverlay = ({
               placeholder="3"
               style={{ width: '100%' }}
             />
-          </div>
-
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                className="bp3-checkbox"
-                checked={localSettings.breadcrumbsEnabled}
-                onChange={(e) => setLocalSettings({ ...localSettings, breadcrumbsEnabled: e.target.checked })}
-                style={{ marginRight: '8px' }}
-              />
-              <span>Show Breadcrumbs by Default</span>
-            </label>
-            <p style={{ fontSize: '12px', color: '#888', margin: '5px 0 0 0' }}>
-              When enabled, the practice window will open with breadcrumbs visible.
-            </p>
           </div>
         </div>
 
@@ -893,6 +883,13 @@ const Header = ({
   const currentIndexDelta = isCramming ? 0 : completedTodayCount;
   const currentDisplayCount = currentIndexDelta + currentIndex + 1;
 
+  // Wrapper function to persist breadcrumbs state
+  const toggleBreadcrumbs = () => {
+    const newState = !showBreadcrumbs;
+    setShowBreadcrumbs(newState);
+    localStorage.setItem('roamMemo_showBreadcrumbs', String(newState));
+  };
+
   return (
     <HeaderWrapper className={className} tabIndex={0}>
       <div className="flex items-center">
@@ -903,7 +900,7 @@ const Header = ({
       </div>
       <div className="flex items-center justify-end">
         {!isDone && (
-          <div onClick={() => setShowBreadcrumbs(!showBreadcrumbs)} className="px-1 cursor-pointer">
+          <div onClick={toggleBreadcrumbs} className="px-1 cursor-pointer">
             {/* @ts-ignore */}
             <Tooltip
               content={<BreadcrumbTooltipContent showBreadcrumbs={showBreadcrumbs} />}
