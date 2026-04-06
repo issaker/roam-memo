@@ -67,73 +67,64 @@ export const saveSettingsToPage = async (dataPageTitle: string, settings: Settin
  */
 export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Settings | null> => {
   try {
-    // Get the page UID
-    const pageUid = await getOrCreatePage(dataPageTitle);
+    // Query everything in one go - from page title to settings block to child blocks
+    // This avoids passing UIDs as parameters entirely
+    const query = `
+      [:find ?setting-key ?setting-val
+       :in $ ?page-title ?settings-name
+       :where
+       [?page :node/title ?page-title]
+       [?settings :block/parents ?page]
+       [?settings :block/string ?settings-name]
+       [?child :block/parents ?settings]
+       [?child :block/string ?raw-string]
+       [(clojure.string/split ?raw-string #"::") ?parts]
+       [(first ?parts) ?setting-key]
+       [(apply str (rest ?parts)) ?raw-val]
+       [(clojure.string/trim ?setting-key) ?setting-key]
+       [(clojure.string/trim ?raw-val) ?setting-val]
+      ]
+    `;
     
-    if (!pageUid) {
-      console.log('Memo: Settings page not found, using defaults');
-      return null;
-    }
-
-    // Get the settings block using getChildBlock
-    const settingsBlockUid = await getChildBlock(pageUid, SETTINGS_BLOCK_NAME, {
-      exactMatch: true,
-    });
+    const results = window.roamAlphaAPI.q(query, dataPageTitle, SETTINGS_BLOCK_NAME);
     
-    if (!settingsBlockUid) {
-      console.log('Memo: Settings block not found, using defaults');
-      return null;
-    }
-    
-    console.log('Memo: Found settings block with UID', settingsBlockUid);
-
-    // Get all child blocks of the settings block
-    const childBlocksUidQuery = `[:find ?c ?s :in $ ?p :where [?b :block/uid ?p] [?c :block/parents ?b] [?c :block/string ?s]]`;
-    const childBlocks = window.roamAlphaAPI.q(childBlocksUidQuery, settingsBlockUid);
-    
-    if (!childBlocks || childBlocks.length === 0) {
+    if (!results || results.length === 0) {
       console.log('Memo: No settings found, using defaults');
       return null;
     }
 
-    console.log('Memo: Found', childBlocks.length, 'setting blocks');
+    console.log('Memo: Found', results.length, 'settings');
 
     const loadedSettings: Partial<Settings> = {};
     
     // Parse settings from the query results
-    for (const [blockUid, blockString] of childBlocks) {
+    for (const [key, value] of results) {
       try {
-        if (blockString && blockString.includes('::')) {
-          const [key, ...valueParts] = blockString.split('::');
-          const trimmedKey = key.trim();
-          const value = valueParts.join('::').trim();
-          
-          console.log('Memo: Loading setting', trimmedKey, '=', value);
+        console.log('Memo: Loading setting', key, '=', value);
 
-          // Convert values to appropriate types
-          switch (trimmedKey) {
-            case 'tagsListString':
-              loadedSettings.tagsListString = value;
-              break;
-            case 'dataPageTitle':
-              loadedSettings.dataPageTitle = value;
-              break;
-            case 'dailyLimit':
-              loadedSettings.dailyLimit = Number(value) || 0;
-              break;
-            case 'rtlEnabled':
-              loadedSettings.rtlEnabled = value === 'true';
-              break;
-            case 'shuffleCards':
-              loadedSettings.shuffleCards = value === 'true';
-              break;
-            case 'forgotReinsertOffset':
-              loadedSettings.forgotReinsertOffset = Number(value) || 3;
-              break;
-          }
+        // Convert values to appropriate types
+        switch (key) {
+          case 'tagsListString':
+            loadedSettings.tagsListString = value;
+            break;
+          case 'dataPageTitle':
+            loadedSettings.dataPageTitle = value;
+            break;
+          case 'dailyLimit':
+            loadedSettings.dailyLimit = Number(value) || 0;
+            break;
+          case 'rtlEnabled':
+            loadedSettings.rtlEnabled = value === 'true';
+            break;
+          case 'shuffleCards':
+            loadedSettings.shuffleCards = value === 'true';
+            break;
+          case 'forgotReinsertOffset':
+            loadedSettings.forgotReinsertOffset = Number(value) || 3;
+            break;
         }
       } catch (err) {
-        console.error('Memo: Error parsing setting block', blockUid, blockString, err);
+        console.error('Memo: Error parsing setting', key, value, err);
       }
     }
 
