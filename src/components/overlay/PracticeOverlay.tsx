@@ -151,6 +151,7 @@ const PracticeOverlay = ({
   const [showAnswers, setShowAnswers] = React.useState(false);
   const [hasCloze, setHasCloze] = React.useState(true);
   const [showSettings, setShowSettings] = React.useState(false);
+  const [saveStatus, setSaveStatus] = React.useState<'idle' | 'saving' | 'success' | 'error'>('idle');
 
   const shouldShowAnswerFirst =
     renderMode === RenderMode.AnswerFirst && hasBlockChildrenUids && !showAnswers;
@@ -547,32 +548,46 @@ const PracticeOverlay = ({
             />
           </div>
 
-          <div style={{ padding: '10px', backgroundColor: '#d4edda', borderRadius: '4px', fontSize: '12px' }}>
-            <strong>✅ Settings are saved!</strong> Your settings will be saved to the {localSettings.dataPageTitle} page and loaded automatically next time.
-          </div>
+          {/* Save status feedback */}
+          {saveStatus === 'success' && (
+            <div style={{ padding: '10px', backgroundColor: '#d4edda', borderRadius: '4px', fontSize: '12px', marginBottom: '10px' }}>
+              <strong>✅ Settings saved!</strong> Changes will take effect after refresh.
+            </div>
+          )}
+          {saveStatus === 'error' && (
+            <div style={{ padding: '10px', backgroundColor: '#f8d7da', borderRadius: '4px', fontSize: '12px', marginBottom: '10px' }}>
+              <strong>❌ Failed to save!</strong> Please check console for details.
+            </div>
+          )}
         </div>
 
         <div className="bp3-dialog-footer">
           <div className="bp3-dialog-footer-actions">
             <button
               className="bp3-button bp3-intent-primary"
+              disabled={saveStatus === 'saving'}
               onClick={async () => {
-                // Save settings to page
+                setSaveStatus('saving');
                 const success = await saveSettingsToPage(localSettings.dataPageTitle, localSettings);
                 if (success) {
-                  console.log('Memo: Settings applied and saved');
-                  setShowSettings(false);
+                  setSaveStatus('success');
+                  setTimeout(() => {
+                    setShowSettings(false);
+                    setSaveStatus('idle');
+                  }, 1000);
                 } else {
-                  console.error('Memo: Failed to save settings');
-                  alert('Failed to save settings. Please check the console for details.');
+                  setSaveStatus('error');
                 }
               }}
             >
-              Apply & Close
+              {saveStatus === 'saving' ? 'Saving...' : 'Apply & Close'}
             </button>
             <button
               className="bp3-button"
-              onClick={() => setShowSettings(false)}
+              onClick={() => {
+                setShowSettings(false);
+                setSaveStatus('idle');
+              }}
             >
               Cancel
             </button>
