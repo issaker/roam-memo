@@ -166,7 +166,7 @@ const PracticeOverlay = ({
         console.log('Memo: Loaded settings from page');
         
         // Sync with extensionAPI so useSettings hook can pick them up
-        if (window.roamMemo && window.roamMemo.extensionAPI) {
+        if (window.roamMemo && window.roamMemo.extensionAPI && window.roamMemo.extensionAPI.settings) {
           Object.entries(savedSettings).forEach(([key, value]) => {
             window.roamMemo.extensionAPI.settings.set(key, value);
           });

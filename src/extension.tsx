@@ -28,44 +28,37 @@ function onload({ extensionAPI }: { extensionAPI: any }) {
   // In-memory settings storage for roam/js mode
   const inMemorySettings: Record<string, any> = {};
   
-  // If settings.panel doesn't exist, create a stub to prevent errors
+  // Always ensure we have proper settings methods with in-memory storage
+  // This is critical for roam/js mode where settings need to persist across components
   if (!compatibleExtensionAPI.settings) {
-    compatibleExtensionAPI.settings = {
-      panel: {
-        create: () => {
-          console.warn('Memo: Settings panel not available in roam/js mode. Use Roam Depot for full settings support.');
-        },
-      },
-      getAll: () => ({ ...inMemorySettings }),
-      set: (key: string, value: any) => {
-        inMemorySettings[key] = value;
-        console.log('Memo: Setting saved in memory', key, '=', value);
-        // Dispatch custom event to notify settings change
-        window.dispatchEvent(new CustomEvent('roamMemoSettingsChanged', { detail: { key, value } }));
-      },
-      get: (key: string) => inMemorySettings[key],
-    };
-  } else if (!compatibleExtensionAPI.settings.panel) {
+    compatibleExtensionAPI.settings = {};
+  }
+  
+  // Override settings methods to use in-memory storage
+  compatibleExtensionAPI.settings.getAll = () => {
+    console.log('Memo: Getting all settings from memory', inMemorySettings);
+    return { ...inMemorySettings };
+  };
+  
+  compatibleExtensionAPI.settings.set = (key: string, value: any) => {
+    inMemorySettings[key] = value;
+    console.log('Memo: Setting saved in memory', key, '=', value);
+    // Dispatch custom event to notify settings change
+    window.dispatchEvent(new CustomEvent('roamMemoSettingsChanged', { detail: { key, value } }));
+  };
+  
+  compatibleExtensionAPI.settings.get = (key: string) => {
+    console.log('Memo: Getting setting from memory', key, '=', inMemorySettings[key]);
+    return inMemorySettings[key];
+  };
+  
+  // Ensure settings.panel exists
+  if (!compatibleExtensionAPI.settings.panel) {
     compatibleExtensionAPI.settings.panel = {
       create: () => {
-        console.warn('Memo: Settings panel not available. Using default settings.');
+        console.log('Memo: Settings panel create called (roam/js mode)');
       },
     };
-    // Also add in-memory storage if settings exists but methods are missing
-    if (!compatibleExtensionAPI.settings.getAll) {
-      compatibleExtensionAPI.settings.getAll = () => ({ ...inMemorySettings });
-    }
-    if (!compatibleExtensionAPI.settings.set) {
-      compatibleExtensionAPI.settings.set = (key: string, value: any) => {
-        inMemorySettings[key] = value;
-        console.log('Memo: Setting saved in memory', key, '=', value);
-        // Dispatch custom event to notify settings change
-        window.dispatchEvent(new CustomEvent('roamMemoSettingsChanged', { detail: { key, value } }));
-      };
-    }
-    if (!compatibleExtensionAPI.settings.get) {
-      compatibleExtensionAPI.settings.get = (key: string) => inMemorySettings[key];
-    }
   }
   
   window.roamMemo = {
