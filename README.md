@@ -68,9 +68,29 @@ Type "Memo: Start Review Session" in the command palette (`Cmd+P` / `Ctrl+P`).
 
 ### Build Configuration
 
-- Webpack UMD output with `library.type: 'umd'` (no `library.export` to avoid ES Module syntax issues)
+- Webpack UMD output with `library.type: 'umd'` and `library.export: 'default'`
 - Babel preset-env for ES5 compatibility
 - External dependencies: React, ReactDOM, BlueprintJS, ChronoNode
+
+**⚠️ CRITICAL: Do NOT remove `library.export: 'default'`!**
+
+When building for Roam Research via `[[roam/js]]` loading, the webpack configuration **MUST** include `export: 'default'` in the library output settings. Removing this causes:
+- `Uncaught SyntaxError: Unexpected token 'export'` error in browser
+- Plugin fails to load silently (no UI appears)
+- Script execution stops before reaching `onload()` function
+
+This is required because Roam Research loads the plugin via `<script>` tag, and the UMD wrapper needs proper default export handling to work in browser environments.
+
+**Correct configuration:**
+```javascript
+output: {
+  library: {
+    name: 'RoamMemo',
+    type: 'umd',
+    export: 'default',  // ⚠️ MUST NOT be removed
+  },
+}
+```
 
 ### roam/js Loading
 
