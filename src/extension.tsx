@@ -25,6 +25,9 @@ function onload({ extensionAPI }: { extensionAPI: any }) {
   // When loaded via roam/js, extensionAPI might be window.roamAlphaAPI which doesn't have settings.panel
   const compatibleExtensionAPI = extensionAPI || {};
   
+  // In-memory settings storage for roam/js mode
+  const inMemorySettings: Record<string, any> = {};
+  
   // If settings.panel doesn't exist, create a stub to prevent errors
   if (!compatibleExtensionAPI.settings) {
     compatibleExtensionAPI.settings = {
@@ -33,11 +36,14 @@ function onload({ extensionAPI }: { extensionAPI: any }) {
           console.warn('Memo: Settings panel not available in roam/js mode. Use Roam Depot for full settings support.');
         },
       },
-      getAll: () => ({}),
-      set: () => {
-        console.warn('Memo: Settings save not available in roam/js mode.');
+      getAll: () => ({ ...inMemorySettings }),
+      set: (key: string, value: any) => {
+        inMemorySettings[key] = value;
+        console.log('Memo: Setting saved in memory', key, '=', value);
+        // Dispatch custom event to notify settings change
+        window.dispatchEvent(new CustomEvent('roamMemoSettingsChanged', { detail: { key, value } }));
       },
-      get: () => undefined,
+      get: (key: string) => inMemorySettings[key],
     };
   } else if (!compatibleExtensionAPI.settings.panel) {
     compatibleExtensionAPI.settings.panel = {
@@ -45,6 +51,21 @@ function onload({ extensionAPI }: { extensionAPI: any }) {
         console.warn('Memo: Settings panel not available. Using default settings.');
       },
     };
+    // Also add in-memory storage if settings exists but methods are missing
+    if (!compatibleExtensionAPI.settings.getAll) {
+      compatibleExtensionAPI.settings.getAll = () => ({ ...inMemorySettings });
+    }
+    if (!compatibleExtensionAPI.settings.set) {
+      compatibleExtensionAPI.settings.set = (key: string, value: any) => {
+        inMemorySettings[key] = value;
+        console.log('Memo: Setting saved in memory', key, '=', value);
+        // Dispatch custom event to notify settings change
+        window.dispatchEvent(new CustomEvent('roamMemoSettingsChanged', { detail: { key, value } }));
+      };
+    }
+    if (!compatibleExtensionAPI.settings.get) {
+      compatibleExtensionAPI.settings.get = (key: string) => inMemorySettings[key];
+    }
   }
   
   window.roamMemo = {

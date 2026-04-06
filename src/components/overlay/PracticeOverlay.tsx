@@ -157,13 +157,21 @@ const PracticeOverlay = ({
     forgotReinsertOffset: 3,
   });
 
-  // Load settings from page on mount
+  // Load settings from page on mount and sync with extensionAPI
   React.useEffect(() => {
     const loadSettings = async () => {
       const savedSettings = await loadSettingsFromPage('roam/memo');
       if (savedSettings) {
         setLocalSettings(savedSettings);
         console.log('Memo: Loaded settings from page');
+        
+        // Sync with extensionAPI so useSettings hook can pick them up
+        if (window.roamMemo && window.roamMemo.extensionAPI) {
+          Object.entries(savedSettings).forEach(([key, value]) => {
+            window.roamMemo.extensionAPI.settings.set(key, value);
+          });
+          console.log('Memo: Synced settings with extensionAPI');
+        }
       }
     };
     loadSettings();

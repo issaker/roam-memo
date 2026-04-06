@@ -65,6 +65,30 @@ const useSettings = () => {
     setSettings((currentSettings) => ({ ...currentSettings, ...filteredSettings }));
   }, [setSettings]);
 
+  // Listen for settings changes from roam/js mode
+  React.useEffect(() => {
+    const handleSettingsChange = (event: CustomEvent) => {
+      console.log('Memo: Settings changed event received', event.detail);
+      // Reload all settings when any setting changes
+      const allSettings = window.roamMemo.extensionAPI.settings.getAll() || {};
+      const numbers = ['dailyLimit'];
+
+      const filteredSettings = Object.keys(allSettings).reduce((acc, key) => {
+        const value = allSettings[key];
+        acc[key] = numbers.includes(key) ? Number(value) : value;
+        return acc;
+      }, {});
+
+      setSettings((currentSettings) => ({ ...currentSettings, ...filteredSettings }));
+    };
+
+    window.addEventListener('roamMemoSettingsChanged', handleSettingsChange as EventListener);
+    
+    return () => {
+      window.removeEventListener('roamMemoSettingsChanged', handleSettingsChange as EventListener);
+    };
+  }, [setSettings]);
+
   return settings;
 };
 
