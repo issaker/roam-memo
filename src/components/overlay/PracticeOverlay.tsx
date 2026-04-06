@@ -436,7 +436,6 @@ const PracticeOverlay = ({
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
         title="Memo Settings"
-        className="bp3-dark"
         style={{ maxWidth: '500px' }}
       >
         <div className="bp3-dialog-body" style={{ padding: '20px', maxHeight: '70vh', overflowY: 'auto' }}>

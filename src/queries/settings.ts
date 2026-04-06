@@ -28,23 +28,30 @@ export const saveSettingsToPage = async (dataPageTitle: string, settings: Settin
     };
 
     for (const [key, value] of Object.entries(settingsToSave)) {
-      // Delete existing block if it exists
-      const existingBlockUid = await getChildBlock(settingsBlockUid, `${key}::`, {
-        exactMatch: false,
-      });
-      
-      if (existingBlockUid) {
-        await window.roamAlphaAPI.deleteBlock({ block: { uid: existingBlockUid } });
-      }
+      try {
+        // Delete existing block if it exists
+        const existingBlockUid = await getChildBlock(settingsBlockUid, `${key}::`, {
+          exactMatch: false,
+        });
+        
+        if (existingBlockUid) {
+          console.log('Memo: Deleting existing setting', key, existingBlockUid);
+          await window.roamAlphaAPI.deleteBlock({ block: { uid: existingBlockUid } });
+        }
 
-      // Create new block with updated value
-      await window.roamAlphaAPI.createBlock({
-        location: { 'parent-uid': settingsBlockUid, order: -1 },
-        block: {
-          string: `${key}:: ${value}`,
-          open: false,
-        },
-      });
+        // Create new block with updated value
+        console.log('Memo: Creating setting', key, value);
+        await window.roamAlphaAPI.createBlock({
+          location: { 'parent-uid': settingsBlockUid, order: -1 },
+          block: {
+            string: `${key}:: ${value}`,
+            open: false,
+          },
+        });
+      } catch (err) {
+        console.error(`Memo: Failed to save setting ${key}`, err);
+        throw err; // Re-throw to be caught by outer try-catch
+      }
     }
 
     console.log('Memo: Settings saved to page', dataPageTitle);
