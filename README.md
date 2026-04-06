@@ -81,6 +81,9 @@ When building for Roam Research via `[[roam/js]]` loading, the webpack configura
 
 This is required because Roam Research loads the plugin via `<script>` tag, and the UMD wrapper needs proper default export handling to work in browser environments.
 
+个人判断，仅作参考：
+这是一个 “Webpack UMD 打包 + ES Module 默认导出 + 浏览器直接加载” 的经典坑。export: 'default' 在这里的作用是 指导 Webpack 正确生成 UMD 包装代码，避免残留 ES Module 语法。对于 Roam Research 这种通过 <script> 标签加载插件的环境，这个配置是必须的。
+
 **Correct configuration:**
 ```javascript
 output: {

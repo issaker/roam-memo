@@ -1,6 +1,7 @@
 import ReactDOM from 'react-dom';
 import App from './app';
 import { FocusStyleManager } from '@blueprintjs/core';
+import { injectZIndexFixStyles, removeZIndexFixStyles } from './utils/zIndexFix';
 
 const container_id: string = 'roam-memo-wrapper';
 
@@ -76,6 +77,10 @@ function onload({ extensionAPI }: { extensionAPI: any }) {
 
     FocusStyleManager.onlyShowFocusOnTabs();
 
+    // 注入 z-index 修复样式
+    injectZIndexFixStyles();
+    console.log('Memo: Z-index fix styles injected');
+
     const container = createAndRenderContainer();
     if (container) {
       ReactDOM.render(<App />, container);
@@ -95,6 +100,10 @@ function onunload() {
     ReactDOM.unmountComponentAtNode(container);
     container.remove();
   }
+
+  // 移除 z-index 修复样式
+  removeZIndexFixStyles();
+  console.log('Memo: Z-index fix styles removed');
 }
 
 const plugin = {

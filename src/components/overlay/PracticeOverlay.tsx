@@ -609,6 +609,32 @@ const Dialog = styled(Blueprint.Dialog)<{ $isEditing?: boolean }>`
 
 const mobileOverlayStyles = (isEditing: boolean) => `
   @media (max-width: 768px) {
+    /* 移动端禁用半透明背景层，使其完全透明且可穿透 */
+    .bp3-overlay.bp3-overlay-open > .bp3-overlay-backdrop {
+      opacity: 0 !important;
+      background: transparent !important;
+      pointer-events: none !important;
+    }
+
+    /* overlay 本身不拦截背后页面点击 */
+    .bp3-overlay.bp3-overlay-open {
+      pointer-events: none !important;
+    }
+
+    /* memo 弹窗主体仍可操作 */
+    .bp3-overlay.bp3-overlay-open .bp3-dialog-container,
+    .bp3-overlay.bp3-overlay-open .bp3-dialog,
+    .bp3-overlay.bp3-overlay-open [role="dialog"],
+    .bp3-overlay.bp3-overlay-open .bp3-dialog * {
+      pointer-events: auto !important;
+    }
+
+    /* memo 内部菜单仍可点 */
+    .bp3-overlay.bp3-overlay-open .bp3-popover,
+    .bp3-overlay.bp3-overlay-open .bp3-popover * {
+      pointer-events: auto !important;
+    }
+
     .bp3-overlay.bp3-overlay-open {
       position: fixed !important;
       top: 0 !important;
