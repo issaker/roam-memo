@@ -9,6 +9,15 @@ interface Props {
 }
 
 const Wrapper = ({ className, wrapperClassName, ...restProps }: Props) => {
+  // Detect if device is mobile/touch-enabled
+  const isTouchDevice = typeof window !== 'undefined' && 
+    ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+  
+  // On touch devices, don't render tooltip to prevent flickering
+  if (isTouchDevice) {
+    return <>{restProps.children}</>;
+  }
+  
   return (
     // @ts-ignore
     <BluePrintTooltip className={wrapperClassName} popoverClassName={className} {...restProps} />
