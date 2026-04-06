@@ -34,22 +34,30 @@ function onload({ extensionAPI }: { extensionAPI: any }) {
     compatibleExtensionAPI.settings = {};
   }
   
-  // Override settings methods to use in-memory storage
+  // Override settings methods to use in-memory storage (always override to ensure proper behavior)
+  // Remove verbose logging to prevent console spam
+  const _originalGetAll = compatibleExtensionAPI.settings.getAll;
+  const _originalSet = compatibleExtensionAPI.settings.set;
+  const _originalGet = compatibleExtensionAPI.settings.get;
+  
   compatibleExtensionAPI.settings.getAll = () => {
-    console.log('Memo: Getting all settings from memory', inMemorySettings);
-    return { ...inMemorySettings };
+    // Merge in-memory settings with any existing settings
+    const existingSettings = _originalGetAll ? _originalGetAll() : {};
+    return { ...existingSettings, ...inMemorySettings };
   };
   
   compatibleExtensionAPI.settings.set = (key: string, value: any) => {
     inMemorySettings[key] = value;
-    console.log('Memo: Setting saved in memory', key, '=', value);
+    // Also call original set if it exists (for Roam Depot compatibility)
+    if (_originalSet) _originalSet(key, value);
     // Dispatch custom event to notify settings change
     window.dispatchEvent(new CustomEvent('roamMemoSettingsChanged', { detail: { key, value } }));
   };
   
   compatibleExtensionAPI.settings.get = (key: string) => {
-    console.log('Memo: Getting setting from memory', key, '=', inMemorySettings[key]);
-    return inMemorySettings[key];
+    // Check in-memory first, then fall back to original
+    if (key in inMemorySettings) return inMemorySettings[key];
+    return _originalGet ? _originalGet(key) : undefined;
   };
   
   // Ensure settings.panel exists
