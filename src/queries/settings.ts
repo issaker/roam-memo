@@ -109,39 +109,39 @@ export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Setti
         });
         
         if (blockUid) {
-          // Get the block string using roamAlphaAPI.pull with correct syntax
-          const blockData = window.roamAlphaAPI.pull(
-            '[:block/string]',
-            [':block/uid', blockUid]
-          );
+          // Get the block string using Datalog query
+          const blockStringQuery = `[:find ?string :in $ ?uid :where [?b :block/uid ?uid] [?b :block/string ?string]]`;
+          const result = window.roamAlphaAPI.q(blockStringQuery, blockUid);
           
-          const blockString = blockData?.[':block/string'];
-          if (blockString && blockString.includes('::')) {
-            const [keyPart, ...valueParts] = blockString.split('::');
-            const value = valueParts.join('::').trim();
-            
-            console.log('Memo: Loading setting', key, '=', value);
-            
-            // Convert values to appropriate types
-            switch (key) {
-              case 'tagsListString':
-                loadedSettings.tagsListString = value;
-                break;
-              case 'dataPageTitle':
-                loadedSettings.dataPageTitle = value;
-                break;
-              case 'dailyLimit':
-                loadedSettings.dailyLimit = Number(value) || 0;
-                break;
-              case 'rtlEnabled':
-                loadedSettings.rtlEnabled = value === 'true';
-                break;
-              case 'shuffleCards':
-                loadedSettings.shuffleCards = value === 'true';
-                break;
-              case 'forgotReinsertOffset':
-                loadedSettings.forgotReinsertOffset = Number(value) || 3;
-                break;
+          if (result && result.length > 0) {
+            const blockString = result[0][0];
+            if (blockString && blockString.includes('::')) {
+              const [keyPart, ...valueParts] = blockString.split('::');
+              const value = valueParts.join('::').trim();
+              
+              console.log('Memo: Loading setting', key, '=', value);
+              
+              // Convert values to appropriate types
+              switch (key) {
+                case 'tagsListString':
+                  loadedSettings.tagsListString = value;
+                  break;
+                case 'dataPageTitle':
+                  loadedSettings.dataPageTitle = value;
+                  break;
+                case 'dailyLimit':
+                  loadedSettings.dailyLimit = Number(value) || 0;
+                  break;
+                case 'rtlEnabled':
+                  loadedSettings.rtlEnabled = value === 'true';
+                  break;
+                case 'shuffleCards':
+                  loadedSettings.shuffleCards = value === 'true';
+                  break;
+                case 'forgotReinsertOffset':
+                  loadedSettings.forgotReinsertOffset = Number(value) || 3;
+                  break;
+              }
             }
           }
         }
