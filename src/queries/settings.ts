@@ -106,13 +106,13 @@ export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Setti
         // Query for block UID and string in one query (no lookup refs needed)
         const blockQuery = `
           [:find ?uid ?string
-           :in $ ?parent-uid ?key-prefix
+           :in $ ?pu ?kp
            :where
-           [?parent :block/uid ?parent-uid]
-           [?child :block/parents ?parent]
-           [?child :block/string ?string]
-           [(clojure.string/starts-with? ?string ?key-prefix)]
-           [?child :block/uid ?uid]
+           [?p :block/uid ?pu]
+           [?c :block/parents ?p]
+           [?c :block/string ?string]
+           [(clojure.string/starts-with? ?string ?kp)]
+           [?c :block/uid ?uid]
           ]
         `;
         
