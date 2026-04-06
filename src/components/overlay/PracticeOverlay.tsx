@@ -73,6 +73,14 @@ const PracticeOverlay = ({
   forgotReinsertOffset,
 }: Props) => {
   const todaySelectedTag = today.tags[selectedTag];
+  
+  // Handle case where tag data hasn't loaded yet (e.g., when settings just changed)
+  // Return null to prevent crash - component will re-render when data is available
+  if (!todaySelectedTag) {
+    console.log('Memo: Tag data not yet available for', selectedTag, '- waiting for refresh');
+    return null;
+  }
+  
   const newCardsUids = todaySelectedTag.newUids;
   const dueCardsUids = todaySelectedTag.dueUids;
   const initialCardUids = [...dueCardsUids, ...newCardsUids];

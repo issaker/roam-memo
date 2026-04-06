@@ -41,6 +41,11 @@ const App = () => {
     shuffleCards,
   });
 
+  // Refresh data when settings change (e.g., after loading from page in roam/js mode)
+  React.useEffect(() => {
+    refreshData();
+  }, [tagsListString]);
+
   const handlePracticeClick = async ({ refUid, ...cardData }: handlePracticeProps) => {
     if (!refUid) {
       console.error('HandlePracticeFn Error: No refUid provided');
@@ -99,7 +104,7 @@ const App = () => {
   useCollapseReferenceList({ dataPageTitle });
 
   // Keep counters in sync as you add/remove tags from blocks
-  const [tagsOnEnter, setTagsOnEnter] = React.useState([]);
+  const [tagsOnEnter, setTagsOnEnter] = React.useState<string[]>([]);
   const onBlockEnterHandler = (elm: HTMLTextAreaElement) => {
     const tags = tagsList.filter((tag) => elm.value.includes(tag));
     setTagsOnEnter(tags);
