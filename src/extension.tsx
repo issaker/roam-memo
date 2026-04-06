@@ -7,18 +7,20 @@ console.log('Memo: Initializing...');
 const container_id: string = 'roam-memo-wrapper';
 
 const createAndRenderContainer = () => {
-  // @TODO: This is where I want it personally, but maybe make this a configurable setting?
   const siblingElm = document.querySelector('.rm-left-sidebar__daily-notes');
+  if (!siblingElm || !siblingElm.parentNode) {
+    console.warn('Memo: Could not find sidebar element');
+    return null;
+  }
+  
   const newContainerElm = document.createElement('div');
   newContainerElm.id = container_id;
-  newContainerElm.classList.add('log-button'); // match style
+  newContainerElm.classList.add('log-button');
   siblingElm.parentNode.insertBefore(newContainerElm, siblingElm.nextSibling);
 
   return newContainerElm;
 };
-function onload({ extensionAPI }) {
-  // This just makes life easier (instead of having to pipe it down everywhere I
-  // want to dynamically fetch the latest config)
+function onload({ extensionAPI }: { extensionAPI: any }) {
   window.roamMemo = {
     extensionAPI,
   };
@@ -26,21 +28,31 @@ function onload({ extensionAPI }) {
   FocusStyleManager.onlyShowFocusOnTabs();
 
   const container = createAndRenderContainer();
-  ReactDOM.render(<App />, container);
-
-  console.log('Memo: Initialized');
+  if (container) {
+    ReactDOM.render(<App />, container);
+    console.log('Memo: Initialized');
+  } else {
+    console.error('Memo: Failed to create container');
+  }
 }
 
 function onunload() {
   const container = document.getElementById(container_id);
 
-  ReactDOM.unmountComponentAtNode(container);
-  container.remove();
-
-  console.log('Memo: Unloaded');
+  if (container) {
+    ReactDOM.unmountComponentAtNode(container);
+    container.remove();
+    console.log('Memo: Unloaded');
+  }
 }
 
-export default {
+const plugin = {
   onload: onload,
   onunload: onunload,
 };
+
+export default plugin;
+
+if (typeof window !== 'undefined') {
+  (window as any).RoamMemo = plugin;
+}
