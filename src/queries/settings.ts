@@ -89,8 +89,7 @@ export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Setti
 
     console.log('Memo: Found settings block with UID', settingsBlockUid);
 
-    // Use getChildBlock with startsWith query to find all setting child blocks
-    // We need to query each setting key individually
+    // Use getChildBlock to find all setting child blocks
     const settingKeys = [
       'tagsListString',
       'dataPageTitle', 
@@ -104,44 +103,51 @@ export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Setti
     
     for (const key of settingKeys) {
       try {
-        const blockUid = await getChildBlock(settingsBlockUid, `${key}::`, {
-          exactMatch: false,
-        });
+        // Query for block UID and string in one query (no lookup refs needed)
+        const blockQuery = `
+          [:find ?uid ?string
+           :in $ ?parent-uid ?key-prefix
+           :where
+           [?parent :block/uid ?parent-uid]
+           [?child :block/parents ?parent]
+           [?child :block/string ?string]
+           [(clojure.string/starts-with? ?string ?key-prefix)]
+           [?child :block/uid ?uid]
+          ]
+        `;
         
-        if (blockUid) {
-          // Get the block string using Datalog query
-          const blockStringQuery = `[:find ?string :in $ ?uid :where [?b :block/uid ?uid] [?b :block/string ?string]]`;
-          const result = window.roamAlphaAPI.q(blockStringQuery, blockUid);
+        const results = window.roamAlphaAPI.q(blockQuery, settingsBlockUid, `${key}::`);
+        
+        if (results && results.length > 0) {
+          const [uid, blockString] = results[0];
+          console.log('Memo: Loading setting', key, 'with UID', uid);
           
-          if (result && result.length > 0) {
-            const blockString = result[0][0];
-            if (blockString && blockString.includes('::')) {
-              const [keyPart, ...valueParts] = blockString.split('::');
-              const value = valueParts.join('::').trim();
-              
-              console.log('Memo: Loading setting', key, '=', value);
-              
-              // Convert values to appropriate types
-              switch (key) {
-                case 'tagsListString':
-                  loadedSettings.tagsListString = value;
-                  break;
-                case 'dataPageTitle':
-                  loadedSettings.dataPageTitle = value;
-                  break;
-                case 'dailyLimit':
-                  loadedSettings.dailyLimit = Number(value) || 0;
-                  break;
-                case 'rtlEnabled':
-                  loadedSettings.rtlEnabled = value === 'true';
-                  break;
-                case 'shuffleCards':
-                  loadedSettings.shuffleCards = value === 'true';
-                  break;
-                case 'forgotReinsertOffset':
-                  loadedSettings.forgotReinsertOffset = Number(value) || 3;
-                  break;
-              }
+          if (blockString && blockString.includes('::')) {
+            const [keyPart, ...valueParts] = blockString.split('::');
+            const value = valueParts.join('::').trim();
+            
+            console.log('Memo: Setting value', key, '=', value);
+            
+            // Convert values to appropriate types
+            switch (key) {
+              case 'tagsListString':
+                loadedSettings.tagsListString = value;
+                break;
+              case 'dataPageTitle':
+                loadedSettings.dataPageTitle = value;
+                break;
+              case 'dailyLimit':
+                loadedSettings.dailyLimit = Number(value) || 0;
+                break;
+              case 'rtlEnabled':
+                loadedSettings.rtlEnabled = value === 'true';
+                break;
+              case 'shuffleCards':
+                loadedSettings.shuffleCards = value === 'true';
+                break;
+              case 'forgotReinsertOffset':
+                loadedSettings.forgotReinsertOffset = Number(value) || 3;
+                break;
             }
           }
         }
