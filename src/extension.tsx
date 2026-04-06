@@ -21,8 +21,34 @@ const createAndRenderContainer = () => {
   return newContainerElm;
 };
 function onload({ extensionAPI }: { extensionAPI: any }) {
+  // Create a compatible extensionAPI for roam/js loading
+  // When loaded via roam/js, extensionAPI might be window.roamAlphaAPI which doesn't have settings.panel
+  const compatibleExtensionAPI = extensionAPI || {};
+  
+  // If settings.panel doesn't exist, create a stub to prevent errors
+  if (!compatibleExtensionAPI.settings) {
+    compatibleExtensionAPI.settings = {
+      panel: {
+        create: () => {
+          console.warn('Memo: Settings panel not available in roam/js mode. Use Roam Depot for full settings support.');
+        },
+      },
+      getAll: () => ({}),
+      set: () => {
+        console.warn('Memo: Settings save not available in roam/js mode.');
+      },
+      get: () => undefined,
+    };
+  } else if (!compatibleExtensionAPI.settings.panel) {
+    compatibleExtensionAPI.settings.panel = {
+      create: () => {
+        console.warn('Memo: Settings panel not available. Using default settings.');
+      },
+    };
+  }
+  
   window.roamMemo = {
-    extensionAPI,
+    extensionAPI: compatibleExtensionAPI,
   };
 
   FocusStyleManager.onlyShowFocusOnTabs();
