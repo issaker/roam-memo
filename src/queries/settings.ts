@@ -109,10 +109,10 @@ export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Setti
         });
         
         if (blockUid) {
-          // Get the block string using roamAlphaAPI.pull
-          const blockData = await window.roamAlphaAPI.pull(
+          // Get the block string using roamAlphaAPI.pull with correct syntax
+          const blockData = window.roamAlphaAPI.pull(
             '[:block/string]',
-            ['block/uid', blockUid]
+            [':block/uid', blockUid]
           );
           
           const blockString = blockData?.[':block/string'];
