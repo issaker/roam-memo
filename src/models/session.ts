@@ -42,4 +42,5 @@ export enum IntervalMultiplierType {
   Weeks = 'Weeks',
   Months = 'Months',
   Years = 'Years',
+  Progressive = 'Progressive',
 }

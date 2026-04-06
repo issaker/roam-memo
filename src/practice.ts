@@ -52,17 +52,33 @@ export const generatePracticeData = ({
   };
 
   if (reviewMode === ReviewModes.FixedInterval) {
-    const { intervalMultiplier, intervalMultiplierType } = props;
+    const { intervalMultiplier, intervalMultiplierType, repetitions } = props;
     const today = new Date();
-    let nextDueDate = null;
-    if (intervalMultiplierType === IntervalMultiplierType.Days) {
-      nextDueDate = dateUtils.addDays(today, intervalMultiplier);
+    let nextDueDate: Date | undefined = undefined;
+    
+    // Progressive mode: uses SM2 algorithm with grade=4 (Good)
+    if (intervalMultiplierType === IntervalMultiplierType.Progressive) {
+      // Count how many times this card has been reviewed in progressive mode
+      const progressiveRepetition = repetitions || 0;
+      
+      if (progressiveRepetition === 0) {
+        nextDueDate = dateUtils.addDays(today, 2); // First time: 2 days
+      } else if (progressiveRepetition === 1) {
+        nextDueDate = dateUtils.addDays(today, 6); // Second time: 6 days
+      } else {
+        // SM2 Good algorithm (grade=4, efactor=2.5)
+        const currentInterval = intervalMultiplier || 6;
+        const progressiveInterval = Math.round(currentInterval * 2.5 * 0.8);
+        nextDueDate = dateUtils.addDays(today, progressiveInterval);
+      }
+    } else if (intervalMultiplierType === IntervalMultiplierType.Days) {
+      nextDueDate = dateUtils.addDays(today, intervalMultiplier || 3);
     } else if (intervalMultiplierType === IntervalMultiplierType.Weeks) {
-      nextDueDate = dateUtils.addDays(today, intervalMultiplier * 7);
+      nextDueDate = dateUtils.addDays(today, (intervalMultiplier || 1) * 7);
     } else if (intervalMultiplierType === IntervalMultiplierType.Months) {
-      nextDueDate = dateUtils.addDays(today, intervalMultiplier * 30);
+      nextDueDate = dateUtils.addDays(today, (intervalMultiplier || 1) * 30);
     } else if (intervalMultiplierType === IntervalMultiplierType.Years) {
-      nextDueDate = dateUtils.addDays(today, intervalMultiplier * 365);
+      nextDueDate = dateUtils.addDays(today, (intervalMultiplier || 1) * 365);
     }
 
     return {

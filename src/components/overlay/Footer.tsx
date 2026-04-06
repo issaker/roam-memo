@@ -396,6 +396,7 @@ const FixedIntervalEditor = () => {
   };
 
   const intervalMultiplierTypes = [
+    { value: IntervalMultiplierType.Progressive, label: 'Progressive' },
     { value: IntervalMultiplierType.Days, label: 'Days' },
     { value: IntervalMultiplierType.Weeks, label: 'Weeks' },
     { value: IntervalMultiplierType.Months, label: 'Months' },
@@ -487,14 +488,14 @@ const FixedIntervalModeControls = ({
   isIntervalEditorOpen: boolean;
   toggleIntervalEditorOpen: () => void;
   intervalEstimates: IntervalEstimates;
-}): JSX.Element | undefined => {
+}): JSX.Element => {
   const { intervalMultiplier, intervalMultiplierType } = React.useContext(MainContext);
   const onInteractionhandler = (nextState) => {
     if (!nextState && isIntervalEditorOpen) toggleIntervalEditorOpen();
   };
   if (!intervalEstimates) {
     console.error('Interval estimates not set');
-    return;
+    return <></>;
   }
 
   return (
@@ -545,10 +546,10 @@ const SpacedIntervalModeControls = ({
   activeButtonKey: string;
   gradeFn: (grade: number) => void;
   intervalEstimates: IntervalEstimates;
-}) => {
+}): JSX.Element => {
   if (!intervalEstimates) {
     console.error('Interval estimates not set');
-    return;
+    return <></>;
   }
 
   return (

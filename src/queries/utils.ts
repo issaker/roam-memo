@@ -214,7 +214,7 @@ export const getOrCreateChildBlock = async (parent_uid, block, order, blockProps
 };
 
 export const generateNewSession = ({
-  reviewMode = ReviewModes.DefaultSpacedInterval,
+  reviewMode = ReviewModes.FixedInterval,
   dateCreated = undefined,
   isNew = true,
 } = {}): NewSession => {
@@ -231,8 +231,9 @@ export const generateNewSession = ({
 
   return {
     dateCreated: dateCreated || new Date(),
-    intervalMultiplier: 3,
-    intervalMultiplierType: IntervalMultiplierType.Days,
+    intervalMultiplier: 2,
+    intervalMultiplierType: IntervalMultiplierType.Progressive,
+    repetitions: 0,
     isNew,
     reviewMode,
   };
