@@ -151,3 +151,15 @@ if (window.RoamMemo && window.RoamMemo.onload) {
 - 不要同时使用 Roam Depot 和 roam/js 加载，会导致插件运行两次
 - 如果使用 roam/js 方式，请从 Roam Depot 中移除该插件
 - 确保 GitHub 仓库的 `main` 分支上有最新的 `extension.js`
+
+### ⚠️ roam/js 模式的限制
+
+由于 roam/js 模式使用的是 `window.roamAlphaAPI` 而不是完整的 Roam Depot `extensionAPI`，以下功能**不可用**：
+
+- ❌ **设置面板** - 无法通过 UI 修改插件设置
+- ❌ **持久化设置** - 设置更改不会保存
+
+**解决方案**：
+- 使用默认设置（tags: `memo`, data page: `roam/memo`）
+- 如需自定义设置，请使用 Roam Depot 安装
+- 或者手动修改代码中的 `defaultSettings`
