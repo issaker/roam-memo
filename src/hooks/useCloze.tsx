@@ -2,12 +2,12 @@ import * as React from 'react';
 
 interface UseCustomClozeProps {
   renderedBlockElm: HTMLElement;
-  setClozeCounts: any;
+  setClozeCounts: React.Dispatch<React.SetStateAction<{ default: number; custom: number }>>;
 }
 
 function getAllTextNodes(element: Element) {
   return Array.from(element.childNodes).filter(
-    (node) => node.nodeType === 3 && node.textContent.trim().length > 1
+    (node) => node.nodeType === 3 && node.textContent && node.textContent.trim().length > 1
   );
 }
 
@@ -18,6 +18,11 @@ function wrapMatches(node: Element, regex: RegExp) {
   for (let i = 0; i < textNodes.length; ) {
     const textNode = textNodes[i];
     const text = textNode.textContent;
+
+    if (!text) {
+      i++;
+      continue;
+    }
 
     const match = regex.exec(text);
 
@@ -39,10 +44,12 @@ function wrapMatches(node: Element, regex: RegExp) {
       const afterElm = document.createTextNode(afterText);
 
       // Replace text node with new elements
-      textNode.parentNode.insertBefore(beforeElm, textNode);
-      textNode.parentNode.insertBefore(clozeElm, textNode);
-      textNode.parentNode.insertBefore(afterElm, textNode);
-      textNode.parentNode.removeChild(textNode);
+      if (textNode.parentNode) {
+        textNode.parentNode.insertBefore(beforeElm, textNode);
+        textNode.parentNode.insertBefore(clozeElm, textNode);
+        textNode.parentNode.insertBefore(afterElm, textNode);
+        textNode.parentNode.removeChild(textNode);
+      }
       textNodes = getAllTextNodes(node);
     } else {
       i++;
@@ -80,15 +87,15 @@ interface UseClozeProps {
 }
 
 const useCloze = ({ renderedBlockElm, hasClozeCallback }: UseClozeProps) => {
-  const [clozeCounts, setClozeCounts] = React.useState({ default: undefined, custom: undefined });
+  const [clozeCounts, setClozeCounts] = React.useState<{ default: number; custom: number }>({ default: 0, custom: 0 });
 
-  // Count default clozes
+  // Count default clozes - removed since we no longer support ^^ syntax
+  // Only custom clozes with {} syntax are supported now
   React.useEffect(() => {
     (async () => {
       if (!renderedBlockElm) return;
-      const clozeElms = renderedBlockElm.querySelectorAll('.rm-highlight');
-
-      setClozeCounts(() => ({ ...clozeCounts, default: clozeElms.length }));
+      // No longer counting .rm-highlight elements as clozes
+      setClozeCounts((prev) => ({ ...prev, default: 0 }));
     })();
   }, [renderedBlockElm]);
 
@@ -98,11 +105,12 @@ const useCloze = ({ renderedBlockElm, hasClozeCallback }: UseClozeProps) => {
   // Use Cloze counts to enable/disable "Show Answer" UI blocking
   React.useEffect(() => {
     // Wait for both default and custom cloze counts to be set
-    if (Object.values(clozeCounts).every((count) => count === undefined)) {
+    if (clozeCounts.default === 0 && clozeCounts.custom === 0) {
+      hasClozeCallback(false);
       return;
     }
 
-    const sum = Object.values(clozeCounts).reduce((a, b) => a + b, 0);
+    const sum = clozeCounts.default + clozeCounts.custom;
 
     hasClozeCallback(sum > 0);
   }, [clozeCounts]);

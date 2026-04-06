@@ -149,7 +149,8 @@ const ContentWrapper = styled.div<{
     min-width: unset; // Keeping roam block from expanding 100
   }
 
-  & .rm-highlight,
+  // Only apply cloze hiding to custom clozes with {} syntax
+  // Roam's native ^^ highlighting (.rm-highlight) should always be visible
   .roam-memo-cloze {
     background-color: ${(props) => (props.showAnswers ? 'transparent' : '#e1e3e5')};
     color: ${(props) => (props.showAnswers ? 'inherit' : 'transparent')};
@@ -157,6 +158,12 @@ const ContentWrapper = styled.div<{
     border-radius: 2px;
     padding: 0;
     margin: 0;
+  }
+
+  // Keep Roam's native highlighting always visible
+  & .rm-highlight {
+    background-color: inherit;
+    color: inherit;
   }
 `;
 

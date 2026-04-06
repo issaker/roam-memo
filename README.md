@@ -29,8 +29,8 @@ Enter a comma-separated list of tags in "Tag Pages" in settings to create multip
 ### Text Masking (Cloze)
 
 Hide text for recall practice:
-- Enclose text with `^^`, e.g., `^^hide me^^`
-- Or use braces `{}`, e.g., `{hide me too}`
+- Use braces `{}`, e.g., `{hide me}`
+- Note: Roam's native `^^highlight^^` syntax is now preserved as-is and not treated as cloze
 
 ### Daily Limits
 
