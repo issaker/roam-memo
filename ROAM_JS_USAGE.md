@@ -154,12 +154,12 @@ if (window.RoamMemo && window.RoamMemo.onload) {
 
 ### ⚠️ roam/js 模式的限制
 
-由于 roam/js 模式使用的是 `window.roamAlphaAPI` 而不是完整的 Roam Depot `extensionAPI`，以下功能**不可用**：
+由于 roam/js 模式使用的是 `window.roamAlphaAPI` 而不是完整的 Roam Depot `extensionAPI`，以下功能**受限**：
 
-- ❌ **设置面板** - 无法通过 UI 修改插件设置
-- ❌ **持久化设置** - 设置更改不会保存
+- ⚠️ **设置不持久化** - 设置更改不会保存到 Roam，刷新页面后会重置为默认值
+- ✅ **设置对话框可用** - 点击插件弹窗右上角的齿轮图标可以打开设置面板
 
 **解决方案**：
-- 使用默认设置（tags: `memo`, data page: `roam/memo`）
-- 如需自定义设置，请使用 Roam Depot 安装
+- 每次使用时通过设置对话框配置（刷新后需要重新设置）
+- 如需持久化设置，请使用 Roam Depot 安装
 - 或者手动修改代码中的 `defaultSettings`
