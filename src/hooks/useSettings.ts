@@ -8,6 +8,7 @@ export type Settings = {
   rtlEnabled: boolean;
   shuffleCards: boolean;
   forgotReinsertOffset: number;
+  breadcrumbsEnabled: boolean;
 };
 
 export const defaultSettings: Settings = {
@@ -17,6 +18,7 @@ export const defaultSettings: Settings = {
   rtlEnabled: false,
   shuffleCards: false,
   forgotReinsertOffset: 3,
+  breadcrumbsEnabled: false,
 };
 
 // @TODO: Refactor/Hoist this so we can call useSettings in multiple places

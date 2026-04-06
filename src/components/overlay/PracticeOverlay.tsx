@@ -151,7 +151,6 @@ const PracticeOverlay = ({
   const [showAnswers, setShowAnswers] = React.useState(false);
   const [hasCloze, setHasCloze] = React.useState(true);
   const [showSettings, setShowSettings] = React.useState(false);
-  const [saveStatus, setSaveStatus] = React.useState<'idle' | 'saving' | 'success' | 'error'>('idle');
 
   const shouldShowAnswerFirst =
     renderMode === RenderMode.AnswerFirst && hasBlockChildrenUids && !showAnswers;
@@ -164,6 +163,7 @@ const PracticeOverlay = ({
     rtlEnabled: false,
     shuffleCards: false,
     forgotReinsertOffset: 3,
+    breadcrumbsEnabled: false,
   });
 
   // Load settings from page on mount and sync with extensionAPI
@@ -185,6 +185,11 @@ const PracticeOverlay = ({
     };
     loadSettings();
   }, []);
+
+  // Update showBreadcrumbs when breadcrumbsEnabled setting changes
+  React.useEffect(() => {
+    setShowBreadcrumbs(localSettings.breadcrumbsEnabled);
+  }, [localSettings.breadcrumbsEnabled]);
 
   // Reset showAnswers state
   React.useEffect(() => {
@@ -548,45 +553,38 @@ const PracticeOverlay = ({
             />
           </div>
 
-          {/* Save status feedback */}
-          {saveStatus === 'success' && (
-            <div style={{ padding: '10px', backgroundColor: '#d4edda', borderRadius: '4px', fontSize: '12px', marginBottom: '10px' }}>
-              <strong>✅ Settings saved!</strong> Changes will take effect after refresh.
-            </div>
-          )}
-          {saveStatus === 'error' && (
-            <div style={{ padding: '10px', backgroundColor: '#f8d7da', borderRadius: '4px', fontSize: '12px', marginBottom: '10px' }}>
-              <strong>❌ Failed to save!</strong> Please check console for details.
-            </div>
-          )}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                className="bp3-checkbox"
+                checked={localSettings.breadcrumbsEnabled}
+                onChange={(e) => setLocalSettings({ ...localSettings, breadcrumbsEnabled: e.target.checked })}
+                style={{ marginRight: '8px' }}
+              />
+              <span>Show Breadcrumbs by Default</span>
+            </label>
+            <p style={{ fontSize: '12px', color: '#888', margin: '5px 0 0 0' }}>
+              When enabled, the practice window will open with breadcrumbs visible.
+            </p>
+          </div>
         </div>
 
         <div className="bp3-dialog-footer">
           <div className="bp3-dialog-footer-actions">
             <button
               className="bp3-button bp3-intent-primary"
-              disabled={saveStatus === 'saving'}
               onClick={async () => {
-                setSaveStatus('saving');
-                const success = await saveSettingsToPage(localSettings.dataPageTitle, localSettings);
-                if (success) {
-                  setSaveStatus('success');
-                  setTimeout(() => {
-                    setShowSettings(false);
-                    setSaveStatus('idle');
-                  }, 1000);
-                } else {
-                  setSaveStatus('error');
-                }
+                await saveSettingsToPage(localSettings.dataPageTitle, localSettings);
+                setShowSettings(false);
               }}
             >
-              {saveStatus === 'saving' ? 'Saving...' : 'Apply & Close'}
+              Apply & Close
             </button>
             <button
               className="bp3-button"
               onClick={() => {
                 setShowSettings(false);
-                setSaveStatus('idle');
               }}
             >
               Cancel
