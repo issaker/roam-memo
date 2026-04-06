@@ -19,65 +19,72 @@ const createAndRenderContainer = () => {
   return newContainerElm;
 };
 function onload({ extensionAPI }: { extensionAPI: any }) {
-  // Create a compatible extensionAPI for roam/js loading
-  // When loaded via roam/js, extensionAPI might be window.roamAlphaAPI which doesn't have settings.panel
-  const compatibleExtensionAPI = extensionAPI || {};
-  
-  // In-memory settings storage for roam/js mode
-  const inMemorySettings: Record<string, any> = {};
-  
-  // Always ensure we have proper settings methods with in-memory storage
-  // This is critical for roam/js mode where settings need to persist across components
-  if (!compatibleExtensionAPI.settings) {
-    compatibleExtensionAPI.settings = {};
-  }
-  
-  // Override settings methods to use in-memory storage (always override to ensure proper behavior)
-  // Remove verbose logging to prevent console spam
-  const _originalGetAll = compatibleExtensionAPI.settings.getAll;
-  const _originalSet = compatibleExtensionAPI.settings.set;
-  const _originalGet = compatibleExtensionAPI.settings.get;
-  
-  compatibleExtensionAPI.settings.getAll = () => {
-    // Merge in-memory settings with any existing settings
-    const existingSettings = _originalGetAll ? _originalGetAll() : {};
-    return { ...existingSettings, ...inMemorySettings };
-  };
-  
-  compatibleExtensionAPI.settings.set = (key: string, value: any) => {
-    inMemorySettings[key] = value;
-    // Also call original set if it exists (for Roam Depot compatibility)
-    if (_originalSet) _originalSet(key, value);
-    // Dispatch custom event to notify settings change
-    window.dispatchEvent(new CustomEvent('roamMemoSettingsChanged', { detail: { key, value } }));
-  };
-  
-  compatibleExtensionAPI.settings.get = (key: string) => {
-    // Check in-memory first, then fall back to original
-    if (key in inMemorySettings) return inMemorySettings[key];
-    return _originalGet ? _originalGet(key) : undefined;
-  };
-  
-  // Ensure settings.panel exists
-  if (!compatibleExtensionAPI.settings.panel) {
-    compatibleExtensionAPI.settings.panel = {
-      create: () => {
-        // Silently handle settings panel creation in roam/js mode
-      },
+  try {
+    console.log('Memo: Initializing...');
+    
+    // Create a compatible extensionAPI for roam/js loading
+    // When loaded via roam/js, extensionAPI might be window.roamAlphaAPI which doesn't have settings.panel
+    const compatibleExtensionAPI = extensionAPI || {};
+    
+    // In-memory settings storage for roam/js mode
+    const inMemorySettings: Record<string, any> = {};
+    
+    // Always ensure we have proper settings methods with in-memory storage
+    // This is critical for roam/js mode where settings need to persist across components
+    if (!compatibleExtensionAPI.settings) {
+      compatibleExtensionAPI.settings = {};
+    }
+    
+    // Override settings methods to use in-memory storage (always override to ensure proper behavior)
+    // Remove verbose logging to prevent console spam
+    const _originalGetAll = compatibleExtensionAPI.settings.getAll;
+    const _originalSet = compatibleExtensionAPI.settings.set;
+    const _originalGet = compatibleExtensionAPI.settings.get;
+    
+    compatibleExtensionAPI.settings.getAll = () => {
+      // Merge in-memory settings with any existing settings
+      const existingSettings = _originalGetAll ? _originalGetAll() : {};
+      return { ...existingSettings, ...inMemorySettings };
     };
-  }
-  
-  window.roamMemo = {
-    extensionAPI: compatibleExtensionAPI,
-  };
+    
+    compatibleExtensionAPI.settings.set = (key: string, value: any) => {
+      inMemorySettings[key] = value;
+      // Also call original set if it exists (for Roam Depot compatibility)
+      if (_originalSet) _originalSet(key, value);
+      // Dispatch custom event to notify settings change
+      window.dispatchEvent(new CustomEvent('roamMemoSettingsChanged', { detail: { key, value } }));
+    };
+    
+    compatibleExtensionAPI.settings.get = (key: string) => {
+      // Check in-memory first, then fall back to original
+      if (key in inMemorySettings) return inMemorySettings[key];
+      return _originalGet ? _originalGet(key) : undefined;
+    };
+    
+    // Ensure settings.panel exists
+    if (!compatibleExtensionAPI.settings.panel) {
+      compatibleExtensionAPI.settings.panel = {
+        create: () => {
+          // Silently handle settings panel creation in roam/js mode
+        },
+      };
+    }
+    
+    window.roamMemo = {
+      extensionAPI: compatibleExtensionAPI,
+    };
 
-  FocusStyleManager.onlyShowFocusOnTabs();
+    FocusStyleManager.onlyShowFocusOnTabs();
 
-  const container = createAndRenderContainer();
-  if (container) {
-    ReactDOM.render(<App />, container);
-  } else {
-    console.error('Memo: Failed to create container');
+    const container = createAndRenderContainer();
+    if (container) {
+      ReactDOM.render(<App />, container);
+      console.log('Memo: Initialized successfully');
+    } else {
+      console.error('Memo: Failed to create container - sidebar element not found');
+    }
+  } catch (error) {
+    console.error('Memo: Initialization failed', error);
   }
 }
 
