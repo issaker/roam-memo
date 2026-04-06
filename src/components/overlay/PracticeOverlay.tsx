@@ -10,6 +10,7 @@ import Lottie from 'react-lottie';
 import doneAnimationData from '~/lotties/done.json';
 import Tooltip from '~/components/Tooltip';
 import mediaQueries from '~/utils/mediaQueries';
+import { saveSettingsToPage, loadSettingsFromPage } from '~/queries/settings';
 
 import CardBlock from '~/components/overlay/CardBlock';
 import Footer from '~/components/overlay/Footer';
@@ -155,6 +156,18 @@ const PracticeOverlay = ({
     shuffleCards: false,
     forgotReinsertOffset: 3,
   });
+
+  // Load settings from page on mount
+  React.useEffect(() => {
+    const loadSettings = async () => {
+      const savedSettings = await loadSettingsFromPage('roam/memo');
+      if (savedSettings) {
+        setLocalSettings(savedSettings);
+        console.log('Memo: Loaded settings from page');
+      }
+    };
+    loadSettings();
+  }, []);
 
   // Reset showAnswers state
   React.useEffect(() => {
@@ -519,8 +532,8 @@ const PracticeOverlay = ({
             />
           </div>
 
-          <div style={{ padding: '10px', backgroundColor: '#fff3cd', borderRadius: '4px', fontSize: '12px' }}>
-            <strong>Note:</strong> These settings are not saved in roam/js mode. They will reset when you refresh the page. For persistent settings, use Roam Depot.
+          <div style={{ padding: '10px', backgroundColor: '#d4edda', borderRadius: '4px', fontSize: '12px' }}>
+            <strong>✅ Settings are saved!</strong> Your settings will be saved to the {localSettings.dataPageTitle} page and loaded automatically next time.
           </div>
         </div>
 
@@ -528,11 +541,16 @@ const PracticeOverlay = ({
           <div className="bp3-dialog-footer-actions">
             <button
               className="bp3-button bp3-intent-primary"
-              onClick={() => {
-                // Apply settings by reloading the page with new settings
-                // For now, just close the dialog
-                console.log('Applied settings:', localSettings);
-                setShowSettings(false);
+              onClick={async () => {
+                // Save settings to page
+                const success = await saveSettingsToPage(localSettings.dataPageTitle, localSettings);
+                if (success) {
+                  console.log('Memo: Settings applied and saved');
+                  setShowSettings(false);
+                } else {
+                  console.error('Memo: Failed to save settings');
+                  alert('Failed to save settings. Please check the console for details.');
+                }
               }}
             >
               Apply & Close
