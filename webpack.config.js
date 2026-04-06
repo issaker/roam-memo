@@ -20,7 +20,6 @@ module.exports = {
     library: {
       name: 'RoamMemo',
       type: 'umd',
-      export: 'default',
     },
   },
   devtool: 'inline-source-map',
