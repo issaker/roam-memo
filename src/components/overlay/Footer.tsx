@@ -581,7 +581,7 @@ const SpacedIntervalModeControls = ({
       </ControlButton>
       <ControlButton
         className="text-base font-medium py-1"
-        intent="primary"
+        intent="none"
         onClick={() => gradeFn(4)}
         tooltipText={`Review ${intervalEstimates[4]?.nextDueDateFromNow}`}
         active={activeButtonKey === 'good-button'}
