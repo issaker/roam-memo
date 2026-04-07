@@ -633,8 +633,8 @@ const FooterWrapper = styled.div`
     align-items: center;
   }
 
-  /* 继承 Dialog 的背景色 */
-  background-color: ${colors.dialogBackground};
+  /* 内部组件不定义背景色，继承 Dialog 容器的背景 */
+  background-color: transparent;
 `;
 
 const FooterActionsWrapper = styled.div`

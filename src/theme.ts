@@ -1,8 +1,10 @@
 /**
  * Roam Memo Theme System
  * 
- * This theme system inherits colors from the host application (Roam Research)
- * to ensure visual consistency across light and dark modes.
+ * Design Principle:
+ * - Dialog container manages background color via CSS (html.rs-dark/rs-light)
+ * - Internal components (Footer/Header/Body) use transparent background
+ * - This ensures unified theme adaptation without duplicate definitions
  * 
  * Roam switches themes via html class (rs-light/rs-dark), with colors set on body.
  */
@@ -25,15 +27,7 @@ export const getIntentColor = (intent?: string): string => {
 
 // Common color utilities
 export const colors = {
-  // Background colors - use CSS variables with proper theme detection
-  // Roam uses html.rs-light and html.rs-dark classes to switch themes
-  // Light theme fallback: #ffffff (white), Dark theme fallback: #182026
-  dialogBackground: 'var(--roam-background-color, var(--bp3-background1, #ffffff))',
-  
-  // Inherit text color from body - automatically adapts to theme changes
-  colorInherit: 'inherit',
-  
-  // Transparent backgrounds with opacity for overlays
+  // Transparent backgrounds with opacity for overlays (buttons, etc.)
   overlayLight: 'rgba(255, 255, 255, 0.05)',
   overlayLightHover: 'rgba(255, 255, 255, 0.1)',
   
