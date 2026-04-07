@@ -48,10 +48,10 @@ export const colors = {
 
 // Background color inheritance - prevent transparent overlay from showing body background
 export const backgroundStyles = {
-  // CSS for overlay container - inherit body color with opacity
+  // CSS for overlay container - inherit body color directly
   overlayBackgroundCSS: `
     .bp3-portal {
-      background-color: inherit;
+      background-color: inherit !important;
     }
   `,
   
