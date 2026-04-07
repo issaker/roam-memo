@@ -46,18 +46,31 @@ export const colors = {
   textTertiary: '0.5',
 };
 
-// Background color inheritance - prevent transparent overlay from showing body background
+// Background color inheritance - use JS to read body color and inject as CSS
 export const backgroundStyles = {
-  // CSS for overlay container - inherit body color directly
-  overlayBackgroundCSS: `
-    .bp3-portal {
-      background-color: inherit !important;
+  // Generate CSS string with actual body background color
+  generateOverlayCSS: () => {
+    if (typeof window !== 'undefined' && document.body) {
+      const bodyBg = getComputedStyle(document.body).backgroundColor;
+      return `
+        .bp3-portal {
+          background-color: ${bodyBg} !important;
+        }
+        .bp3-dialog {
+          background-color: transparent !important;
+          color: inherit;
+        }
+      `;
     }
-  `,
-  
-  // CSS for Dialog component - transparent is fine since parent handles background
-  dialogBackgroundCSS: `
-    background-color: transparent !important;
-    color: inherit;
-  `,
+    // Fallback for SSR
+    return `
+      .bp3-portal {
+        background-color: #ffffff !important;
+      }
+      .bp3-dialog {
+        background-color: transparent !important;
+        color: inherit;
+      }
+    `;
+  },
 };

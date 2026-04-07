@@ -26,6 +26,18 @@ export interface handlePracticeProps {
 const App = () => {
   const [showPracticeOverlay, setShowPracticeOverlay] = React.useState(false);
   const [isCramming, setIsCramming] = React.useState(false);
+  const [overlayCSS, setOverlayCSS] = React.useState(backgroundStyles.generateOverlayCSS());
+
+  // Listen to theme changes and update CSS in real-time
+  React.useEffect(() => {
+    const updateCSS = () => setOverlayCSS(backgroundStyles.generateOverlayCSS());
+    
+    // Watch for html class changes (rs-light, rs-dark, rs-auto)
+    const observer = new MutationObserver(updateCSS);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    
+    return () => observer.disconnect();
+  }, []);
 
   const { tagsListString, dataPageTitle, dailyLimit, rtlEnabled, shuffleCards, forgotReinsertOffset } = useSettings();
   const { selectedTag, setSelectedTag, tagsList } = useTags({ tagsListString });
@@ -131,8 +143,8 @@ const App = () => {
   return (
     <Blueprint.HotkeysProvider>
       <>
-        {/* 不透明背景放在 .bp3-portal 上，防止透明容器穿透 body 颜色 */}
-        <style>{backgroundStyles.overlayBackgroundCSS}</style>
+        {/* JS 读取 body 颜色并动态注入 CSS，确保优先级最高 */}
+        <style>{overlayCSS}</style>
         <SidePannelWidget onClickCallback={onShowPracticeOverlay} today={today} />
         {showPracticeOverlay && (
           <PracticeOverlay
