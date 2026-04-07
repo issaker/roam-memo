@@ -46,24 +46,30 @@ export const colors = {
   textTertiary: '0.5',
 };
 
-// Background color inheritance - inject Roam body color into CSS variable
-// Components use this CSS variable to get the actual computed background color
+// Background color inheritance - simple hardcoded fallback based on Roam theme class
+// Apply to overlay container to prevent transparent layers from showing body background
 export const backgroundStyles = {
-  // Inject this into global style or component
-  injectBodyColor: () => {
-    if (typeof window !== 'undefined' && document.body) {
-      const bgColor = getComputedStyle(document.body).backgroundColor;
-      return `:root { --roam-memo-bg-color: ${bgColor}; }`;
+  // CSS for overlay container - prevents transparent layers from showing through
+  overlayBackgroundCSS: `
+    /* Light theme: white background */
+    .bp3-portal {
+      background-color: #ffffff;
     }
-    return ':root { --roam-memo-bg-color: #ffffff; }';
-  },
+    
+    /* Dark theme: Roam uses html.rs-dark class */
+    html.rs-dark .bp3-portal {
+      background-color: #182026;
+    }
+    
+    /* Auto theme: inherit from body */
+    html.rs-auto .bp3-portal {
+      background-color: inherit;
+    }
+  `,
   
-  // CSS variable reference for components
-  bgVar: 'var(--roam-memo-bg-color)',
-  
-  // CSS-in-JS string version for styled-components
-  inheritBackgroundCSS: `
-    background-color: var(--roam-memo-bg-color);
+  // CSS for Dialog component itself (transparent is fine since parent handles background)
+  dialogBackgroundCSS: `
+    background-color: transparent;
     color: inherit;
   `,
 };

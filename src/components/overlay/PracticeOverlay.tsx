@@ -589,8 +589,8 @@ const Dialog = styled(Blueprint.Dialog)<{ $isEditing?: boolean }>`
   grid-template-rows: 50px 1fr auto;
   max-height: 80vh;
   width: 90vw;
-  /* 使用 theme 注入的 CSS 变量，直接读取 Roam body 计算后的背景色 */
-  ${backgroundStyles.inheritBackgroundCSS}
+  /* 硬编码两套颜色，根据 Roam theme class 切换 */
+  ${backgroundStyles.dialogBackgroundCSS}
 
   ${mediaQueries.lg} {
     width: 80vw;

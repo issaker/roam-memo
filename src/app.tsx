@@ -15,9 +15,6 @@ import { IntervalMultiplierType, ReviewModes } from '~/models/session';
 import { RenderMode } from '~/models/practice';
 import { backgroundStyles } from '~/theme';
 
-// Inject Roam body background color as CSS variable for theme inheritance
-const injectBodyColorStyle = backgroundStyles.injectBodyColor();
-
 export interface handlePracticeProps {
   refUid: string;
   grade: number;
@@ -85,11 +82,6 @@ const App = () => {
   });
 
   const onShowPracticeOverlay = () => {
-    // Update CSS variable when opening overlay (in case theme changed)
-    const styleEl = document.getElementById('roam-memo-theme');
-    if (styleEl) {
-      styleEl.textContent = backgroundStyles.injectBodyColor();
-    }
     refreshData();
     setShowPracticeOverlay(true);
     setIsCramming(false);
@@ -139,8 +131,8 @@ const App = () => {
   return (
     <Blueprint.HotkeysProvider>
       <>
-        {/* Inject Roam body color as CSS variable for theme inheritance */}
-        <style id="roam-memo-theme">{injectBodyColorStyle}</style>
+        {/* 不透明背景放在 .bp3-portal 上，防止透明容器穿透 body 颜色 */}
+        <style>{backgroundStyles.overlayBackgroundCSS}</style>
         <SidePannelWidget onClickCallback={onShowPracticeOverlay} today={today} />
         {showPracticeOverlay && (
           <PracticeOverlay
