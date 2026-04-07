@@ -630,7 +630,8 @@ const FooterActionsWrapper = styled.div`
 const SetIntervalToggleWrapper = styled.div``;
 
 const ControlButtonWrapper = styled(Blueprint.Button)<{ intent?: string }>`
-  /* 统一按钮背景色 */
+  /* 强制重置所有按钮背景 */
+  background: transparent !important;
   background-color: transparent !important;
   background-image: none !important;
   box-shadow: none !important;
@@ -659,8 +660,16 @@ const ControlButtonWrapper = styled(Blueprint.Button)<{ intent?: string }>`
     }} !important;
   }
 
+  /* 强制覆盖 Blueprint 的 intent 背景 */
+  &::before,
+  &::after {
+    background: transparent !important;
+    background-color: transparent !important;
+  }
+
   /* hover 效果 */
   &:hover {
+    background: rgba(128, 128, 128, 0.15) !important;
     background-color: rgba(128, 128, 128, 0.15) !important;
     background-image: none !important;
     box-shadow: none !important;
