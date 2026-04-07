@@ -629,7 +629,25 @@ const FooterActionsWrapper = styled.div`
 
 const SetIntervalToggleWrapper = styled.div``;
 
-const ControlButtonWrapper = styled(Blueprint.Button)``;
+const ControlButtonWrapper = styled(Blueprint.Button)`
+  /* 手动应用 intent 颜色（亮色版本，适合夜间模式） */
+  &.bp3-intent-primary,
+  &.bp3-intent-primary .bp3-button-text {
+    color: #8cb4ff !important;
+  }
+  &.bp3-intent-success,
+  &.bp3-intent-success .bp3-button-text {
+    color: #56d364 !important;
+  }
+  &.bp3-intent-warning,
+  &.bp3-intent-warning .bp3-button-text {
+    color: #d29922 !important;
+  }
+  &.bp3-intent-danger,
+  &.bp3-intent-danger .bp3-button-text {
+    color: #f85149 !important;
+  }
+`;
 
 const ControlButton = ({ tooltipText, wrapperClassName = '', ...props }) => {
   return (
