@@ -314,8 +314,6 @@ const PracticeOverlay = ({
 
   // Detect editing state and adjust bottom spacing
   const [isEditing, setIsEditing] = React.useState(false);
-  // Detect if page is in dark mode (inverted)
-  const [isDarkMode, setIsDarkMode] = React.useState(false);
 
   React.useEffect(() => {
     if (!isOpen) return;
@@ -341,26 +339,10 @@ const PracticeOverlay = ({
       }
     };
 
-    // Detect dark mode by checking if body has invert filter
-    const checkDarkMode = () => {
-      const body = document.body;
-      const computedStyle = window.getComputedStyle(body);
-      const filter = computedStyle.filter || '';
-      setIsDarkMode(filter.includes('invert'));
-    };
-
-    // Check on mount and when dialog opens
-    checkDarkMode();
-
-    // Observe body style changes
-    const observer = new MutationObserver(checkDarkMode);
-    observer.observe(document.body, { attributes: true, attributeFilter: ['style'] });
-
     document.addEventListener('focusin', handleFocusIn);
     document.addEventListener('focusout', handleFocusOut);
 
     return () => {
-      observer.disconnect();
       document.removeEventListener('focusin', handleFocusIn);
       document.removeEventListener('focusout', handleFocusOut);
     };
@@ -389,7 +371,7 @@ const PracticeOverlay = ({
         $isEditing={isEditing}
         isOpen={isOpen}
         onClose={onCloseCallback}
-        className={`pb-0 ${isDarkMode ? 'bp3-dark' : 'bg-white'}`}
+        className="pb-0"
         canEscapeKeyClose={false}
       >
         <Header
@@ -675,19 +657,6 @@ const mobileOverlayStyles = (isEditing: boolean) => `
       justify-content: stretch !important;
       margin: 0 !important;
     }
-
-    /* 移动端夜间模式适配：抵消 Roam 页面的反色滤镜 */
-    @supports (filter: invert(1)) {
-      .bp3-overlay.bp3-overlay-open .bp3-dialog {
-        filter: invert(1) hue-rotate(180deg) !important;
-      }
-      /* 图片和视频不需要反色，再次反转回来 */
-      .bp3-overlay.bp3-overlay-open .bp3-dialog img,
-      .bp3-overlay.bp3-overlay-open .bp3-dialog video,
-      .bp3-overlay.bp3-overlay-open .bp3-dialog canvas {
-        filter: invert(1) hue-rotate(180deg) !important;
-      }
-    }
   }
 `;
 
@@ -698,8 +667,8 @@ const DialogBody = styled.div`
 
 const HeaderWrapper = styled.div`
   justify-content: space-between;
-  color: #5c7080;
-  background-color: #f6f9fd;
+  color: var(--roam-log-color, #5c7080);
+  background-color: var(--roam-background-color, #f6f9fd);
   box-shadow: 0 1px 0 rgb(16 22 26 / 10%);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -711,7 +680,7 @@ const HeaderWrapper = styled.div`
 
   /* Shortcut way to tag selector color */
   & .bp3-button {
-    color: #5c7080;
+    color: var(--roam-log-color, #5c7080);
   }
 `;
 

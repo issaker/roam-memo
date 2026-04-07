@@ -152,7 +152,7 @@ const ContentWrapper = styled.div<{
   // Only apply cloze hiding to custom clozes with {} syntax
   // Roam's native ^^ highlighting (.rm-highlight) keeps its default styles
   .roam-memo-cloze {
-    background-color: ${(props) => (props.showAnswers ? 'transparent' : '#e1e3e5')};
+    background-color: ${(props) => (props.showAnswers ? 'transparent' : 'var(--roam-log-background, #e1e3e5)')};
     color: ${(props) => (props.showAnswers ? 'inherit' : 'transparent')};
     overflow: hidden;
     border-radius: 2px;
