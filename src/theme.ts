@@ -57,7 +57,7 @@ export const backgroundStyles = {
   
   // CSS for Dialog component - transparent is fine since parent handles background
   dialogBackgroundCSS: `
-    background-color: transparent;
+    background-color: transparent !important;
     color: inherit;
   `,
 };
