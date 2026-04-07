@@ -53,22 +53,24 @@ export const backgroundStyles = {
     if (typeof window !== 'undefined' && document.body) {
       const bodyBg = getComputedStyle(document.body).backgroundColor;
       return `
-        .bp3-portal {
+        .bp3-dialog-container,
+        .bp3-overlay-content,
+        .bp3-dialog {
           background-color: ${bodyBg} !important;
         }
         .bp3-dialog {
-          background-color: transparent !important;
           color: inherit;
         }
       `;
     }
     // Fallback for SSR
     return `
-      .bp3-portal {
+      .bp3-dialog-container,
+      .bp3-overlay-content,
+      .bp3-dialog {
         background-color: #ffffff !important;
       }
       .bp3-dialog {
-        background-color: transparent !important;
         color: inherit;
       }
     `;
