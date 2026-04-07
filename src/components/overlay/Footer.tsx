@@ -446,6 +446,15 @@ const FixedIntervalEditor = () => {
 };
 
 const IntervalString = ({ intervalMultiplier, intervalMultiplierType }) => {
+  // Progressive mode has its own display
+  if (intervalMultiplierType === IntervalMultiplierType.Progressive) {
+    return (
+      <>
+        Review <span className="font-medium mr-3">Progressive</span>
+      </>
+    );
+  }
+
   let singularString = '';
   if (intervalMultiplier === 1) {
     switch (intervalMultiplierType) {
