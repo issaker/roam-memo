@@ -52,18 +52,18 @@ export const generatePracticeData = ({
   };
 
   if (reviewMode === ReviewModes.FixedInterval) {
-    const { intervalMultiplier, intervalMultiplierType, repetitions } = props;
+    const { intervalMultiplier, intervalMultiplierType, repetitions, progressiveRepetitions } = props;
     const today = new Date();
     let nextDueDate: Date | undefined = undefined;
     
     // Progressive mode: uses SM2 algorithm with grade=4 (Good)
     if (intervalMultiplierType === IntervalMultiplierType.Progressive) {
-      // Count how many times this card has been reviewed in progressive mode
-      const progressiveRepetition = repetitions || 0;
+      // Use separate counter for Progressive mode to avoid interference
+      const progReps = progressiveRepetitions || 0;
       
-      if (progressiveRepetition === 0) {
+      if (progReps === 0) {
         nextDueDate = dateUtils.addDays(today, 2); // First time: 2 days
-      } else if (progressiveRepetition === 1) {
+      } else if (progReps === 1) {
         nextDueDate = dateUtils.addDays(today, 6); // Second time: 6 days
       } else {
         // SM2 Good algorithm (grade=4, efactor=2.5)
@@ -86,6 +86,9 @@ export const generatePracticeData = ({
       reviewMode: ReviewModes.FixedInterval,
       intervalMultiplier,
       intervalMultiplierType,
+      progressiveRepetitions: intervalMultiplierType === IntervalMultiplierType.Progressive 
+        ? (progressiveRepetitions || 0) + 1 
+        : progressiveRepetitions,
       nextDueDate,
       nextDueDateFromNow: dateUtils.customFromNow(nextDueDate),
     };

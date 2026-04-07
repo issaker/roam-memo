@@ -234,6 +234,7 @@ export const generateNewSession = ({
     intervalMultiplier: 2,
     intervalMultiplierType: IntervalMultiplierType.Progressive,
     repetitions: 0,
+    progressiveRepetitions: 0, // Initialize Progressive mode counter
     isNew,
     reviewMode,
   };

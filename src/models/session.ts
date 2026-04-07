@@ -17,6 +17,7 @@ export type Session = {
   grade?: number;
   intervalMultiplier?: number;
   intervalMultiplierType?: IntervalMultiplierType;
+  progressiveRepetitions?: number; // Separate counter for Progressive mode
 } & SessionCommon;
 
 export interface NewSession extends Omit<Session, 'nextDueDate' | 'grade'> {
