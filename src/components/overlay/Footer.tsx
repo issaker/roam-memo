@@ -580,8 +580,8 @@ const SpacedIntervalModeControls = ({
         </span>
       </ControlButton>
       <ControlButton
-        className="text-base font-medium py-1"
-        intent="none"
+        className="text-base font-medium py-1 bp3-intent-primary"
+        intent="primary"
         onClick={() => gradeFn(4)}
         tooltipText={`Review ${intervalEstimates[4]?.nextDueDateFromNow}`}
         active={activeButtonKey === 'good-button'}
@@ -629,36 +629,32 @@ const FooterActionsWrapper = styled.div`
 
 const SetIntervalToggleWrapper = styled.div``;
 
-const ControlButtonWrapper = styled(Blueprint.Button)<{ intent?: string }>`
-  /* 继承背景色 + 半透明灰色遮罩 */
-  background: rgba(255, 255, 255, 0.05) !important;
+const ControlButtonWrapper = styled(Blueprint.Button)`
+  position: relative;
+  background-color: transparent !important;
+  background-image: none !important;
   
-  /* 手动应用 intent 颜色（亮色版本，适合夜间模式） */
-  color: ${(props) => {
-    switch (props.intent) {
-      case 'primary': return '#8cb4ff';
-      case 'success': return '#56d364';
-      case 'warning': return '#d29922';
-      case 'danger': return '#f85149';
-      default: return 'inherit';
-    }
-  }};
-
-  & .bp3-button-text {
-    color: ${(props) => {
-      switch (props.intent) {
-        case 'primary': return '#8cb4ff';
-        case 'success': return '#56d364';
-        case 'warning': return '#d29922';
-        case 'danger': return '#f85149';
-        default: return 'inherit';
-      }
-    }};
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+    z-index: -1;
+    pointer-events: none;
   }
 
-  /* hover 效果 */
-  &:hover {
-    background: rgba(255, 255, 255, 0.1) !important;
+  /* 手动应用 intent 颜色 */
+  &.bp3-intent-primary .bp3-button-text { color: #8cb4ff !important; }
+  &.bp3-intent-success .bp3-button-text { color: #56d364 !important; }
+  &.bp3-intent-warning .bp3-button-text { color: #d29922 !important; }
+  &.bp3-intent-danger .bp3-button-text { color: #f85149 !important; }
+  
+  &:hover::before {
+    background-color: rgba(255, 255, 255, 0.1);
   }
 `;
 
