@@ -48,7 +48,7 @@ export const fetchBlockInfo: (refUid: any) => Promise<BlockInfo> = async (refUid
     string: blockInfo.string,
     children: sortedChildren?.map((child) => child.string),
     childrenUids: sortedChildren?.map((child) => child.uid),
-    breadcrumbs: parentChainInfo,
+    breadcrumbs: parentChainInfo.reverse(), // Reverse to match Roam native breadcrumb order
     refUid,
   };
 };
