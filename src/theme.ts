@@ -25,9 +25,11 @@ export const getIntentColor = (intent?: string): string => {
 
 // Common color utilities
 export const colors = {
-  // Inherit from body - automatically adapts to theme changes
-  // Using 'inherit' ensures real-time updates when Roam switches themes
-  backgroundInherit: 'inherit',
+  // Background colors - use CSS variables to get Roam's actual background
+  // This ensures the dialog is opaque and adapts to theme changes
+  dialogBackground: 'var(--roam-background-color, var(--bp3-dark-background1, #182026))',
+  
+  // Inherit text color from body - automatically adapts to theme changes
   colorInherit: 'inherit',
   
   // Transparent backgrounds with opacity for overlays

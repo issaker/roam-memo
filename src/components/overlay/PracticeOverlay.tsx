@@ -589,8 +589,8 @@ const Dialog = styled(Blueprint.Dialog)<{ $isEditing?: boolean }>`
   grid-template-rows: 50px 1fr auto;
   max-height: 80vh;
   width: 90vw;
-  /* 直接继承 body 的背景色和文字颜色，自动适配主题切换 */
-  background-color: ${colors.backgroundInherit};
+  /* 使用不透明背景色，自动适配 Roam 的主题切换 */
+  background-color: ${colors.dialogBackground};
   color: ${colors.colorInherit};
 
   ${mediaQueries.lg} {

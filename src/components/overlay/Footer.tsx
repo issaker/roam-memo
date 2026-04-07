@@ -634,7 +634,7 @@ const FooterWrapper = styled.div`
   }
 
   /* 继承 Dialog 的背景色 */
-  background-color: ${colors.backgroundInherit};
+  background-color: ${colors.dialogBackground};
 `;
 
 const FooterActionsWrapper = styled.div`
