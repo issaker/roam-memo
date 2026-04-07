@@ -9,6 +9,7 @@ const ButtonTags = styled.span<{ kind?: 'light' }>`
   top: -0.5px;
   color: currentColor;
   opacity: 0.6;
+  background-color: transparent;
 `;
 
 export default ButtonTags;
