@@ -612,9 +612,9 @@ const SpacedIntervalModeControls = ({
 };
 
 const FooterWrapper = styled.div`
-  background-color: var(--roam-background-color, #f6f9fd);
+  background-color: inherit;
   min-height: 50px;
-  border-top: 1px solid rgba(16, 22, 26, 0.1);
+  border-top: 1px solid rgba(128, 128, 128, 0.15);
 
   & .bp3-button-text {
     display: flex;

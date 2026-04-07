@@ -588,6 +588,8 @@ const Dialog = styled(Blueprint.Dialog)<{ $isEditing?: boolean }>`
   grid-template-rows: 50px 1fr auto;
   max-height: 80vh;
   width: 90vw;
+  color: inherit;
+  background-color: inherit;
 
   ${mediaQueries.lg} {
     width: 80vw;
@@ -663,13 +665,14 @@ const mobileOverlayStyles = (isEditing: boolean) => `
 const DialogBody = styled.div`
   overflow-x: hidden; // because of tweaks we do in ContentWrapper container overflows
   min-height: 200px;
+  color: inherit;
+  background-color: inherit;
 `;
 
 const HeaderWrapper = styled.div`
   justify-content: space-between;
-  color: var(--roam-log-color, #5c7080);
-  background-color: var(--roam-background-color, #f6f9fd);
-  box-shadow: 0 1px 0 rgb(16 22 26 / 10%);
+  color: inherit;
+  background-color: inherit;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -677,10 +680,11 @@ const HeaderWrapper = styled.div`
   line-height: inherit;
   margin: 0;
   min-height: 50px;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.15);
 
   /* Shortcut way to tag selector color */
   & .bp3-button {
-    color: var(--roam-log-color, #5c7080);
+    color: inherit;
   }
 `;
 
@@ -721,12 +725,24 @@ const TagSelectorItemWrapper = styled.div<{ active: boolean }>`
   display: flex;
   justify-content: space-between;
   padding: 4px 6px;
-  background-color: ${({ active }) => (active ? 'rgba(0, 0, 0, 0.05)' : 'transparent')};
+  position: relative;
   user-select: none;
 
-  &:hover {
-    cursor: pointer;
-    background-color: ${({ active }) => (active ? 'rgba(0, 0, 0, 0.05)' : 'rgba(0, 0, 0, 0.03)')};
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: currentColor;
+    opacity: ${({ active }) => (active ? 0.08 : 0)};
+    border-radius: 2px;
+    z-index: -1;
+  }
+
+  &:hover::before {
+    opacity: ${({ active }) => (active ? 0.12 : 0.06)};
   }
 `;
 
