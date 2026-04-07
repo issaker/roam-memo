@@ -599,9 +599,9 @@ const Dialog = styled(Blueprint.Dialog)<{ $isEditing?: boolean }>`
 
   /* Full-screen on mobile */
   @media (max-width: 768px) {
-    max-height: ${({ $isEditing }) => ($isEditing ? 'calc(100vh - 35px)' : '100vh')};
+    max-height: 100vh;
     width: 100vw;
-    height: ${({ $isEditing }) => ($isEditing ? 'calc(100vh - 35px)' : '100vh')};
+    height: 100vh;
     margin: 0;
     border-radius: 0;
   }
@@ -640,7 +640,7 @@ const mobileOverlayStyles = (isEditing: boolean) => `
       top: 0 !important;
       left: 0 !important;
       width: 100vw !important;
-      height: ${isEditing ? 'calc(100vh - 35px)' : '100vh'} !important;
+      height: 100vh !important;
       margin: 0 !important;
       padding: 0 !important;
     }
