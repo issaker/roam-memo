@@ -445,12 +445,13 @@ const FixedIntervalEditor = () => {
   );
 };
 
-const IntervalString = ({ intervalMultiplier, intervalMultiplierType }) => {
-  // Progressive mode has its own display
+const IntervalString = ({ intervalMultiplier, intervalMultiplierType, nextDueDateFromNow }) => {
+  // Progressive mode: show when the next review is due
   if (intervalMultiplierType === IntervalMultiplierType.Progressive) {
+    const displayText = nextDueDateFromNow || 'Progressive';
     return (
       <>
-        Review <span className="font-medium mr-3">Progressive</span>
+        Review <span className="font-medium mr-3">{displayText}</span>
       </>
     );
   }
@@ -527,6 +528,7 @@ const FixedIntervalModeControls = ({
             <IntervalString
               intervalMultiplier={intervalMultiplier}
               intervalMultiplierType={intervalMultiplierType}
+              nextDueDateFromNow={intervalEstimates[4]?.nextDueDateFromNow}
             />
             <ButtonTags>E</ButtonTags>
           </span>
