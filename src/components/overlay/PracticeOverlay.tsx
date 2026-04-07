@@ -588,7 +588,6 @@ const Dialog = styled(Blueprint.Dialog)<{ $isEditing?: boolean }>`
   grid-template-rows: 50px 1fr auto;
   max-height: 80vh;
   width: 90vw;
-  color: inherit;
   background-color: ${() => {
     // 继承 body 的背景色，自动适配 Roam 的明暗主题
     if (typeof window !== 'undefined' && document.body) {
@@ -671,12 +670,10 @@ const mobileOverlayStyles = (isEditing: boolean) => `
 const DialogBody = styled.div`
   overflow-x: hidden; // because of tweaks we do in ContentWrapper container overflows
   min-height: 200px;
-  color: inherit;
 `;
 
 const HeaderWrapper = styled.div`
   justify-content: space-between;
-  color: inherit;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -685,11 +682,6 @@ const HeaderWrapper = styled.div`
   margin: 0;
   min-height: 50px;
   border-bottom: 1px solid rgba(128, 128, 128, 0.15);
-
-  /* Shortcut way to tag selector color */
-  & .bp3-button {
-    color: inherit;
-  }
 `;
 
 const TagSelector = ({ tagsList, selectedTag, onTagChange }) => {
