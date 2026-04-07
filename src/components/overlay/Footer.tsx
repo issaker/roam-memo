@@ -632,6 +632,9 @@ const SetIntervalToggleWrapper = styled.div``;
 const ControlButtonWrapper = styled(Blueprint.Button)<{ intent?: string }>`
   /* 统一按钮背景色 */
   background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  border: none !important;
   
   /* 手动应用 intent 颜色（亮色版本，适合夜间模式） */
   color: ${(props) => {
@@ -659,6 +662,8 @@ const ControlButtonWrapper = styled(Blueprint.Button)<{ intent?: string }>`
   /* hover 效果 */
   &:hover {
     background-color: rgba(128, 128, 128, 0.15) !important;
+    background-image: none !important;
+    box-shadow: none !important;
   }
 `;
 
