@@ -589,7 +589,6 @@ const Dialog = styled(Blueprint.Dialog)<{ $isEditing?: boolean }>`
   max-height: 80vh;
   width: 90vw;
   color: inherit;
-  background-color: inherit;
 
   ${mediaQueries.lg} {
     width: 80vw;
@@ -666,13 +665,11 @@ const DialogBody = styled.div`
   overflow-x: hidden; // because of tweaks we do in ContentWrapper container overflows
   min-height: 200px;
   color: inherit;
-  background-color: inherit;
 `;
 
 const HeaderWrapper = styled.div`
   justify-content: space-between;
   color: inherit;
-  background-color: inherit;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

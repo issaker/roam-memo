@@ -612,7 +612,6 @@ const SpacedIntervalModeControls = ({
 };
 
 const FooterWrapper = styled.div`
-  background-color: inherit;
   min-height: 50px;
   border-top: 1px solid rgba(128, 128, 128, 0.15);
 
