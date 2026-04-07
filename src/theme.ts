@@ -25,6 +25,11 @@ export const getIntentColor = (intent?: string): string => {
 
 // Common color utilities
 export const colors = {
+  // Inherit from body - automatically adapts to theme changes
+  // Using 'inherit' ensures real-time updates when Roam switches themes
+  backgroundInherit: 'inherit',
+  colorInherit: 'inherit',
+  
   // Transparent backgrounds with opacity for overlays
   overlayLight: 'rgba(255, 255, 255, 0.05)',
   overlayLightHover: 'rgba(255, 255, 255, 0.1)',

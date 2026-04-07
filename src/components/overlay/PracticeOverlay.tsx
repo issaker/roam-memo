@@ -21,7 +21,7 @@ import { generateNewSession } from '~/queries';
 import { CompletionStatus, Today, RenderMode } from '~/models/practice';
 import { handlePracticeProps } from '~/app';
 import { useSafeContext } from '~/hooks/useSafeContext';
-import { getBodyBackgroundColor, colors } from '~/theme';
+import { colors } from '~/theme';
 
 interface MainContextProps {
   reviewMode: ReviewModes | undefined;
@@ -589,7 +589,9 @@ const Dialog = styled(Blueprint.Dialog)<{ $isEditing?: boolean }>`
   grid-template-rows: 50px 1fr auto;
   max-height: 80vh;
   width: 90vw;
-  background-color: ${getBodyBackgroundColor()};
+  /* 直接继承 body 的背景色和文字颜色，自动适配主题切换 */
+  background-color: ${colors.backgroundInherit};
+  color: ${colors.colorInherit};
 
   ${mediaQueries.lg} {
     width: 80vw;
