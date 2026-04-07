@@ -561,7 +561,6 @@ const SpacedIntervalModeControls = ({
         tooltipText={`Review ${intervalEstimates[0]?.nextDueDateFromNow}`}
         onClick={() => gradeFn(0)}
         active={activeButtonKey === 'forgot-button'}
-        outlined
       >
         Forgot{' '}
         <span className="ml-2">
@@ -574,7 +573,6 @@ const SpacedIntervalModeControls = ({
         onClick={() => gradeFn(2)}
         tooltipText={`Review ${intervalEstimates[2]?.nextDueDateFromNow}`}
         active={activeButtonKey === 'hard-button'}
-        outlined
       >
         Hard{' '}
         <span className="ml-2">
@@ -587,7 +585,6 @@ const SpacedIntervalModeControls = ({
         onClick={() => gradeFn(4)}
         tooltipText={`Review ${intervalEstimates[4]?.nextDueDateFromNow}`}
         active={activeButtonKey === 'good-button'}
-        outlined
       >
         Good{' '}
         <span className="ml-2">
@@ -600,7 +597,6 @@ const SpacedIntervalModeControls = ({
         onClick={() => gradeFn(5)}
         tooltipText={`Review ${intervalEstimates[5]?.nextDueDateFromNow}`}
         active={activeButtonKey === 'perfect-button'}
-        outlined
       >
         Perfect{' '}
         <span className="ml-2">
