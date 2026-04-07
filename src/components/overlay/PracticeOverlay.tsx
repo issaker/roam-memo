@@ -21,7 +21,7 @@ import { generateNewSession } from '~/queries';
 import { CompletionStatus, Today, RenderMode } from '~/models/practice';
 import { handlePracticeProps } from '~/app';
 import { useSafeContext } from '~/hooks/useSafeContext';
-import { colors } from '~/theme';
+import { colors, backgroundStyles } from '~/theme';
 
 interface MainContextProps {
   reviewMode: ReviewModes | undefined;
@@ -589,9 +589,8 @@ const Dialog = styled(Blueprint.Dialog)<{ $isEditing?: boolean }>`
   grid-template-rows: 50px 1fr auto;
   max-height: 80vh;
   width: 90vw;
-  /* 完全继承 Roam body 的颜色，支持所有主题（包括自定义主题） */
-  background-color: inherit;
-  color: inherit;
+  /* 使用 theme 注入的 CSS 变量，直接读取 Roam body 计算后的背景色 */
+  ${backgroundStyles.inheritBackgroundCSS}
 
   ${mediaQueries.lg} {
     width: 80vw;

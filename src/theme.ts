@@ -2,11 +2,11 @@
  * Roam Memo Theme System
  * 
  * Design Principle:
- * - Dialog container manages background color via CSS (html.rs-dark/rs-light)
- * - Internal components (Footer/Header/Body) use transparent background
- * - This ensures unified theme adaptation without duplicate definitions
+ * - All colors inherit from Roam body (background + text)
+ * - Functional colors (intent, borders, cloze masks) are defined separately
+ * - This ensures unified theme adaptation for any Roam theme (light/dark/auto/custom)
  * 
- * Roam switches themes via html class (rs-light/rs-dark), with colors set on body.
+ * Roam sets colors on body element, we use CSS inherit to get them.
  */
 
 // Intent color mapping - uses CSS custom properties that adapt to theme
@@ -46,10 +46,24 @@ export const colors = {
   textTertiary: '0.5',
 };
 
-// Get background color from document body (fallback to dark theme default)
-export const getBodyBackgroundColor = (): string => {
-  if (typeof window !== 'undefined' && document.body) {
-    return getComputedStyle(document.body).backgroundColor || '#1a1a1a';
-  }
-  return '#1a1a1a';
+// Background color inheritance - inject Roam body color into CSS variable
+// Components use this CSS variable to get the actual computed background color
+export const backgroundStyles = {
+  // Inject this into global style or component
+  injectBodyColor: () => {
+    if (typeof window !== 'undefined' && document.body) {
+      const bgColor = getComputedStyle(document.body).backgroundColor;
+      return `:root { --roam-memo-bg-color: ${bgColor}; }`;
+    }
+    return ':root { --roam-memo-bg-color: #ffffff; }';
+  },
+  
+  // CSS variable reference for components
+  bgVar: 'var(--roam-memo-bg-color)',
+  
+  // CSS-in-JS string version for styled-components
+  inheritBackgroundCSS: `
+    background-color: var(--roam-memo-bg-color);
+    color: inherit;
+  `,
 };

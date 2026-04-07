@@ -13,6 +13,10 @@ import useCachedData from '~/hooks/useCachedData';
 import useOnVisibilityStateChange from '~/hooks/useOnVisibilityStateChange';
 import { IntervalMultiplierType, ReviewModes } from '~/models/session';
 import { RenderMode } from '~/models/practice';
+import { backgroundStyles } from '~/theme';
+
+// Inject Roam body background color as CSS variable for theme inheritance
+const injectBodyColorStyle = backgroundStyles.injectBodyColor();
 
 export interface handlePracticeProps {
   refUid: string;
@@ -130,6 +134,8 @@ const App = () => {
   return (
     <Blueprint.HotkeysProvider>
       <>
+        {/* Inject Roam body color as CSS variable for theme inheritance */}
+        <style>{injectBodyColorStyle}</style>
         <SidePannelWidget onClickCallback={onShowPracticeOverlay} today={today} />
         {showPracticeOverlay && (
           <PracticeOverlay
