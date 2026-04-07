@@ -21,6 +21,7 @@ import { generateNewSession } from '~/queries';
 import { CompletionStatus, Today, RenderMode } from '~/models/practice';
 import { handlePracticeProps } from '~/app';
 import { useSafeContext } from '~/hooks/useSafeContext';
+import { getBodyBackgroundColor, colors } from '~/theme';
 
 interface MainContextProps {
   reviewMode: ReviewModes | undefined;
@@ -466,7 +467,7 @@ const PracticeOverlay = ({
         <div className="bp3-dialog-body" style={{ padding: '20px', maxHeight: '70vh', overflowY: 'auto' }}>
           <div style={{ marginBottom: '20px' }}>
             <h5 style={{ margin: '0 0 10px 0' }}>Tag Pages (Decks)</h5>
-            <p style={{ fontSize: '12px', color: '#888', margin: '0 0 5px 0' }}>
+            <p style={{ fontSize: '12px', color: colors.textMuted, margin: '0 0 5px 0' }}>
               Separate multiple decks with commas. Example: "memo, sr, 🐘, french exam"
             </p>
             <input
@@ -481,7 +482,7 @@ const PracticeOverlay = ({
 
           <div style={{ marginBottom: '20px' }}>
             <h5 style={{ margin: '0 0 10px 0' }}>Data Page Title</h5>
-            <p style={{ fontSize: '12px', color: '#888', margin: '0 0 5px 0' }}>
+            <p style={{ fontSize: '12px', color: colors.textMuted, margin: '0 0 5px 0' }}>
               Name of page where we'll store all your data
             </p>
             <input
@@ -496,7 +497,7 @@ const PracticeOverlay = ({
 
           <div style={{ marginBottom: '20px' }}>
             <h5 style={{ margin: '0 0 10px 0' }}>Daily Review Limit</h5>
-            <p style={{ fontSize: '12px', color: '#888', margin: '0 0 5px 0' }}>
+            <p style={{ fontSize: '12px', color: colors.textMuted, margin: '0 0 5px 0' }}>
               Number of cards to review each day. 0 means no limit.
             </p>
             <input
@@ -520,7 +521,7 @@ const PracticeOverlay = ({
               />
               <span>Right-to-Left (RTL) Enabled</span>
             </label>
-            <p style={{ fontSize: '12px', color: '#888', margin: '5px 0 0 0' }}>
+            <p style={{ fontSize: '12px', color: colors.textMuted, margin: '5px 0 0 0' }}>
               Enable RTL for languages like Arabic, Hebrew, etc.
             </p>
           </div>
@@ -536,14 +537,14 @@ const PracticeOverlay = ({
               />
               <span>Shuffle Cards</span>
             </label>
-            <p style={{ fontSize: '12px', color: '#888', margin: '5px 0 0 0' }}>
+            <p style={{ fontSize: '12px', color: colors.textMuted, margin: '5px 0 0 0' }}>
               Randomly shuffle the order of new and due cards during review.
             </p>
           </div>
 
           <div style={{ marginBottom: '20px' }}>
             <h5 style={{ margin: '0 0 10px 0' }}>Reinsert "Forgot" Cards After N Cards</h5>
-            <p style={{ fontSize: '12px', color: '#888', margin: '0 0 5px 0' }}>
+            <p style={{ fontSize: '12px', color: colors.textMuted, margin: '0 0 5px 0' }}>
               When you mark a card as "Forgot", it will be reinserted into the current review session N cards later. Set to 0 to disable.
             </p>
             <input
@@ -588,13 +589,7 @@ const Dialog = styled(Blueprint.Dialog)<{ $isEditing?: boolean }>`
   grid-template-rows: 50px 1fr auto;
   max-height: 80vh;
   width: 90vw;
-  background-color: ${() => {
-    // 继承 body 的背景色，自动适配 Roam 的明暗主题
-    if (typeof window !== 'undefined' && document.body) {
-      return getComputedStyle(document.body).backgroundColor || '#1a1a1a';
-    }
-    return '#1a1a1a';
-  }};
+  background-color: ${getBodyBackgroundColor()};
 
   ${mediaQueries.lg} {
     width: 80vw;
@@ -681,7 +676,7 @@ const HeaderWrapper = styled.div`
   line-height: inherit;
   margin: 0;
   min-height: 50px;
-  border-bottom: 1px solid rgba(128, 128, 128, 0.15);
+  border-bottom: 1px solid ${colors.borderSubtle};
 `;
 
 const TagSelector = ({ tagsList, selectedTag, onTagChange }) => {

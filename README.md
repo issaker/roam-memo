@@ -57,8 +57,26 @@ After finishing due cards, continue reviewing all cards in the deck without affe
 
 Type "Memo: Start Review Session" in the command palette (`Cmd+P` / `Ctrl+P`).
 
+## Review Modes
+
+The plugin offers two review modes:
+
+### Spaced Interval Mode (Memory Training)
+Uses the SM2 algorithm to optimize long-term memory retention with grading: Forgot / Hard / Good / Perfect.
+
+### Fixed Interval Mode (Progressive Reading)
+A relaxed approach for content you want to revisit regularly. Includes **Progressive Mode** with exponential growth:
+- Review schedule: 2 days → 6 days → 12 days → 24 days → 48 days → 96 days → and so on
+- Pure function design: Next interval calculated solely from `progressiveRepetitions` count
+- No state tracking needed between reviews
+- Formula after 2nd review: `interval = 6 × 2^(repetitions-1)`
+
+> **Tip:** New cards default to Progressive mode for a gentler learning experience.
+
 ## Recent Updates
 
+- **2026-04 Color Theme System** — Unified color management with CSS variables for automatic light/dark theme adaptation. Eliminated hardcoded colors and duplicate code for better maintainability.
+- **2026-04 Progressive Mode Simplification** — Progressive mode now uses pure function design based solely on `progressiveRepetitions` count. No interval state tracking needed. Simpler and more predictable.
 - **2025-04 Breadcrumbs persistence** — User's breadcrumb visibility preference is now saved to localStorage and restored on next session
 - **Mobile navigation buttons** — ◀ ▶ buttons in the footer for card navigation on all devices
 - **Focus fix** — Resolved focus loss when navigating between blocks with arrow keys or selecting text

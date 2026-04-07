@@ -5,46 +5,11 @@ import * as asyncUtils from '~/utils/async';
 import styled from '@emotion/styled';
 import * as stringUtils from '~/utils/string';
 import { CompleteRecords } from '~/models/session';
-
-const BorderColor = '#e5e7eb';
-
-const SessionsTable = ({ sessions }) => {
-  const hasNewSession = sessions.some((session) => !session.isRoamSrOldPracticeRecord);
-  return (
-    <div className="overflow-scroll">
-      <table className="bp3-html-table bp3-small bp3-html-table-striped w-full">
-        <thead>
-          <tr>
-            <th>Grade</th>
-            <th>Date</th>
-            <th>eFactor</th>
-            <th>Interval</th>
-            <th>Streak</th>
-            <th>Due</th>
-            {hasNewSession && <th>New</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {sessions.map((session, i) => (
-            <tr key={i}>
-              <td>{session.grade}</td>
-              <td>{stringUtils.toDateString(session.dateCreated)}</td>
-              <td>{session.eFactor.toFixed(2)}</td>
-              <td>{session.interval}</td>
-              <td>{session.repetitions}</td>
-              <td>{stringUtils.toDateString(session.nextDueDate)}</td>
-              {hasNewSession && <td>{!session.isRoamSrOldPracticeRecord ? '❇️' : ''}</td>}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-};
+import { colors } from '~/theme';
 
 const Divider = styled.div`
   width: 100%;
-  border-bottom: 1px solid ${BorderColor};
+  border-bottom: 1px solid ${colors.borderSubtle};
 `;
 
 const Block = ({ uuid, sessions, isLast, isFirst, selectedUids, setSelectedUids, blockInfo }) => {
@@ -118,7 +83,7 @@ const Dialog = styled(Blueprint.Dialog)`
 `;
 
 const HeaderElm = styled.div`
-  border-bottom: 1px solid ${BorderColor};
+  border-bottom: 1px solid ${colors.borderSubtle};
 `;
 
 const Header = ({

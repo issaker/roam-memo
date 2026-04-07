@@ -5,6 +5,7 @@ import * as domUtils from '~/utils/dom';
 import * as asyncUtils from '~/utils/async';
 import { Icon } from '@blueprintjs/core';
 import useCloze from '~/hooks/useCloze';
+import { colors } from '~/theme';
 
 const CardBlock = ({
   refUid,
@@ -152,7 +153,7 @@ const ContentWrapper = styled.div<{
   // Only apply cloze hiding to custom clozes with {} syntax
   // Roam's native ^^ highlighting (.rm-highlight) keeps its default styles
   .roam-memo-cloze {
-    background-color: ${(props) => (props.showAnswers ? 'transparent' : '#e1e3e5')};
+    background-color: ${(props) => (props.showAnswers ? colors.clozeVisible : colors.clozeHidden)};
     color: ${(props) => (props.showAnswers ? 'inherit' : 'transparent')};
     overflow: hidden;
     border-radius: 2px;

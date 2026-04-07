@@ -7,6 +7,7 @@ import Tooltip from '~/components/Tooltip';
 import ButtonTags from '~/components/ButtonTags';
 import { IntervalMultiplierType, ReviewModes } from '~/models/session';
 import { MainContext } from '~/components/overlay/PracticeOverlay';
+import { getIntentColor, colors } from '~/theme';
 
 interface IntervalEstimate {
   reviewMode: string;
@@ -624,7 +625,7 @@ const SpacedIntervalModeControls = ({
 
 const FooterWrapper = styled.div`
   min-height: 50px;
-  border-top: 1px solid rgba(128, 128, 128, 0.15);
+  border-top: 1px solid ${colors.borderSubtle};
 
   & .bp3-button-text {
     display: flex;
@@ -646,34 +647,18 @@ const SetIntervalToggleWrapper = styled.div``;
 
 const ControlButtonWrapper = styled(Blueprint.Button)<{ intent?: string }>`
   /* 继承背景色 + 半透明灰色遮罩 */
-  background: rgba(255, 255, 255, 0.05) !important;
+  background: ${colors.overlayLight} !important;
   
-  /* 手动应用 intent 颜色（亮色版本，适合夜间模式） */
-  color: ${(props) => {
-    switch (props.intent) {
-      case 'primary': return '#8cb4ff';
-      case 'success': return '#56d364';
-      case 'warning': return '#d29922';
-      case 'danger': return '#f85149';
-      default: return 'inherit';
-    }
-  }};
+  /* 使用主题系统中的 intent 颜色 */
+  color: ${(props) => getIntentColor(props.intent)};
 
   & .bp3-button-text {
-    color: ${(props) => {
-      switch (props.intent) {
-        case 'primary': return '#8cb4ff';
-        case 'success': return '#56d364';
-        case 'warning': return '#d29922';
-        case 'danger': return '#f85149';
-        default: return 'inherit';
-      }
-    }};
+    color: ${(props) => getIntentColor(props.intent)};
   }
 
   /* hover 效果 */
   &:hover {
-    background: rgba(255, 255, 255, 0.1) !important;
+    background: ${colors.overlayLightHover} !important;
   }
 `;
 
