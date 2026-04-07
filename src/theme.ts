@@ -46,28 +46,16 @@ export const colors = {
   textTertiary: '0.5',
 };
 
-// Background color inheritance - simple hardcoded fallback based on Roam theme class
-// Apply to overlay container to prevent transparent layers from showing body background
+// Background color inheritance - prevent transparent overlay from showing body background
 export const backgroundStyles = {
-  // CSS for overlay container - prevents transparent layers from showing through
+  // CSS for overlay container - inherit body color with opacity
   overlayBackgroundCSS: `
-    /* Light theme: white background */
     .bp3-portal {
-      background-color: #ffffff;
-    }
-    
-    /* Dark theme: Roam uses html.rs-dark class */
-    html.rs-dark .bp3-portal {
-      background-color: #182026;
-    }
-    
-    /* Auto theme: inherit from body */
-    html.rs-auto .bp3-portal {
       background-color: inherit;
     }
   `,
   
-  // CSS for Dialog component itself (transparent is fine since parent handles background)
+  // CSS for Dialog component - transparent is fine since parent handles background
   dialogBackgroundCSS: `
     background-color: transparent;
     color: inherit;
