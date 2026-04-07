@@ -646,19 +646,19 @@ const FooterActionsWrapper = styled.div`
 const SetIntervalToggleWrapper = styled.div``;
 
 const ControlButtonWrapper = styled(Blueprint.Button)<{ intent?: string }>`
-  /* 继承背景色 + 半透明灰色遮罩 */
-  background: ${colors.overlayLight} !important;
+  /* Semi-transparent overlay background */
+  background: ${colors.overlayLight};
   
-  /* 使用主题系统中的 intent 颜色 */
+  /* Use intent colors from theme system */
   color: ${(props) => getIntentColor(props.intent)};
 
   & .bp3-button-text {
     color: ${(props) => getIntentColor(props.intent)};
   }
 
-  /* hover 效果 */
+  /* Hover effect */
   &:hover {
-    background: ${colors.overlayLightHover} !important;
+    background: ${colors.overlayLightHover};
   }
 `;
 

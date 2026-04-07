@@ -2,14 +2,12 @@
  * Roam Memo Theme System
  * 
  * Design Principle:
- * - All colors inherit from Roam body (background + text)
- * - Functional colors (intent, borders, cloze masks) are defined separately
- * - This ensures unified theme adaptation for any Roam theme (light/dark/auto/custom)
- * 
- * Roam sets colors on body element, we use CSS inherit to get them.
+ * - All colors inherit from Roam body automatically via CSS
+ * - Only functional colors (intent, cloze masks) are explicitly defined
+ * - Simple and straightforward - no complex JS injection needed
  */
 
-// Intent color mapping - uses CSS custom properties that adapt to theme
+// Intent color mapping - uses Roam's CSS variables
 export const intentColors = {
   primary: 'var(--roam-primary-color, #8cb4ff)',
   success: 'var(--roam-success-color, #56d364)',
@@ -28,8 +26,8 @@ export const getIntentColor = (intent?: string): string => {
 // Common color utilities
 export const colors = {
   // Transparent backgrounds with opacity for overlays (buttons, etc.)
-  overlayLight: 'rgba(255, 255, 255, 0.05)',
-  overlayLightHover: 'rgba(255, 255, 255, 0.1)',
+  overlayLight: 'rgba(128, 128, 128, 0.08)',
+  overlayLightHover: 'rgba(128, 128, 128, 0.12)',
   
   // Cloze card background (light gray for hidden state)
   clozeHidden: '#e1e3e5',
@@ -40,39 +38,4 @@ export const colors = {
   
   // Text colors
   textMuted: 'var(--roam-text-muted-color, #888)',
-  
-  // Text opacity variants
-  textSecondary: '0.6',
-  textTertiary: '0.5',
-};
-
-// Background color inheritance - use JS to read body color and inject as CSS
-export const backgroundStyles = {
-  // Generate CSS string with actual body background color
-  generateOverlayCSS: () => {
-    if (typeof window !== 'undefined' && document.body) {
-      const bodyBg = getComputedStyle(document.body).backgroundColor;
-      return `
-        .bp3-dialog-container,
-        .bp3-overlay-content,
-        .bp3-dialog {
-          background-color: ${bodyBg} !important;
-        }
-        .bp3-dialog {
-          color: inherit;
-        }
-      `;
-    }
-    // Fallback for SSR
-    return `
-      .bp3-dialog-container,
-      .bp3-overlay-content,
-      .bp3-dialog {
-        background-color: #ffffff !important;
-      }
-      .bp3-dialog {
-        color: inherit;
-      }
-    `;
-  },
 };

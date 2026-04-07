@@ -21,7 +21,7 @@ import { generateNewSession } from '~/queries';
 import { CompletionStatus, Today, RenderMode } from '~/models/practice';
 import { handlePracticeProps } from '~/app';
 import { useSafeContext } from '~/hooks/useSafeContext';
-import { colors, backgroundStyles } from '~/theme';
+import { colors } from '~/theme';
 
 interface MainContextProps {
   reviewMode: ReviewModes | undefined;
@@ -589,7 +589,7 @@ const Dialog = styled(Blueprint.Dialog)<{ $isEditing?: boolean }>`
   grid-template-rows: 50px 1fr auto;
   max-height: 80vh;
   width: 90vw;
-  /* 背景色由全局 CSS 控制（app.tsx 注入） */
+  /* Background and text color inherit from Roam body automatically */
 
   ${mediaQueries.lg} {
     width: 80vw;
@@ -613,19 +613,19 @@ const Dialog = styled(Blueprint.Dialog)<{ $isEditing?: boolean }>`
 
 const mobileOverlayStyles = (isEditing: boolean) => `
   @media (max-width: 768px) {
-    /* 移动端禁用半透明背景层，使其完全透明且可穿透 */
+    /* Mobile: Make backdrop transparent and clickable-through */
     .bp3-overlay.bp3-overlay-open > .bp3-overlay-backdrop {
       opacity: 0 !important;
       background: transparent !important;
       pointer-events: none !important;
     }
 
-    /* overlay 本身不拦截背后页面点击 */
+    /* Overlay itself doesn't block clicks */
     .bp3-overlay.bp3-overlay-open {
       pointer-events: none !important;
     }
 
-    /* memo 弹窗主体仍可操作 */
+    /* Dialog content remains interactive */
     .bp3-overlay.bp3-overlay-open .bp3-dialog-container,
     .bp3-overlay.bp3-overlay-open .bp3-dialog,
     .bp3-overlay.bp3-overlay-open [role=\"dialog\"],
@@ -633,12 +633,13 @@ const mobileOverlayStyles = (isEditing: boolean) => `
       pointer-events: auto !important;
     }
 
-    /* memo 内部菜单仍可点 */
+    /* Internal menus remain clickable */
     .bp3-overlay.bp3-overlay-open .bp3-popover,
     .bp3-overlay.bp3-overlay-open .bp3-popover * {
       pointer-events: auto !important;
     }
 
+    /* Full-screen positioning - must override Blueprint defaults */
     .bp3-overlay.bp3-overlay-open {
       position: fixed !important;
       top: 0 !important;
@@ -647,7 +648,6 @@ const mobileOverlayStyles = (isEditing: boolean) => `
       height: 100dvh !important;
       margin: 0 !important;
       padding: 0 !important;
-      /* 使用 safe-area-inset-bottom 自动适配浏览器底部工具栏 */
       padding-bottom: env(safe-area-inset-bottom, 0px) !important;
     }
     .bp3-overlay .bp3-dialog-container {
