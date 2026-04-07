@@ -629,23 +629,36 @@ const FooterActionsWrapper = styled.div`
 
 const SetIntervalToggleWrapper = styled.div``;
 
-const ControlButtonWrapper = styled(Blueprint.Button)`
+const ControlButtonWrapper = styled(Blueprint.Button)<{ intent?: string }>`
+  /* 统一按钮背景色 */
+  background-color: transparent !important;
+  
   /* 手动应用 intent 颜色（亮色版本，适合夜间模式） */
-  &.bp3-intent-primary,
-  &.bp3-intent-primary .bp3-button-text {
-    color: #8cb4ff !important;
+  color: ${(props) => {
+    switch (props.intent) {
+      case 'primary': return '#8cb4ff';
+      case 'success': return '#56d364';
+      case 'warning': return '#d29922';
+      case 'danger': return '#f85149';
+      default: return 'inherit';
+    }
+  }} !important;
+
+  & .bp3-button-text {
+    color: ${(props) => {
+      switch (props.intent) {
+        case 'primary': return '#8cb4ff';
+        case 'success': return '#56d364';
+        case 'warning': return '#d29922';
+        case 'danger': return '#f85149';
+        default: return 'inherit';
+      }
+    }} !important;
   }
-  &.bp3-intent-success,
-  &.bp3-intent-success .bp3-button-text {
-    color: #56d364 !important;
-  }
-  &.bp3-intent-warning,
-  &.bp3-intent-warning .bp3-button-text {
-    color: #d29922 !important;
-  }
-  &.bp3-intent-danger,
-  &.bp3-intent-danger .bp3-button-text {
-    color: #f85149 !important;
+
+  /* hover 效果 */
+  &:hover {
+    background-color: rgba(128, 128, 128, 0.15) !important;
   }
 `;
 
