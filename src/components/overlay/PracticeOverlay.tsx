@@ -594,14 +594,25 @@ const Dialog = styled(Blueprint.Dialog)<{ $isEditing?: boolean }>`
   color: inherit;
   
   /* 确保不透明：如果 inherit 导致透明，使用固定背景色回退 */
-  /* 夜间模式：Roam 使用 html.rs-dark class */
+  /* 明确设置了夜间模式 */
   html.rs-dark & {
     background-color: #182026;
   }
   
-  /* 白天模式：默认白色背景 */
-  html.rs-light &, html:not(.rs-dark) & {
+  /* 明确设置了白天模式 */
+  html.rs-light & {
     background-color: #ffffff;
+  }
+  
+  /* 自动模式：跟随系统主题 */
+  html:not(.rs-light):not(.rs-dark) & {
+    background-color: #ffffff;
+  }
+  
+  @media (prefers-color-scheme: dark) {
+    html:not(.rs-light):not(.rs-dark) & {
+      background-color: #182026;
+    }
   }
 
   ${mediaQueries.lg} {
