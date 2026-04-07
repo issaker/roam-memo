@@ -403,21 +403,25 @@ const FixedIntervalEditor = () => {
     { value: IntervalMultiplierType.Years, label: 'Years' },
   ];
 
+  const isProgressiveMode = intervalMultiplierType === IntervalMultiplierType.Progressive;
+
   return (
     <div className="flex p-2 items-center w-80 justify-evenly">
-      <div className="">Every</div>
-      <div className="w-24">
-        <Blueprint.NumericInput
-          min={1}
-          max={365}
-          stepSize={1}
-          majorStepSize={30}
-          minorStepSize={1}
-          value={intervalMultiplier}
-          onValueChange={handleInputValueChange}
-          fill
-        />
-      </div>
+      {!isProgressiveMode && <div className="">Every</div>}
+      {!isProgressiveMode && (
+        <div className="w-24">
+          <Blueprint.NumericInput
+            min={1}
+            max={365}
+            stepSize={1}
+            majorStepSize={30}
+            minorStepSize={1}
+            value={intervalMultiplier}
+            onValueChange={handleInputValueChange}
+            fill
+          />
+        </div>
+      )}
       <div className="bp3-html-select">
         <select
           value={intervalMultiplierType}
