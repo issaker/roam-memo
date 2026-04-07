@@ -407,7 +407,7 @@ const FixedIntervalEditor = () => {
   const isProgressiveMode = intervalMultiplierType === IntervalMultiplierType.Progressive;
 
   return (
-    <div className="flex p-2 items-center w-80 justify-evenly">
+    <div className={`flex p-2 items-center ${isProgressiveMode ? 'w-auto' : 'w-80'} justify-evenly`}>
       {!isProgressiveMode && <div className="">Every</div>}
       {!isProgressiveMode && (
         <div className="w-24">
