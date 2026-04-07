@@ -85,6 +85,11 @@ const App = () => {
   });
 
   const onShowPracticeOverlay = () => {
+    // Update CSS variable when opening overlay (in case theme changed)
+    const styleEl = document.getElementById('roam-memo-theme');
+    if (styleEl) {
+      styleEl.textContent = backgroundStyles.injectBodyColor();
+    }
     refreshData();
     setShowPracticeOverlay(true);
     setIsCramming(false);
@@ -135,7 +140,7 @@ const App = () => {
     <Blueprint.HotkeysProvider>
       <>
         {/* Inject Roam body color as CSS variable for theme inheritance */}
-        <style>{injectBodyColorStyle}</style>
+        <style id="roam-memo-theme">{injectBodyColorStyle}</style>
         <SidePannelWidget onClickCallback={onShowPracticeOverlay} today={today} />
         {showPracticeOverlay && (
           <PracticeOverlay
