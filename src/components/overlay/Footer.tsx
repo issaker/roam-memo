@@ -630,12 +630,8 @@ const FooterActionsWrapper = styled.div`
 const SetIntervalToggleWrapper = styled.div``;
 
 const ControlButtonWrapper = styled(Blueprint.Button)<{ intent?: string }>`
-  /* 强制重置所有按钮背景 */
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  box-shadow: none !important;
-  border: none !important;
+  /* 继承背景色 + 半透明灰色遮罩 */
+  background: rgba(255, 255, 255, 0.05) !important;
   
   /* 手动应用 intent 颜色（亮色版本，适合夜间模式） */
   color: ${(props) => {
@@ -646,7 +642,7 @@ const ControlButtonWrapper = styled(Blueprint.Button)<{ intent?: string }>`
       case 'danger': return '#f85149';
       default: return 'inherit';
     }
-  }} !important;
+  }};
 
   & .bp3-button-text {
     color: ${(props) => {
@@ -657,22 +653,12 @@ const ControlButtonWrapper = styled(Blueprint.Button)<{ intent?: string }>`
         case 'danger': return '#f85149';
         default: return 'inherit';
       }
-    }} !important;
-  }
-
-  /* 强制覆盖 Blueprint 的 intent 背景 */
-  &::before,
-  &::after {
-    background: transparent !important;
-    background-color: transparent !important;
+    }};
   }
 
   /* hover 效果 */
   &:hover {
-    background: rgba(128, 128, 128, 0.15) !important;
-    background-color: rgba(128, 128, 128, 0.15) !important;
-    background-image: none !important;
-    box-shadow: none !important;
+    background: rgba(255, 255, 255, 0.1) !important;
   }
 `;
 
