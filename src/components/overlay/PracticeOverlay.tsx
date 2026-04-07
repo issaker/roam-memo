@@ -371,7 +371,7 @@ const PracticeOverlay = ({
         $isEditing={isEditing}
         isOpen={isOpen}
         onClose={onCloseCallback}
-        className="pb-0 bg-white"
+        className="pb-0 bp3-dark"
         canEscapeKeyClose={false}
       >
         <Header
