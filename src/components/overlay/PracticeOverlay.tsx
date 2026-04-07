@@ -589,9 +589,20 @@ const Dialog = styled(Blueprint.Dialog)<{ $isEditing?: boolean }>`
   grid-template-rows: 50px 1fr auto;
   max-height: 80vh;
   width: 90vw;
-  /* 使用不透明背景色，自动适配 Roam 的主题切换 */
-  background-color: ${colors.dialogBackground};
-  color: ${colors.colorInherit};
+  /* 优先使用 body 的背景色，自动适配所有主题（包括自定义主题） */
+  background-color: inherit;
+  color: inherit;
+  
+  /* 确保不透明：如果 inherit 导致透明，使用固定背景色回退 */
+  /* 夜间模式：Roam 使用 html.rs-dark class */
+  html.rs-dark & {
+    background-color: #182026;
+  }
+  
+  /* 白天模式：默认白色背景 */
+  html.rs-light &, html:not(.rs-dark) & {
+    background-color: #ffffff;
+  }
 
   ${mediaQueries.lg} {
     width: 80vw;

@@ -25,9 +25,10 @@ export const getIntentColor = (intent?: string): string => {
 
 // Common color utilities
 export const colors = {
-  // Background colors - use CSS variables to get Roam's actual background
-  // This ensures the dialog is opaque and adapts to theme changes
-  dialogBackground: 'var(--roam-background-color, var(--bp3-dark-background1, #182026))',
+  // Background colors - use CSS variables with proper theme detection
+  // Roam uses html.rs-light and html.rs-dark classes to switch themes
+  // Light theme fallback: #ffffff (white), Dark theme fallback: #182026
+  dialogBackground: 'var(--roam-background-color, var(--bp3-background1, #ffffff))',
   
   // Inherit text color from body - automatically adapts to theme changes
   colorInherit: 'inherit',
