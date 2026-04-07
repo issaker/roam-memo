@@ -589,6 +589,13 @@ const Dialog = styled(Blueprint.Dialog)<{ $isEditing?: boolean }>`
   max-height: 80vh;
   width: 90vw;
   color: inherit;
+  background-color: ${() => {
+    // 继承 body 的背景色，自动适配 Roam 的明暗主题
+    if (typeof window !== 'undefined' && document.body) {
+      return getComputedStyle(document.body).backgroundColor || '#1a1a1a';
+    }
+    return '#1a1a1a';
+  }};
 
   ${mediaQueries.lg} {
     width: 80vw;

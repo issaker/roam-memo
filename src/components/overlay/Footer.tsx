@@ -620,6 +620,9 @@ const FooterWrapper = styled.div`
     justify-content: center;
     align-items: center;
   }
+
+  /* 继承 Dialog 的背景色 */
+  background-color: inherit;
 `;
 
 const FooterActionsWrapper = styled.div`
