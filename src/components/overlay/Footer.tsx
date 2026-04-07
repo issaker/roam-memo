@@ -528,7 +528,7 @@ const FixedIntervalModeControls = ({
             <IntervalString
               intervalMultiplier={intervalMultiplier}
               intervalMultiplierType={intervalMultiplierType}
-              nextDueDateFromNow={intervalEstimates[4]?.nextDueDateFromNow}
+              nextDueDateFromNow={intervalEstimates[0]?.nextDueDateFromNow}
             />
             <ButtonTags>E</ButtonTags>
           </span>
