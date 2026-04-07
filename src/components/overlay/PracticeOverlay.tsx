@@ -658,17 +658,13 @@ const mobileOverlayStyles = (isEditing: boolean) => `
       margin: 0 !important;
     }
 
-    /* 移动端夜间模式适配：抵消 Roam 页面的反色滤镜 */
-    @supports (filter: invert(1)) {
-      .bp3-overlay.bp3-overlay-open .bp3-dialog {
-        filter: invert(1) hue-rotate(180deg) !important;
-      }
-      /* 图片和视频不需要反色，再次反转回来 */
-      .bp3-overlay.bp3-overlay-open .bp3-dialog img,
-      .bp3-overlay.bp3-overlay-open .bp3-dialog video,
-      .bp3-overlay.bp3-overlay-open .bp3-dialog canvas {
-        filter: invert(1) hue-rotate(180deg) !important;
-      }
+    /* 移动端夜间模式适配：阻止 Roam 页面的反色滤镜影响插件窗口 */
+    .bp3-overlay.bp3-overlay-open .bp3-dialog,
+    .bp3-overlay.bp3-overlay-open .bp3-dialog *,
+    .bp3-overlay.bp3-overlay-open .bp3-dialog-container,
+    .bp3-overlay.bp3-overlay-open .bp3-dialog-container * {
+      filter: none !important;
+      -webkit-filter: none !important;
     }
   }
 `;
