@@ -599,11 +599,13 @@ const Dialog = styled(Blueprint.Dialog)<{ $isEditing?: boolean }>`
 
   /* Full-screen on mobile */
   @media (max-width: 768px) {
-    max-height: 100vh;
+    max-height: 100dvh;
     width: 100vw;
-    height: 100vh;
+    height: 100dvh;
     margin: 0;
     border-radius: 0;
+    /* 使用 safe-area-inset-bottom 自动适配浏览器底部工具栏 */
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 `;
 
@@ -624,7 +626,7 @@ const mobileOverlayStyles = (isEditing: boolean) => `
     /* memo 弹窗主体仍可操作 */
     .bp3-overlay.bp3-overlay-open .bp3-dialog-container,
     .bp3-overlay.bp3-overlay-open .bp3-dialog,
-    .bp3-overlay.bp3-overlay-open [role="dialog"],
+    .bp3-overlay.bp3-overlay-open [role=\"dialog\"],
     .bp3-overlay.bp3-overlay-open .bp3-dialog * {
       pointer-events: auto !important;
     }
@@ -640,9 +642,11 @@ const mobileOverlayStyles = (isEditing: boolean) => `
       top: 0 !important;
       left: 0 !important;
       width: 100vw !important;
-      height: 100vh !important;
+      height: 100dvh !important;
       margin: 0 !important;
       padding: 0 !important;
+      /* 使用 safe-area-inset-bottom 自动适配浏览器底部工具栏 */
+      padding-bottom: env(safe-area-inset-bottom, 0px) !important;
     }
     .bp3-overlay .bp3-dialog-container {
       position: static !important;
@@ -652,6 +656,19 @@ const mobileOverlayStyles = (isEditing: boolean) => `
       align-items: stretch !important;
       justify-content: stretch !important;
       margin: 0 !important;
+    }
+
+    /* 移动端夜间模式适配：抵消 Roam 页面的反色滤镜 */
+    @supports (filter: invert(1)) {
+      .bp3-overlay.bp3-overlay-open .bp3-dialog {
+        filter: invert(1) hue-rotate(180deg) !important;
+      }
+      /* 图片和视频不需要反色，再次反转回来 */
+      .bp3-overlay.bp3-overlay-open .bp3-dialog img,
+      .bp3-overlay.bp3-overlay-open .bp3-dialog video,
+      .bp3-overlay.bp3-overlay-open .bp3-dialog canvas {
+        filter: invert(1) hue-rotate(180deg) !important;
+      }
     }
   }
 `;
