@@ -44,6 +44,8 @@ export default function useCurrentCardData({
 
   const [reviewModeOverride, setReviewModeOverride] = React.useState<ReviewModes | undefined>();
 
+  // Effect 1: Respond to reviewModeOverride changes (manual switch or live-data override)
+  // Resolves the correct session data matching the override, or falls back to latestSession
   React.useEffect(() => {
     if (!currentCardRefUid) {
       setCurrentCardData(undefined);
@@ -65,6 +67,9 @@ export default function useCurrentCardData({
     setReviewMode(latestSession?.reviewMode);
   }, [reviewMode, sessions, currentCardRefUid, latestSession, reviewModeOverride]);
 
+  // Effect 2: On card navigation, fetch live reviewMode from Data Page
+  // Defers state update until async query completes to avoid flicker
+  // (no intermediate reset of reviewModeOverride before the new value is ready)
   React.useEffect(() => {
     if (!currentCardRefUid) {
       setReviewModeOverride(undefined);
@@ -82,13 +87,17 @@ export default function useCurrentCardData({
 
     (async () => {
       try {
+        // getPluginPageData({ limitToLatest: true }) returns Records type:
+        // { [uid: string]: Session } — each value is a single Session object, NOT an array
         const latestPluginData = await getPluginPageData({ dataPageTitle, limitToLatest: true });
         if (cancelled) return;
 
         const liveSession = latestPluginData[currentCardRefUid];
         if (liveSession?.reviewMode && liveSession.reviewMode !== latestSession?.reviewMode) {
+          // Live reviewMode differs from session-cached value → apply override
           setReviewModeOverride(liveSession.reviewMode);
         } else {
+          // No difference → clear override, confirm current reviewMode
           setReviewModeOverride(undefined);
           setReviewMode(latestSession?.reviewMode);
         }

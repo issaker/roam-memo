@@ -91,8 +91,17 @@ A relaxed approach for content you want to revisit regularly. Includes **Progres
 
 > **Tip:** New cards default to Progressive mode for a gentler learning experience. Switch to Spaced Interval mode anytime if you want more granular control over difficulty ratings.
 
+### Dynamic Review Mode Switching
+
+Each card's `reviewMode` is read from the Data Page in real-time on every card navigation. This means:
+
+- If you change a card's `reviewMode::` field on the Data Page during a session, the change takes effect immediately when you navigate to that card — no session restart required.
+- Different cards can have independent review modes within the same session.
+- The implementation uses `getPluginPageData({ limitToLatest: true })` to fetch the latest `reviewMode` from the Data Page asynchronously. To avoid UI flicker, state updates are deferred until the async query completes, so no intermediate render with stale mode occurs.
+
 ## Recent Updates
 
+- **2026-04 Dynamic Review Mode Switching** — `reviewMode` is now read from the Data Page in real-time on each card navigation, instead of being fixed at session start. Changes to `reviewMode::` on the Data Page take effect immediately without restarting the session. Async state updates are deferred to prevent UI flicker.
 - **2026-04 Card Rendering Flicker Fix** — Fixed UI flickering when navigating between cards with different structures (e.g., from Q&A card to single-block card). Root cause: state judgment was faster than DOM rendering, causing stale content to briefly appear. Solution: Added `isRendered` flag that delays automatic answer display until Roam API completes rendering. This ensures clean transitions without visual artifacts.
 - **2026-04 Breadcrumb Order Fix** — Fixed breadcrumb display order to perfectly match Roam native. Roam's `:block/parents` API returns unordered ancestor array, so the plugin now queries each parent's depth via pull API and sorts by hierarchy depth. This ensures correct root-to-leaf order regardless of API return order.
 - **2026-04 Color Theme System** — Unified color management with CSS variables for automatic light/dark theme adaptation. Eliminated hardcoded colors and duplicate code for better maintainability.
