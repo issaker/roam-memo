@@ -200,23 +200,41 @@ const PracticeOverlay = ({
     setIsRendered(false);
   }, [currentCardRefUid]);
 
-  // Check reviewMode from block after rendering
+  // Re-fetch reviewMode from roam/memo > data page after rendering
+  // This allows real-time detection of reviewMode changes made by user during session
   React.useEffect(() => {
     if (!isRendered || !currentCardRefUid) return;
 
+    // Query the latest session for this card from roam/memo > data page
     window.roamAlphaAPI.q(
-      `[:find (pull ?block [{:block/children [:block/string]}]) :in $ ?uid :where [?block :block/uid ?uid]]`,
+      `[:find (pull ?session [:block/string {:block/children [:block/string]}]) 
+        :in $ ?ref-uid 
+        :where 
+        [?page :node/title "roam/memo"]
+        [?data-block :block/page ?page]
+        [?data-block :block/string "data"]
+        [?entry :block/parents ?data-block]
+        [?entry-ref :block/string ?ref-string]
+        [(str "((" ?ref-uid "))") ?expected-ref]
+        [(= ?ref-string ?expected-ref)]
+        [?session :block/parents ?entry]
+        [?session :block/order 0]]`,
       currentCardRefUid
     ).then((result) => {
-      if (!result || !result[0] || !result[0][0]) return;
+      if (!result || result.length === 0 || !result[0][0]) return;
       
-      const children = result[0][0].children || [];
-      const reviewModeChild = children.find((c: any) => c.string?.includes('reviewMode::'));
+      const session = result[0][0];
+      if (!session.children) return;
+      
+      // Parse reviewMode from session children
+      const reviewModeChild = session.children.find((c: any) => 
+        c.string && c.string.includes('reviewMode::')
+      );
       
       if (reviewModeChild) {
         const [, mode] = reviewModeChild.string.split('::').map((s: string) => s.trim());
         if (mode === ReviewModes.FixedInterval || mode === ReviewModes.DefaultSpacedInterval) {
-          console.log('[Memo] Card', currentCardRefUid, 'mode:', mode);
+          console.log('[Memo] Real-time reviewMode detected:', mode);
           setReviewModeOverride(mode as ReviewModes);
         }
       }
