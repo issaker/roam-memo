@@ -66,10 +66,17 @@ export default function useCurrentCardData({
   }, [reviewMode, sessions, currentCardRefUid, latestSession, reviewModeOverride]);
 
   React.useEffect(() => {
-    setReviewModeOverride(undefined);
-    setReviewMode(latestSession?.reviewMode);
+    if (!currentCardRefUid) {
+      setReviewModeOverride(undefined);
+      setReviewMode(undefined);
+      return;
+    }
 
-    if (!currentCardRefUid || !dataPageTitle) return;
+    if (!dataPageTitle) {
+      setReviewModeOverride(undefined);
+      setReviewMode(latestSession?.reviewMode);
+      return;
+    }
 
     let cancelled = false;
 
@@ -79,16 +86,16 @@ export default function useCurrentCardData({
         if (cancelled) return;
 
         const liveSession = latestPluginData[currentCardRefUid];
-        console.log('[Memo] liveSession for', currentCardRefUid, ':', liveSession);
-        console.log('[Memo] liveSession.reviewMode:', liveSession?.reviewMode);
-        console.log('[Memo] latestSession?.reviewMode:', latestSession?.reviewMode);
-
         if (liveSession?.reviewMode && liveSession.reviewMode !== latestSession?.reviewMode) {
-          console.log('[Memo] Setting reviewModeOverride to:', liveSession.reviewMode);
           setReviewModeOverride(liveSession.reviewMode);
+        } else {
+          setReviewModeOverride(undefined);
+          setReviewMode(latestSession?.reviewMode);
         }
       } catch (error) {
         console.error('[Memo] Error getting latest plugin data:', error);
+        setReviewModeOverride(undefined);
+        setReviewMode(latestSession?.reviewMode);
       }
     })();
 
