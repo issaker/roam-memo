@@ -151,7 +151,9 @@ const PracticeOverlay = ({
   const [showAnswers, setShowAnswers] = React.useState(false);
   const [hasCloze, setHasCloze] = React.useState(true);
   const [showSettings, setShowSettings] = React.useState(false);
-  const [isRendered, setIsRendered] = React.useState(false);
+  
+  // Use ref to track the current card UID for async safety
+  const currentCardUidRef = React.useRef<string | undefined>(undefined);
 
   const shouldShowAnswerFirst =
     renderMode === RenderMode.AnswerFirst && hasBlockChildrenUids && !showAnswers;
@@ -184,21 +186,30 @@ const PracticeOverlay = ({
     loadSettings();
   }, []);
 
-  // Reset showAnswers state
+  // Update ref when card changes
   React.useEffect(() => {
-    if (!isRendered) return; // Wait for rendering to complete
+    currentCardUidRef.current = currentCardRefUid;
+  }, [currentCardRefUid]);
+
+  // Reset showAnswers synchronously when card changes
+  React.useEffect(() => {
+    setShowAnswers(false);
+  }, [currentCardRefUid]);
+
+  // Auto-show answers for simple cards after data loads
+  // Uses ref to ensure we only affect the current card
+  React.useEffect(() => {
+    // Don't proceed if no card or data not loaded
+    if (!currentCardRefUid || !blockInfo.refUid) return;
     
-    if (hasBlockChildren || hasCloze) {
-      setShowAnswers(false);
-    } else {
+    // Safety check: only proceed if this is still the current card
+    if (blockInfo.refUid !== currentCardUidRef.current) return;
+    
+    // Only auto-show for simple cards (no children AND no cloze)
+    if (!hasBlockChildren && !hasCloze) {
       setShowAnswers(true);
     }
-  }, [hasBlockChildren, hasCloze, isRendered]);
-
-  // Reset render flag when card changes
-  React.useEffect(() => {
-    setIsRendered(false);
-  }, [currentCardRefUid]);
+  }, [blockInfo.refUid, hasBlockChildren, hasCloze]);
 
   const onTagChange = async (tag) => {
     setCurrentIndex(0);
@@ -240,7 +251,7 @@ const PracticeOverlay = ({
       const isForgot = gradeData.grade === 0;
       const insertIndex = currentIndex + 1 + forgotReinsertOffset;
 
-      if (isForgot && forgotReinsertOffset > 0) {
+      if (isForgot && forgotReinsertOffset > 0 && currentCardRefUid) {
         setCardQueue((prev) => {
           const newQueue = [...prev];
           const targetIndex = Math.min(insertIndex, newQueue.length);
@@ -265,17 +276,13 @@ const PracticeOverlay = ({
 
   const onSkipClick = React.useCallback(() => {
     if (isDone) return;
-
-    setShowAnswers(false);
-    setCurrentIndex(currentIndex + 1);
-  }, [currentIndex, isDone]);
+    setCurrentIndex((prev) => prev + 1);
+  }, [isDone]);
 
   const onPrevClick = React.useCallback(() => {
     if (isFirst) return;
-
-    setShowAnswers(false);
-    setCurrentIndex(currentIndex - 1);
-  }, [currentIndex, isFirst]);
+    setCurrentIndex((prev) => prev - 1);
+  }, [isFirst]);
 
   const onStartCrammingClick = () => {
     setIsCramming(true);
@@ -412,7 +419,6 @@ const PracticeOverlay = ({
                     setHasCloze={setHasCloze}
                     breadcrumbs={blockInfo.breadcrumbs}
                     showBreadcrumbs={false}
-                    onRenderComplete={() => setIsRendered(true)}
                   />
                 ))
               ) : (
@@ -422,7 +428,6 @@ const PracticeOverlay = ({
                   setHasCloze={setHasCloze}
                   breadcrumbs={blockInfo.breadcrumbs}
                   showBreadcrumbs={showBreadcrumbs}
-                  onRenderComplete={() => setIsRendered(true)}
                 />
               )}
             </>
@@ -728,6 +733,8 @@ const TagSelectorItemWrapper = styled.div<{ active: boolean }>`
   padding: 4px 6px;
   position: relative;
   user-select: none;
+  cursor: pointer;
+  border-radius: 2px;
 
   &::before {
     content: '';
@@ -739,7 +746,7 @@ const TagSelectorItemWrapper = styled.div<{ active: boolean }>`
     background-color: currentColor;
     opacity: ${({ active }) => (active ? 0.08 : 0)};
     border-radius: 2px;
-    z-index: -1;
+    pointer-events: none;
   }
 
   &:hover::before {

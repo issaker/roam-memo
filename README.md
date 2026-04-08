@@ -65,20 +65,32 @@ The plugin offers two review modes:
 Uses the SM2 algorithm to optimize long-term memory retention with grading: Forgot / Hard / Good / Perfect.
 
 ### Fixed Interval Mode (Progressive Reading)
-A relaxed approach for content you want to revisit regularly. Includes **Progressive Mode** with exponential growth:
+A relaxed approach for content you want to revisit regularly. Includes **Progressive Mode** with automatic interval growth:
 - Review schedule: 2 days → 6 days → 12 days → 24 days → 48 days → 96 days → and so on
-- Pure function design: Next interval calculated solely from `progressiveRepetitions` count
-- No state tracking needed between reviews
-- Formula after 2nd review: `interval = 6 × 2^(repetitions-1)`
+- **Algorithm**: 
+  - First review: Fixed 2-day interval (gentler than SM2's standard 1 day)
+  - Second review: Fixed 6-day interval
+  - Subsequent reviews: Calculated from `progressiveRepetitions` using standard exponential sequence, independent of manual interval settings
+  - Calculation: `nextInterval = (6 × 2^(progressiveRepetitions - 2)) × 2.0`
+- **Independent counter**: Progressive mode maintains its own `progressiveRepetitions` counter, completely separate from standard SM2 mode's `repetitions`, `interval`, and `eFactor`
+- **Mode isolation**: Switching from Days/Weeks/Months modes to Progressive automatically resets to the standard progressive sequence—manual interval settings don't interfere
+- **Design philosophy**: A fully automated approach that eliminates manual grading and configuration while providing scientifically-backed spaced repetition
 
-> **Tip:** New cards default to Progressive mode for a gentler learning experience.
+> **Important Design Note**: In Progressive mode, the `intervalMultiplier` field stores the **actual next review interval** (same as what UI displays). The calculation process is:
+> 1. Calculate `expectedInterval` from standard sequence: `6 × 2^(progressiveRepetitions - 2)`
+> 2. Apply SM2 Good logic: `actualInterval = expectedInterval × 2.0`
+> 3. Store `actualInterval` in `intervalMultiplier` for data persistence
+> 
+> Example sequence: progReps=0 → 2 days, progReps=1 → 6 days, progReps=2 → 12 days, progReps=3 → 24 days...
+
+> **Tip:** New cards default to Progressive mode for a gentler learning experience. Switch to Spaced Interval mode anytime if you want more granular control over difficulty ratings.
 
 ## Recent Updates
 
 - **2026-04 Card Rendering Flicker Fix** — Fixed UI flickering when navigating between cards with different structures (e.g., from Q&A card to single-block card). Root cause: state judgment was faster than DOM rendering, causing stale content to briefly appear. Solution: Added `isRendered` flag that delays automatic answer display until Roam API completes rendering. This ensures clean transitions without visual artifacts.
 - **2026-04 Breadcrumb Order Fix** — Fixed breadcrumb display order to perfectly match Roam native. Roam's `:block/parents` API returns unordered ancestor array, so the plugin now queries each parent's depth via pull API and sorts by hierarchy depth. This ensures correct root-to-leaf order regardless of API return order.
 - **2026-04 Color Theme System** — Unified color management with CSS variables for automatic light/dark theme adaptation. Eliminated hardcoded colors and duplicate code for better maintainability.
-- **2026-04 Progressive Mode Simplification** — Progressive mode now uses pure function design based solely on `progressiveRepetitions` count. No interval state tracking needed. Simpler and more predictable.
+- **2026-04 Progressive Mode Algorithm Fix** — Fixed state pollution issue where manual interval settings from Days/Weeks modes could interfere with Progressive mode calculations. Progressive mode now uses pure function design based solely on `progressiveRepetitions`, ensuring consistent exponential growth sequence (2→6→12→24→48→96) regardless of mode switching history.
 - **2025-04 Breadcrumbs persistence** — User's breadcrumb visibility preference is now saved to localStorage and restored on next session
 - **Mobile navigation buttons** — ◀ ▶ buttons in the footer for card navigation on all devices
 - **Focus fix** — Resolved focus loss when navigating between blocks with arrow keys or selecting text
@@ -101,8 +113,6 @@ When building for Roam Research via `[[roam/js]]` loading, the webpack configura
 
 This is required because Roam Research loads the plugin via `<script>` tag, and the UMD wrapper needs proper default export handling to work in browser environments.
 
-个人判断，仅作参考：
-这是一个 “Webpack UMD 打包 + ES Module 默认导出 + 浏览器直接加载” 的经典坑。export: 'default' 在这里的作用是 指导 Webpack 正确生成 UMD 包装代码，避免残留 ES Module 语法。对于 Roam Research 这种通过 <script> 标签加载插件的环境，这个配置是必须的。
 
 **Correct configuration:**
 ```javascript

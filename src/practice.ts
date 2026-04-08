@@ -55,6 +55,9 @@ export const generatePracticeData = ({
     const { intervalMultiplier, intervalMultiplierType, repetitions, progressiveRepetitions } = props;
     const today = new Date();
     let nextDueDate: Date | undefined = undefined;
+    // calculatedIntervalMultiplier: For Progressive mode, this stores the ACTUAL next review interval
+    // (same as what UI displays via nextDueDateFromNow). Used for data persistence and reference.
+    let calculatedIntervalMultiplier = intervalMultiplier; // Default to input value
     
     // Progressive mode: uses SM2 algorithm with grade=4 (Good)
     if (intervalMultiplierType === IntervalMultiplierType.Progressive) {
@@ -63,13 +66,24 @@ export const generatePracticeData = ({
       
       if (progReps === 0) {
         nextDueDate = dateUtils.addDays(today, 2); // First time: 2 days
+        calculatedIntervalMultiplier = 2; // Actual next review interval
       } else if (progReps === 1) {
         nextDueDate = dateUtils.addDays(today, 6); // Second time: 6 days
+        calculatedIntervalMultiplier = 6; // Actual next review interval
       } else {
-        // SM2 Good algorithm (grade=4, efactor=2.5)
-        const currentInterval = intervalMultiplier || 6;
-        const progressiveInterval = Math.round(currentInterval * 2.5 * 0.8);
+        // Calculate expected interval based solely on progressiveRepetitions
+        // Standard sequence: 2, 6, 12, 24, 48, 96...
+        // Formula for progReps >= 2: expectedInterval = 6 × 2^(progReps - 2)
+        // This ensures Progressive mode is independent of manual interval settings
+        const expectedInterval = 6 * Math.pow(2, progReps - 2);
+        
+        // Apply simplified SM2 Good logic: interval × 2.0 (efactor=2.5, grade=4)
+        // progressiveInterval is the ACTUAL next review interval
+        const progressiveInterval = Math.round(expectedInterval * 2.5 * 0.8);
         nextDueDate = dateUtils.addDays(today, progressiveInterval);
+        
+        // Save the actual next review interval (matches UI display)
+        calculatedIntervalMultiplier = progressiveInterval;
       }
     } else if (intervalMultiplierType === IntervalMultiplierType.Days) {
       nextDueDate = dateUtils.addDays(today, intervalMultiplier || 3);
@@ -84,7 +98,7 @@ export const generatePracticeData = ({
     return {
       ...shared,
       reviewMode: ReviewModes.FixedInterval,
-      intervalMultiplier,
+      intervalMultiplier: calculatedIntervalMultiplier,
       intervalMultiplierType,
       progressiveRepetitions: intervalMultiplierType === IntervalMultiplierType.Progressive 
         ? (progressiveRepetitions || 0) + 1 
