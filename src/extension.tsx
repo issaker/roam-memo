@@ -1,3 +1,14 @@
+/**
+ * Plugin Entry Point
+ *
+ * Lifecycle hooks for Roam Research plugin loading/unloading.
+ * - onload: Creates sidebar widget, renders React app, injects CSS fixes
+ * - onunload: Cleans up DOM and styles
+ *
+ * Settings Compatibility:
+ * When loaded via roam/js (not Roam Depot), extensionAPI lacks settings.panel.
+ * We wrap all settings methods with in-memory fallback to ensure both modes work.
+ */
 import ReactDOM from 'react-dom';
 import App from './app';
 import { FocusStyleManager } from '@blueprintjs/core';
@@ -11,7 +22,7 @@ const createAndRenderContainer = () => {
     console.warn('Memo: Could not find sidebar element');
     return null;
   }
-  
+
   const newContainerElm = document.createElement('div');
   newContainerElm.id = container_id;
   newContainerElm.classList.add('log-button');
@@ -19,67 +30,52 @@ const createAndRenderContainer = () => {
 
   return newContainerElm;
 };
+
 function onload({ extensionAPI }: { extensionAPI: any }) {
   try {
     console.log('Memo: Initializing...');
-    
-    // Create a compatible extensionAPI for roam/js loading
-    // When loaded via roam/js, extensionAPI might be window.roamAlphaAPI which doesn't have settings.panel
+
     const compatibleExtensionAPI = extensionAPI || {};
-    
-    // In-memory settings storage for roam/js mode
+
     const inMemorySettings: Record<string, any> = {};
-    
-    // Always ensure we have proper settings methods with in-memory storage
-    // This is critical for roam/js mode where settings need to persist across components
+
     if (!compatibleExtensionAPI.settings) {
       compatibleExtensionAPI.settings = {};
     }
-    
-    // Override settings methods to use in-memory storage (always override to ensure proper behavior)
-    // Remove verbose logging to prevent console spam
-    const _originalGetAll = compatibleExtensionAPI.settings.getAll;
-    const _originalSet = compatibleExtensionAPI.settings.set;
-    const _originalGet = compatibleExtensionAPI.settings.get;
-    
+
+    const originalGetAll = compatibleExtensionAPI.settings.getAll;
+    const originalSet = compatibleExtensionAPI.settings.set;
+    const originalGet = compatibleExtensionAPI.settings.get;
+
     compatibleExtensionAPI.settings.getAll = () => {
-      // Merge in-memory settings with any existing settings
-      const existingSettings = _originalGetAll ? _originalGetAll() : {};
+      const existingSettings = originalGetAll ? originalGetAll() : {};
       return { ...existingSettings, ...inMemorySettings };
     };
-    
+
     compatibleExtensionAPI.settings.set = (key: string, value: any) => {
       inMemorySettings[key] = value;
-      // Also call original set if it exists (for Roam Depot compatibility)
-      if (_originalSet) _originalSet(key, value);
-      // Dispatch custom event to notify settings change
+      if (originalSet) originalSet(key, value);
       window.dispatchEvent(new CustomEvent('roamMemoSettingsChanged', { detail: { key, value } }));
     };
-    
+
     compatibleExtensionAPI.settings.get = (key: string) => {
-      // Check in-memory first, then fall back to original
       if (key in inMemorySettings) return inMemorySettings[key];
-      return _originalGet ? _originalGet(key) : undefined;
+      return originalGet ? originalGet(key) : undefined;
     };
-    
-    // Ensure settings.panel exists
+
     if (!compatibleExtensionAPI.settings.panel) {
       compatibleExtensionAPI.settings.panel = {
-        create: () => {
-          // Silently handle settings panel creation in roam/js mode
-        },
+        create: () => {},
       };
     }
-    
+
     window.roamMemo = {
       extensionAPI: compatibleExtensionAPI,
     };
 
     FocusStyleManager.onlyShowFocusOnTabs();
 
-    // 注入 z-index 修复样式
     injectZIndexFixStyles();
-    console.log('Memo: Z-index fix styles injected');
 
     const container = createAndRenderContainer();
     if (container) {
@@ -101,14 +97,13 @@ function onunload() {
     container.remove();
   }
 
-  // 移除 z-index 修复样式
   removeZIndexFixStyles();
-  console.log('Memo: Z-index fix styles removed');
+  console.log('Memo: Unloaded');
 }
 
 const plugin = {
-  onload: onload,
-  onunload: onunload,
+  onload,
+  onunload,
 };
 
 export default plugin;

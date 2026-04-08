@@ -24,21 +24,27 @@ Install "Memo" via Roam Depot.
 
 ### Multi Deck Support
 
-Enter a comma-separated list of tags in "Tag Pages" in settings to create multiple decks.
+Enter a comma-separated list of tags in "Tag Pages" in settings to create multiple decks. Supports quoted tags containing commas (e.g., `"french exam, fun facts"`).
 
 ### Text Masking (Cloze)
 
-Hide text for recall practice:
-- Use braces `{}`, e.g., `{hide me}`
-- Note: Roam's native `^^highlight^^` syntax is now preserved as-is and not treated as cloze
+Hide text for recall practice using braces `{}`, e.g., `{hide me}`. Cloze text is masked with a background color overlay and revealed on answer.
 
 ### Daily Limits
 
-Set a daily review limit in settings. The plugin ensures ~25% of reviewed cards are new.
+Set a daily review limit in settings. The plugin ensures ~25% of reviewed cards are new, with round-robin distribution across decks for fairness.
+
+### Shuffle Cards
+
+Enable card shuffling in settings to randomize the order of new and due cards during review.
 
 ### Cram Mode
 
 After finishing due cards, continue reviewing all cards in the deck without affecting scheduling. Useful for exam prep.
+
+### Breadcrumbs
+
+Show the block's page hierarchy as breadcrumbs for context. Toggle with `b` key. Visibility preference is persisted across sessions.
 
 ### Keyboard Shortcuts
 
@@ -52,6 +58,7 @@ After finishing due cards, continue reviewing all cards in the deck without affe
 | Forgot          | `f`        |
 | Hard            | `h`        |
 | Good            | `g`        |
+| Edit interval   | `e`        |
 
 ### Command Palette
 
@@ -59,59 +66,66 @@ Type "Memo: Start Review Session" in the command palette (`Cmd+P` / `Ctrl+P`).
 
 ## Review Modes
 
-The plugin offers two review modes:
-
 ### Spaced Interval Mode (Memory Training)
+
 Uses a **modified SM2 algorithm** to optimize long-term memory retention with grading: Forgot / Hard / Good / Perfect.
 
-**Algorithm Modifications:**
-- **Interval Calculation**: Uses `interval × eFactor × (grade/5)` instead of standard `interval × eFactor`
-  - This provides grade-based interval adjustment: Grade 3 → 60%, Grade 4 → 80%, Grade 5 → 100% of standard interval
-- **E-Factor Update**: Only updates when grade ≥ 3 (standard SM2 behavior)
-- **Reset Behavior**: Grade < 3 resets repetition count to 0 and interval to 1 day
+**Algorithm:**
+- **Interval Calculation**: `interval × eFactor × (grade/5)` — grade-based adjustment (Grade 3 → 60%, Grade 4 → 80%, Grade 5 → 100%)
+- **E-Factor Update**: Always updated. Lower grades → more frequent reviews. Minimum eFactor = 1.3.
+- **Reset Behavior**: Grade 0 → review again today (interval=0); Grades 1-2 → review tomorrow (interval=1)
+- **Grade Mapping**: Forgot(0), Hard(2), Good(4), Perfect(5) — grades 1 and 3 are skipped for simplicity
 
 ### Fixed Interval Mode (Progressive Reading)
+
 A relaxed approach for content you want to revisit regularly. Includes **Progressive Mode** with automatic interval growth:
-- Review schedule: 2 days → 6 days → 12 days → 24 days → 48 days → 96 days → and so on
-- **Algorithm**: 
-  - First review: Fixed 2-day interval (gentler than SM2's standard 1 day)
-  - Second review: Fixed 6-day interval
-  - Subsequent reviews: Calculated from `progressiveRepetitions` using standard exponential sequence, independent of manual interval settings
-  - Calculation: `nextInterval = (6 × 2^(progressiveRepetitions - 2)) × 2.0`
-- **Independent counter**: Progressive mode maintains its own `progressiveRepetitions` counter, completely separate from standard SM2 mode's `repetitions`, `interval`, and `eFactor`
-- **Mode isolation**: Switching from Days/Weeks/Months modes to Progressive automatically resets to the standard progressive sequence—manual interval settings don't interfere
-- **Design philosophy**: A fully automated approach that eliminates manual grading and configuration while providing scientifically-backed spaced repetition
 
-> **Important Design Note**: In Progressive mode, the `intervalMultiplier` field stores the **actual next review interval** (same as what UI displays). The calculation process is:
-> 1. Calculate `expectedInterval` from standard sequence: `6 × 2^(progressiveRepetitions - 2)`
-> 2. Apply SM2 Good logic: `actualInterval = expectedInterval × 2.0`
-> 3. Store `actualInterval` in `intervalMultiplier` for data persistence
-> 
-> Example sequence: progReps=0 → 2 days, progReps=1 → 6 days, progReps=2 → 12 days, progReps=3 → 24 days...
+- Review schedule: 2 → 6 → 12 → 24 → 48 → 96 days...
+- Calculation: `nextInterval = (6 × 2^(progressiveRepetitions - 2)) × 2.0` for progReps ≥ 2; progReps 0 and 1 use hardcoded 2 and 6 days
+- Progressive mode maintains its own `progressiveRepetitions` counter, independent of SM2's `repetitions`, `interval`, and `eFactor`
+- Also supports manual intervals: Days, Weeks, Months, Years
 
-> **Tip:** New cards default to Progressive mode for a gentler learning experience. Switch to Spaced Interval mode anytime if you want more granular control over difficulty ratings.
+> **Tip:** New cards default to Progressive mode for a gentler learning experience. Switch to Spaced Interval mode anytime for more granular control.
 
 ### Dynamic Review Mode Switching
 
-Each card's `reviewMode` is read from the Data Page in real-time on every card navigation. This means:
+Each card's `reviewMode` is read from the Data Page in real-time on every card navigation. Changes to `reviewMode::` on the Data Page take effect immediately — no session restart required.
 
-- If you change a card's `reviewMode::` field on the Data Page during a session, the change takes effect immediately when you navigate to that card — no session restart required.
-- Different cards can have independent review modes within the same session.
-- The implementation uses `getPluginPageData({ limitToLatest: true })` to fetch the latest `reviewMode` from the Data Page asynchronously. To avoid UI flicker, state updates are deferred until the async query completes, so no intermediate render with stale mode occurs.
+## Data Storage
 
-## Recent Updates
+All practice data is stored on a Roam page (default: `roam/memo`) with this structure:
 
-- **2026-04 Dynamic Review Mode Switching** — `reviewMode` is now read from the Data Page in real-time on each card navigation, instead of being fixed at session start. Changes to `reviewMode::` on the Data Page take effect immediately without restarting the session. Async state updates are deferred to prevent UI flicker.
-- **2026-04 Card Rendering Flicker Fix** — Fixed UI flickering when navigating between cards with different structures (e.g., from Q&A card to single-block card). Root cause: state judgment was faster than DOM rendering, causing stale content to briefly appear. Solution: Added `isRendered` flag that delays automatic answer display until Roam API completes rendering. This ensures clean transitions without visual artifacts.
-- **2026-04 Breadcrumb Order Fix** — Fixed breadcrumb display order to perfectly match Roam native. Roam's `:block/parents` API returns unordered ancestor array, so the plugin now queries each parent's depth via pull API and sorts by hierarchy depth. This ensures correct root-to-leaf order regardless of API return order.
-- **2026-04 Color Theme System** — Unified color management with CSS variables for automatic light/dark theme adaptation. Eliminated hardcoded colors and duplicate code for better maintainability.
-- **2026-04 Progressive Mode Algorithm Fix** — Fixed state pollution issue where manual interval settings from Days/Weeks modes could interfere with Progressive mode calculations. Progressive mode now uses pure function design based solely on `progressiveRepetitions`, ensuring consistent exponential growth sequence (2→6→12→24→48→96) regardless of mode switching history.
-- **2025-04 Breadcrumbs persistence** — User's breadcrumb visibility preference is now saved to localStorage and restored on next session
-- **Mobile navigation buttons** — ◀ ▶ buttons in the footer for card navigation on all devices
-- **Focus fix** — Resolved focus loss when navigating between blocks with arrow keys or selecting text
-- **Forgot reinsertion** — Configurable reinsertion of "Forgot" cards into the current session queue (N cards later)
+```
+roam/memo (page)
+├── data (heading block)
+│   ├── ((cardUid1))
+│   │   ├── [[Date]] 🟢        ← session heading (emoji = grade)
+│   │   │   ├── nextDueDate:: [[Date]]
+│   │   │   ├── grade:: 5
+│   │   │   └── reviewMode:: SPACED_INTERVAL
+│   │   └── [[Date]] 🔴
+│   │       └── ...
+│   └── ((cardUid2))
+│       └── ...
+├── cache (heading block)
+│   └── [[tagName]]
+│       ├── renderMode:: normal
+│       └── ...
+└── settings (heading block)
+    ├── tagsListString:: memo
+    └── ...
+```
 
-## Development Notes
+## Development
+
+### Build
+
+```bash
+npm install
+npm run build        # Production build → build/extension.js
+npm run typecheck    # TypeScript type checking
+npm run test         # Run tests
+```
 
 ### Build Configuration
 
@@ -121,15 +135,8 @@ Each card's `reviewMode` is read from the Data Page in real-time on every card n
 
 **⚠️ CRITICAL: Do NOT remove `library.export: 'default'`!**
 
-When building for Roam Research via `[[roam/js]]` loading, the webpack configuration **MUST** include `export: 'default'` in the library output settings. Removing this causes:
-- `Uncaught SyntaxError: Unexpected token 'export'` error in browser
-- Plugin fails to load silently (no UI appears)
-- Script execution stops before reaching `onload()` function
+Roam Research loads the plugin via `<script>` tag. The UMD wrapper needs proper default export handling. Removing this causes `Uncaught SyntaxError: Unexpected token 'export'` and the plugin fails silently.
 
-This is required because Roam Research loads the plugin via `<script>` tag, and the UMD wrapper needs proper default export handling to work in browser environments.
-
-
-**Correct configuration:**
 ```javascript
 output: {
   library: {
@@ -159,6 +166,52 @@ if (!window.roamMemoLoaded) {
 - Settings are persisted to the `roam/memo` page (not Roam Depot's settings panel)
 - Uses `window.roamAlphaAPI` instead of full `extensionAPI`
 - Settings dialog is accessible via gear icon in the practice overlay
+
+### Project Structure
+
+```
+src/
+├── extension.tsx          # Plugin entry point (onload/onunload)
+├── app.tsx                # Root React component, orchestrates review workflow
+├── practice.ts            # SM2 algorithm + Fixed Interval algorithm
+├── models/
+│   ├── session.ts         # Session data model (review modes, interval types)
+│   └── practice.ts        # Today's review status model
+├── queries/
+│   ├── data.ts            # Core data layer (read/write practice data)
+│   ├── today.ts           # Today's review calculation (due/new/completed)
+│   ├── save.ts            # Write practice data to Roam blocks
+│   ├── cache.ts           # Per-tag cache (renderMode, etc.)
+│   ├── settings.ts        # Settings persistence to Roam page
+│   ├── utils.ts           # Roam API query helpers
+│   └── legacyRoamSr.ts    # Roam-SR data migration
+├── hooks/
+│   ├── useSettings.ts     # Settings management with dual-mode support
+│   ├── usePracticeData.tsx # Practice data fetching with ref-based caching
+│   ├── useCurrentCardData.tsx # Active card session data resolution
+│   ├── useBlockInfo.tsx   # Block content + breadcrumbs
+│   ├── useCloze.tsx       # Cloze deletion ({text} masking)
+│   ├── useCachedData.ts   # Per-tag cache management
+│   ├── useTags.tsx        # Tag list parsing with quoted-tag support
+│   └── ...                # Other UI interaction hooks
+├── components/
+│   ├── overlay/
+│   │   ├── PracticeOverlay.tsx  # Main review overlay
+│   │   ├── CardBlock.tsx        # Card rendering with answer toggle
+│   │   └── Footer.tsx           # Grading controls + navigation
+│   ├── SidePanelWidget.tsx      # Sidebar review button + stats
+│   ├── ButtonTags.tsx           # Deck selector buttons
+│   └── RoamSrImportPanel.tsx    # Roam-SR data import
+├── utils/
+│   ├── date.ts            # Date operations (addDays, customFromNow)
+│   ├── string.ts          # String parsing (Roam date format, config strings)
+│   ├── dom.ts             # DOM simulation (mouse click events)
+│   ├── object.ts          # Deep clone utility
+│   ├── async.ts           # Sleep + debounce
+│   ├── mediaQueries.ts    # Responsive breakpoints
+│   └── zIndexFix.ts       # CSS z-index fix injection
+└── theme.ts               # CSS variable definitions for light/dark themes
+```
 
 ## Bug Reports & Feature Requests
 

@@ -1,4 +1,4 @@
-import { CompleteRecords } from '~/models/session';
+import { CompleteRecords, IntervalMultiplierType, ReviewModes } from '~/models/session';
 import { generateNewSession } from '~/queries/utils';
 import { getStringBetween, parseRoamDateString } from '~/utils/string';
 
@@ -129,7 +129,19 @@ export const generateRecordsFromRoamSrData = async (
     for (const result of resultsArr) {
       const { refUid, dateCreated, grade, isRoamSrOldPracticeRecord } = result;
 
-      let practiceInputData = {
+      let practiceInputData: {
+        refUid: string;
+        grade: number;
+        dataPageTitle: string;
+        dateCreated: Date;
+        eFactor?: number;
+        repetitions?: number;
+        interval?: number;
+        reviewMode?: ReviewModes;
+        intervalMultiplier?: number;
+        intervalMultiplierType?: IntervalMultiplierType;
+        progressiveRepetitions?: number;
+      } = {
         refUid,
         grade,
         dataPageTitle,

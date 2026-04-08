@@ -1,11 +1,17 @@
+/**
+ * Today's Review Calculation
+ *
+ * Computes which cards are due, new, and completed for the current session.
+ * Pipeline: initializeToday → calculateCompletedTodayCounts → addNewCards → addDueCards
+ *           → calculateCombinedCounts → limitRemainingPracticeData → calculateTodayStatus
+ */
 import * as dateUtils from '~/utils/date';
-import * as objectUtils from '~/utils/object';
 import { CompleteRecords, RecordUid, Session } from '~/models/session';
 import { CompletionStatus, RenderMode, Today, TodayInitial } from '~/models/practice';
 import { generateNewSession } from '~/queries/utils';
 
 export const initializeToday = ({ tagsList, cachedData }) => {
-  const today: Today = objectUtils.deepClone(TodayInitial);
+  const today: Today = JSON.parse(JSON.stringify(TodayInitial));
 
   for (const tag of tagsList) {
     const cachedTagData = cachedData?.[tag];
@@ -30,7 +36,6 @@ export const initializeToday = ({ tagsList, cachedData }) => {
 };
 
 export const calculateTodayStatus = ({ today, tagsList }) => {
-  // Calculate the status of each tag
   for (const tag of tagsList) {
     const completed = today.tags[tag].completed;
     const remaining = today.tags[tag].new + today.tags[tag].due;
@@ -44,7 +49,6 @@ export const calculateTodayStatus = ({ today, tagsList }) => {
     }
   }
 
-  // Calculate the status of the combined counts
   const completed = today.combinedToday.completed;
   const remaining = today.combinedToday.new + today.combinedToday.due;
 
@@ -57,15 +61,12 @@ export const calculateTodayStatus = ({ today, tagsList }) => {
   }
 };
 
-/**
- * Adds data for all the cards practised today
- */
 export const calculateCompletedTodayCounts = async ({ today, tagsList, sessionData }) => {
   for (const tag of tagsList) {
     let count = 0;
-    const completedUids = [];
-    const completedDueUids = [];
-    const completedNewUids = [];
+    const completedUids: RecordUid[] = [];
+    const completedDueUids: RecordUid[] = [];
+    const completedNewUids: RecordUid[] = [];
 
     const currentTagSessionData = sessionData[tag];
     Object.keys(currentTagSessionData).forEach((cardUid) => {
@@ -101,10 +102,19 @@ export const calculateCompletedTodayCounts = async ({ today, tagsList, sessionDa
 };
 
 export const calculateCombinedCounts = ({ today, tagsList }) => {
-  // Reset combined counts
-  const todayInitial: Today = objectUtils.deepClone(TodayInitial);
-
-  today.combinedToday = todayInitial.combinedToday;
+  today.combinedToday = {
+    status: CompletionStatus.Unstarted,
+    due: 0,
+    new: 0,
+    dueUids: [],
+    newUids: [],
+    completed: 0,
+    completedUids: [],
+    completedDue: 0,
+    completedDueUids: [],
+    completedNew: 0,
+    completedNewUids: [],
+  };
 
   for (const tag of tagsList) {
     today.combinedToday.due += today.tags[tag].due;
@@ -126,9 +136,6 @@ export const calculateCombinedCounts = ({ today, tagsList }) => {
   }
 };
 
-/**
- * Create new cards for all referenced cards with no session data yet
- */
 export const addNewCards = ({
   today,
   tagsList,
@@ -148,19 +155,14 @@ export const addNewCards = ({
 
     allSelectedTagCardsUids.forEach((referenceId) => {
       if (!pluginPageData[referenceId] || !pluginPageData[referenceId].length) {
-        // New
         newCardsUids.push(referenceId);
         pluginPageData[referenceId] = [generateNewSession()];
       }
     });
 
-    // Shuffle cards if necessary in the most efficient way possible
     if (shuffleCards) {
       newCardsUids.sort(() => Math.random() - 0.5);
     } else {
-      // Currently list seems to be sorted from newest to oldest so refersing so
-      // oldest new (this double flip hurts to say out loud but it's true) cards are
-      // first
       newCardsUids.reverse();
     }
 
@@ -185,20 +187,21 @@ export const getDueCardUids = (currentTagSessionData: CompleteRecords, isCrammin
 
     const nextDueDate = latestSession.nextDueDate;
 
-    if (isCramming || nextDueDate <= now) {
+    if (isCramming || (nextDueDate && nextDueDate <= now)) {
       results.push(cardUid);
     }
   });
 
-  // Sort due cards by nextDueDate (due soonest first to increase retention,
-  // accepting that cards that are more past due will likely be forgotten)
   results.sort((a, b) => {
     const aCards = currentTagSessionData[a] as Session[];
     const aLatestSession = aCards[aCards.length - 1];
     const bCards = currentTagSessionData[b] as Session[];
     const bLatestSession = bCards[bCards.length - 1];
 
-    return aLatestSession.nextDueDate < bLatestSession.nextDueDate ? 1 : -1;
+    const aDueDate = aLatestSession?.nextDueDate || new Date(0);
+    const bDueDate = bLatestSession?.nextDueDate || new Date(0);
+
+    return aDueDate < bDueDate ? 1 : -1;
   });
 
   return results;
@@ -222,10 +225,9 @@ export const addDueCards = ({ today, tagsList, sessionData, isCramming, shuffleC
 };
 
 /**
- * Here we're adding back completed cards to counts. This is so we can compute
- * the initial distribution of cards (the distribution before we completed
- * cards). This allows us to maintain the same distribution on re-runs (enabling
- * features like partial completions that don't redistribute everytime)
+ * Restores completed card UIDs back into the new/due lists.
+ * Needed so that the daily limit algorithm can compute the original
+ * distribution before any cards were completed.
  */
 export const restoreCompletedUids = ({ today, tagsList }) => {
   for (const currentTag of tagsList) {

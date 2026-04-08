@@ -1,3 +1,12 @@
+/**
+ * Date Utilities
+ *
+ * Uses dayjs for relative time formatting and calendar display.
+ * Core operations: addDays, daysBetween, isSameDay, customFromNow
+ *
+ * customFromNow: Shows "Today"/"Tomorrow"/weekday names for nearby dates,
+ * falls back to relative time (e.g., "2 months ago") for distant dates.
+ */
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 dayjs.extend(relativeTime);
@@ -19,12 +28,7 @@ export const subtractDays = (date, days) => {
 
 export const daysBetween = (d1, d2) => {
   const oneDay = 24 * 60 * 60 * 1000;
-  const firstDate = d1;
-  const secondDate = d2;
-
-  const diffDays = Math.floor(Math.abs((firstDate - secondDate) / oneDay));
-
-  return diffDays;
+  return Math.floor(Math.abs((d1 - d2) / oneDay));
 };
 
 export const fromNow = (date) => {
@@ -37,10 +41,9 @@ export const customFromNow = (date) => {
     return dayjs(date).calendar(null, {
       sameDay: '[Today]',
       nextDay: '[Tomorrow]',
-      nextWeek: 'dddd', // Tuesday
+      nextWeek: 'dddd',
       lastDay: '[Yesterday]',
-      lastWeek: '[Last] dddd', // Last Tuesday
-      // sameElse: '', // we switch to .fromNow() at this range
+      lastWeek: '[Last] dddd',
     });
   } else {
     return fromNow(date);
@@ -49,7 +52,6 @@ export const customFromNow = (date) => {
 
 export const isSameDay = (d1: Date, d2: Date) => {
   if (!isDate(d1) || !isDate(d2)) return false;
-
   return d1.toDateString() === d2.toDateString();
 };
 

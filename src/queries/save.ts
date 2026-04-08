@@ -68,6 +68,13 @@ interface BulkSavePracticeDataOptions {
   selectedUids: string[];
   dataPageTitle: string;
 }
+
+interface RoamBatchAction {
+  action: string;
+  block?: { uid?: string; string?: string; open?: boolean };
+  location?: { 'parent-uid': string; order: number };
+}
+
 export const bulkSavePracticeData = async ({
   token,
   records,
@@ -90,7 +97,7 @@ export const bulkSavePracticeData = async ({
     graphName,
     data: {
       action: 'batch-actions',
-      actions: [],
+      actions: [] as RoamBatchAction[],
     },
   };
 

@@ -1,3 +1,13 @@
+/**
+ * useSettings Hook
+ *
+ * Manages plugin settings with dual-mode support:
+ * - Roam Depot: Uses extensionAPI.settings for persistence
+ * - roam/js: Uses in-memory storage with page-based persistence
+ *
+ * Settings are synced via custom events ('roamMemoSettingsChanged')
+ * to support cross-component updates.
+ */
 import React from 'react';
 import settingsPanelConfig from '~/settingsPanelConfig';
 
@@ -8,24 +18,43 @@ export type Settings = {
   rtlEnabled: boolean;
   shuffleCards: boolean;
   forgotReinsertOffset: number;
+  showBreadcrumbs: boolean;
 };
 
 export const defaultSettings: Settings = {
   tagsListString: 'memo',
   dataPageTitle: 'roam/memo',
-  dailyLimit: 0, // 0 = no limit,
+  dailyLimit: 0,
   rtlEnabled: false,
   shuffleCards: false,
   forgotReinsertOffset: 3,
+  showBreadcrumbs: false,
 };
 
-// @TODO: Refactor/Hoist this so we can call useSettings in multiple places
-// without duplicating settings state (ie maybe init state in app and use
-// context to access it anywhere)
+const SETTING_TYPES = {
+  dailyLimit: 'number',
+  rtlEnabled: 'boolean',
+  shuffleCards: 'boolean',
+  showBreadcrumbs: 'boolean',
+} as const;
+
+const coerceSettingValue = (key: string, value: any): any => {
+  const type = SETTING_TYPES[key];
+  if (type === 'number') return Number(value);
+  if (type === 'boolean') return value === true || value === 'true';
+  return value;
+};
+
+const coerceAllSettings = (allSettings: Record<string, any>): Record<string, any> => {
+  return Object.keys(allSettings).reduce((acc, key) => {
+    acc[key] = coerceSettingValue(key, allSettings[key]);
+    return acc;
+  }, {});
+};
+
 const useSettings = () => {
   const [settings, setSettings] = React.useState(defaultSettings);
 
-  // If tagsListString is empty, set it to the default
   React.useEffect(() => {
     if (!settings.tagsListString.trim()) {
       setSettings((currentSettings) => ({
@@ -33,60 +62,43 @@ const useSettings = () => {
         tagsListString: defaultSettings.tagsListString,
       }));
     }
-  }, [settings]);
+  }, [settings.tagsListString]);
 
-  // Create settings panel
   React.useEffect(() => {
     window.roamMemo.extensionAPI.settings.panel.create(
       settingsPanelConfig({ settings, setSettings })
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setSettings, settings.dataPageTitle]);
 
-  React.useEffect(() => {
+  const syncSettingsFromAPI = React.useCallback(() => {
     const allSettings = window.roamMemo.extensionAPI.settings.getAll() || {};
-    // Manually set shuffleCards to true if it doesn't exist. Reason: Can't
-    // figure out how to make the switch UI default to on so let's just set it
-    // to true here unless toggled off
+
     if (!('shuffleCards' in allSettings)) {
       window.roamMemo.extensionAPI.settings.set('shuffleCards', defaultSettings.shuffleCards);
     }
+    if (!('showBreadcrumbs' in allSettings)) {
+      window.roamMemo.extensionAPI.settings.set('showBreadcrumbs', defaultSettings.showBreadcrumbs);
+    }
 
-    // For some reason the getAll() method casts numbers to strings, so here we
-    // map keys in this list back to numbers
-    const numbers = ['dailyLimit'];
-
-    const filteredSettings = Object.keys(allSettings).reduce((acc, key) => {
-      const value = allSettings[key];
-      acc[key] = numbers.includes(key) ? Number(value) : value;
-      return acc;
-    }, {});
-
+    const filteredSettings = coerceAllSettings(allSettings);
     setSettings((currentSettings) => ({ ...currentSettings, ...filteredSettings }));
   }, [setSettings]);
 
-  // Listen for settings changes from roam/js mode
   React.useEffect(() => {
-    const handleSettingsChange = (event: CustomEvent) => {
-      // Reload all settings when any setting changes
-      const allSettings = window.roamMemo.extensionAPI.settings.getAll() || {};
-      const numbers = ['dailyLimit'];
+    syncSettingsFromAPI();
+  }, [syncSettingsFromAPI]);
 
-      const filteredSettings = Object.keys(allSettings).reduce((acc, key) => {
-        const value = allSettings[key];
-        acc[key] = numbers.includes(key) ? Number(value) : value;
-        return acc;
-      }, {});
-
-      setSettings((currentSettings) => ({ ...currentSettings, ...filteredSettings }));
+  React.useEffect(() => {
+    const handleSettingsChange = () => {
+      syncSettingsFromAPI();
     };
 
     window.addEventListener('roamMemoSettingsChanged', handleSettingsChange as EventListener);
-    
+
     return () => {
       window.removeEventListener('roamMemoSettingsChanged', handleSettingsChange as EventListener);
     };
-  }, [setSettings]);
+  }, [syncSettingsFromAPI]);
 
   return settings;
 };

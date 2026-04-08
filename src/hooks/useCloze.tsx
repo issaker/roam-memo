@@ -1,9 +1,13 @@
+/**
+ * useCloze Hook
+ *
+ * Implements custom cloze deletion using {} syntax.
+ * Wraps matched text in <span class="roam-memo-cloze"> elements.
+ * When answers are hidden, cloze text is masked with background color.
+ *
+ * Note: Roam's native ^^highlight^^ is NOT treated as cloze.
+ */
 import * as React from 'react';
-
-interface UseCustomClozeProps {
-  renderedBlockElm: HTMLElement;
-  setClozeCounts: React.Dispatch<React.SetStateAction<{ default: number; custom: number }>>;
-}
 
 function getAllTextNodes(element: Element) {
   return Array.from(element.childNodes).filter(
@@ -11,7 +15,6 @@ function getAllTextNodes(element: Element) {
   );
 }
 
-// Takes a dom node and regex and wraps matching part of text in a span
 function wrapMatches(node: Element, regex: RegExp) {
   let textNodes = getAllTextNodes(node);
 
@@ -28,22 +31,18 @@ function wrapMatches(node: Element, regex: RegExp) {
 
     if (match) {
       const matchedText = match[0];
-
       const matchedTextStart = match.index;
       const matchedTextEnd = matchedTextStart + matchedText.length;
       const beforeText = text.slice(0, matchedTextStart);
       const afterText = text.slice(matchedTextEnd);
 
-      // Create span and add text
       const clozeElm = document.createElement('span');
       clozeElm.classList.add('roam-memo-cloze');
       clozeElm.textContent = matchedText;
 
-      // Add before and after text
       const beforeElm = document.createTextNode(beforeText);
       const afterElm = document.createTextNode(afterText);
 
-      // Replace text node with new elements
       if (textNode.parentNode) {
         textNode.parentNode.insertBefore(beforeElm, textNode);
         textNode.parentNode.insertBefore(clozeElm, textNode);
@@ -57,63 +56,30 @@ function wrapMatches(node: Element, regex: RegExp) {
   }
 }
 
-const useCustomCloze = ({ renderedBlockElm, setClozeCounts }: UseCustomClozeProps) => {
-  React.useEffect(() => {
-    (async () => {
-      if (!renderedBlockElm) return;
-
-      const mainBlockElm = renderedBlockElm.querySelector(
-        '.rm-block-main .dont-unfocus-block span'
-      );
-      if (!mainBlockElm) return;
-
-      // @TODO: Perhaps make this customizable
-      const left = '{';
-      const right = '}';
-      const re = new RegExp(`${left}(.+?)${right}`, 'gs');
-      const clozeRegex = new RegExp(re, 'gs');
-      wrapMatches(mainBlockElm, clozeRegex);
-
-      const clozeElms = renderedBlockElm.querySelectorAll('.roam-memo-cloze');
-
-      setClozeCounts((clozeCounts) => ({ ...clozeCounts, custom: clozeElms.length }));
-    })();
-  }, [renderedBlockElm]);
-};
-
-interface UseClozeProps {
+const useCloze = ({ renderedBlockElm, hasClozeCallback }: {
   renderedBlockElm: HTMLElement;
   hasClozeCallback: (hasCloze: boolean) => void;
-}
+}) => {
+  const [clozeCount, setClozeCount] = React.useState(0);
 
-const useCloze = ({ renderedBlockElm, hasClozeCallback }: UseClozeProps) => {
-  const [clozeCounts, setClozeCounts] = React.useState<{ default: number; custom: number }>({ default: 0, custom: 0 });
-
-  // Count default clozes - removed since we no longer support ^^ syntax
-  // Only custom clozes with {} syntax are supported now
   React.useEffect(() => {
-    (async () => {
-      if (!renderedBlockElm) return;
-      // No longer counting .rm-highlight elements as clozes
-      setClozeCounts((prev) => ({ ...prev, default: 0 }));
-    })();
+    if (!renderedBlockElm) return;
+
+    const mainBlockElm = renderedBlockElm.querySelector(
+      '.rm-block-main .dont-unfocus-block span'
+    );
+    if (!mainBlockElm) return;
+
+    const re = new RegExp(`{(.+?)}`, 'gs');
+    wrapMatches(mainBlockElm, re);
+
+    const clozeElms = renderedBlockElm.querySelectorAll('.roam-memo-cloze');
+    setClozeCount(clozeElms.length);
   }, [renderedBlockElm]);
 
-  // Set and count custom clozes
-  useCustomCloze({ renderedBlockElm, setClozeCounts });
-
-  // Use Cloze counts to enable/disable "Show Answer" UI blocking
   React.useEffect(() => {
-    // Wait for both default and custom cloze counts to be set
-    if (clozeCounts.default === 0 && clozeCounts.custom === 0) {
-      hasClozeCallback(false);
-      return;
-    }
-
-    const sum = clozeCounts.default + clozeCounts.custom;
-
-    hasClozeCallback(sum > 0);
-  }, [clozeCounts]);
+    hasClozeCallback(clozeCount > 0);
+  }, [clozeCount, hasClozeCallback]);
 };
 
 export default useCloze;

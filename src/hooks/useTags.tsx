@@ -1,3 +1,10 @@
+/**
+ * useTags Hook
+ *
+ * Parses comma-separated tag list into individual deck names.
+ * Supports quoted tags containing commas (e.g., "french exam, fun facts").
+ * First tag is auto-selected as the default deck.
+ */
 import * as React from 'react';
 
 const splitStringByCommas = (str: string) => {

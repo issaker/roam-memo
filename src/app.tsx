@@ -1,3 +1,15 @@
+/**
+ * App Root Component
+ *
+ * Orchestrates the entire review workflow:
+ * 1. Reads settings and builds tag list (decks)
+ * 2. Fetches practice data and cache from the Roam data page
+ * 3. Renders sidebar widget and practice overlay
+ * 4. Handles card grading via the SM2 / Fixed-Interval algorithms
+ *
+ * Data flow:
+ *   useSettings → useTags → useCachedData → usePracticeData → PracticeOverlay
+ */
 import * as React from 'react';
 import * as Blueprint from '@blueprintjs/core';
 import PracticeOverlay from '~/components/overlay/PracticeOverlay';
@@ -41,7 +53,6 @@ const App = () => {
     shuffleCards,
   });
 
-  // Refresh data when settings change (e.g., after loading from page in roam/js mode)
   React.useEffect(() => {
     refreshData();
   }, [tagsListString]);
@@ -97,20 +108,17 @@ const App = () => {
   };
 
   const handleReviewMoreClick = async () => {
-    // @TODOZ: Handle this case.
     refreshData();
   };
 
   useCollapseReferenceList({ dataPageTitle });
 
-  // Keep counters in sync as you add/remove tags from blocks
   const [tagsOnEnter, setTagsOnEnter] = React.useState<string[]>([]);
   const onBlockEnterHandler = (elm: HTMLTextAreaElement) => {
     const tags = tagsList.filter((tag) => elm.value.includes(tag));
     setTagsOnEnter(tags);
   };
   const onBlockLeaveHandler = (elm: HTMLTextAreaElement) => {
-    // Don't refetch data if overlay is open (to avoid removing cards while editing)
     if (showPracticeOverlay) return;
 
     const tags = tagsList.filter((tag) => elm.value.includes(tag));

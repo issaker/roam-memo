@@ -271,9 +271,9 @@ describe('PracticeOverlay', () => {
       dataPageTitle: testUtils.dataPageTitle,
       dateCreated: new Date(),
       refUid: 'id_due_1',
-      intervalMultiplier: 3,
-      intervalMultiplierType: IntervalMultiplierType.Days,
-      nextDueDate: dateUtils.addDays(new Date(), 3),
+      intervalMultiplier: 2,
+      intervalMultiplierType: IntervalMultiplierType.Progressive,
+      nextDueDate: dateUtils.addDays(new Date(), 2),
     });
 
     // Next card should be new

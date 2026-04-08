@@ -1,3 +1,9 @@
+/**
+ * useCachedData Hook
+ *
+ * Manages per-tag cache data stored on the Roam data page.
+ * Cache stores UI state like renderMode (Normal/AnswerFirst) per deck.
+ */
 import React from 'react';
 import * as queries from '~/queries';
 import { saveCacheData } from '~/queries';
@@ -19,7 +25,6 @@ const useCachedData = ({
   React.useEffect(() => {
     const getData = async () => {
       const result = await queries.getPluginPageCachedData({ dataPageTitle });
-
       setData(result);
     };
 
@@ -33,7 +38,6 @@ const useCachedData = ({
   return {
     saveCacheData: async (data: { [key: string]: any }, overrides?: { [key: string]: any }) => {
       await saveCacheData({ dataPageTitle, data, selectedTag, ...overrides });
-
       setRefetchTrigger((prev) => prev + 1);
     },
     deleteCacheDataKey,

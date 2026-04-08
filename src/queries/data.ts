@@ -1,3 +1,28 @@
+/**
+ * Practice Data Queries
+ *
+ * Core data layer that reads/writes practice session data from the Roam data page.
+ *
+ * Data Page Structure:
+ *   roam/memo (page)
+ *   ├── data (heading block)
+ *   │   ├── ((cardUid1))
+ *   │   │   ├── [[Date]] 🟢  (session heading, emoji = grade)
+ *   │   │   │   ├── nextDueDate:: [[Date]]
+ *   │   │   │   ├── grade:: 5
+ *   │   │   │   └── ...
+ *   │   │   └── [[Date]] 🔴
+ *   │   │       └── ...
+ *   │   └── ((cardUid2))
+ *   │       └── ...
+ *   ├── cache (heading block)
+ *   │   └── [[tagName]]
+ *   │       ├── renderMode:: normal
+ *   │       └── ...
+ *   └── settings (heading block)
+ *       ├── tagsListString:: memo
+ *       └── ...
+ */
 import { getStringBetween, parseConfigString, parseRoamDateString } from '~/utils/string';
 import * as stringUtils from '~/utils/string';
 import { CompleteRecords, Records, RecordUid, ReviewModes } from '~/models/session';
@@ -41,26 +66,15 @@ export const getPracticeData = async ({
     cardUids[tag] = currentCardUids;
   }
 
-  await calculateCompletedTodayCounts({
-    today,
-    tagsList,
-    sessionData,
-  });
+  await calculateCompletedTodayCounts({ today, tagsList, sessionData });
 
   addNewCards({ today, tagsList, cardUids, pluginPageData, shuffleCards });
-  addDueCards({
-    today,
-    tagsList,
-    sessionData,
-    isCramming,
-    shuffleCards,
-  });
+  addDueCards({ today, tagsList, sessionData, isCramming, shuffleCards });
 
   calculateCombinedCounts({ today, tagsList });
 
   limitRemainingPracticeData({ today, dailyLimit, tagsList, isCramming });
 
-  // Calculate combined counts again to update counts after limit filtering
   calculateCombinedCounts({ today, tagsList });
 
   calculateTodayStatus({ today, tagsList });
@@ -87,29 +101,23 @@ export const dataPageReferencesIdsQuery = `[
     [?tagRefs :block/page ?homePage]
     [(!= ?homePage ?dataPage)]
   ]`;
+
 const getPageReferenceIds = async (tag, dataPageTitle): Promise<string[]> => {
-  // First query the data page so that we can exclude those references from the results
   const dataPageResult = window.roamAlphaAPI.q(getDataPageQuery(dataPageTitle));
-
   const dataPageUid = dataPageResult.length ? dataPageResult[0][0] : '';
-
   const results = window.roamAlphaAPI.q(dataPageReferencesIdsQuery, tag, dataPageUid);
-
   return results.map((arr) => arr[0]);
 };
 
 export const getSelectedTagPageBlocksIds = async (selectedTag): Promise<string[]> => {
   const queryResults = await getChildBlocksOnPage(selectedTag);
-
   if (!queryResults.length) return [];
 
   const children = queryResults[0][0].children;
   const filteredChildren = children.filter((child) => !!child.string);
-
   return filteredChildren.map((arr) => arr.uid);
 };
 
-// Ensure that the reviewMode field is always present
 const ensureReviewModeField = (record) => {
   const hasReviewModeField = record.children.some((child) => child.string.includes('reviewMode'));
   const children = hasReviewModeField
@@ -122,10 +130,7 @@ const ensureReviewModeField = (record) => {
         },
       ];
 
-  return {
-    ...record,
-    children,
-  };
+  return { ...record, children };
 };
 
 const parseFieldValues = (object, node) => {
@@ -169,7 +174,6 @@ const mapPluginPageData = (queryResultsData): CompleteRecords =>
       const uid = getStringBetween(cur.string, '((', '))');
       acc[uid] = [];
 
-      // Add date
       if (!cur.children) return acc;
 
       for (const child of cur.children) {
@@ -178,10 +182,12 @@ const mapPluginPageData = (queryResultsData): CompleteRecords =>
           dateCreated: parseRoamDateString(getStringBetween(child.string, '[[', ']]')),
         };
 
-        if (!child.children) return acc;
+        if (!child.children) {
+          acc[uid].push(record);
+          continue;
+        }
 
         parseFieldValues(record, child);
-
         acc[uid].push(record);
       }
 
@@ -217,8 +223,6 @@ export const getPluginPageData = async ({ dataPageTitle, limitToLatest = true })
 
 const mapPluginPageCachedData = (queryResultsData) => {
   const data = queryResultsData.map((arr) => arr[0])[0].children;
-  if (!data || !data.length) return {};
-
   if (!data?.length) return {};
 
   return (
@@ -247,9 +251,6 @@ export const getPluginPageCachedData = async ({ dataPageTitle }) => {
   return mapPluginPageCachedData(queryResultsData);
 };
 
-/**
- * Gets all the card referencing a tag, then finds all the practice session data for those cards
- */
 export const getSessionData = async ({
   pluginPageData,
   tag,
@@ -259,16 +260,14 @@ export const getSessionData = async ({
   tag: string;
   dataPageTitle: string;
 }) => {
-  // Get all the cards for the tag
   const tagReferencesIds = await getPageReferenceIds(tag, dataPageTitle);
   const tagPageBlocksIds = await getSelectedTagPageBlocksIds(tag);
   const allTagCardsUids = tagReferencesIds.concat(tagPageBlocksIds);
 
-  // Filter out due cards that aren't references to the currently selected tag
-  // @TODO: we could probably do this at getPluginPageData query for a
-  // performance boost
+  const allTagCardsUidsSet = new Set(allTagCardsUids);
+
   const selectedTagCardsData = Object.keys(pluginPageData).reduce((acc, cur) => {
-    if (allTagCardsUids.indexOf(cur) > -1) {
+    if (allTagCardsUidsSet.has(cur)) {
       acc[cur] = pluginPageData[cur];
     }
     return acc;
@@ -281,9 +280,9 @@ export const getSessionData = async ({
 };
 
 /**
- *  Limit of cards to practice ensuring that due cards are always
- *  first but ~25% new cards are still practiced when limit is less than total due
- *  cards.
+ * Daily limit enforcement: ensures ~25% new cards, rest due cards.
+ * Round-robin across decks for fair distribution.
+ * Skipped when cramming (no limit) or dailyLimit is 0.
  */
 const limitRemainingPracticeData = ({
   today,
@@ -298,14 +297,12 @@ const limitRemainingPracticeData = ({
 }) => {
   const totalCards = today.combinedToday.due + today.combinedToday.new;
 
-  // When no need to limit, return;
   if (!dailyLimit || !totalCards || isCramming) {
     return;
   }
 
   restoreCompletedUids({ today, tagsList });
 
-  // Initialize selected cards
   const selectedCards = tagsList.reduce(
     (acc, currentTag) => ({
       ...acc,
@@ -317,11 +314,8 @@ const limitRemainingPracticeData = ({
     {}
   );
 
-  // @MAYBE: Consider making this a config option
   const targetNewCardsRatio = 0.25;
   const targetTotalCards = dailyLimit;
-  // We use Math.max here to ensure we have at leats one card even when targetTotal is < 4.
-  // The exception is when targetTotal is 1, in which case we want to prioritize due cards
   const targetNewCards =
     targetTotalCards === 1 ? 0 : Math.max(1, Math.floor(targetTotalCards * targetNewCardsRatio));
   const targetDueCards = targetTotalCards - targetNewCards;
@@ -330,11 +324,8 @@ const limitRemainingPracticeData = ({
   let totalDueAdded = 0;
   let totalAdded = totalNewAdded + totalDueAdded;
 
-  // Add one card at a time (Round Robin style) to evenly select cards from each
-  // deck.
   roundRobinLoop: while (totalAdded < totalCards) {
     for (const currentTag of tagsList) {
-      // if (rounds > 5) break roundRobinLoop;
       totalAdded = totalNewAdded + totalDueAdded;
 
       if (totalAdded === targetTotalCards) {
@@ -352,27 +343,20 @@ const limitRemainingPracticeData = ({
       const stillHaveDueCards = !!nextDueCard || totalDueAdded < today.combinedToday.due;
       const stillHaveNewCards = !!nextNewCard || totalNewAdded < today.combinedToday.new;
 
-      // Add new card
       if (nextNewCard && (stillNeedNewCards || !stillHaveDueCards)) {
         selectedCards[currentTag].newUids.push(today.tags[currentTag].newUids[nextNewIndex]);
         totalNewAdded++;
-
         continue;
       }
 
-      // Add due card
       if (nextDueCard && (stillNeedDueCards || !stillHaveNewCards)) {
         selectedCards[currentTag].dueUids.push(today.tags[currentTag].dueUids[nextDueIndex]);
         totalDueAdded++;
-
         continue;
       }
     }
   }
 
-  // Now that we've generated the original distribution we can subtract
-  // completed cards from selected cards without affecting the original
-  // distribution
   for (const tag of tagsList) {
     const tagStats = today.tags[tag];
     const completedDueUids = tagStats.completedDueUids;
@@ -390,7 +374,6 @@ const limitRemainingPracticeData = ({
     selectedCards[tag].newUids = selectedCards[tag].newUids.slice(0, remainingTargetNew);
   }
 
-  // Replace today values with selected cards
   for (const tag of tagsList) {
     today.tags[tag] = {
       ...today.tags[tag],

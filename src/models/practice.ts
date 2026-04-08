@@ -1,3 +1,12 @@
+/**
+ * Today's Review Status Model
+ *
+ * Tracks per-tag and combined review statistics for the current day:
+ * - Due/new card counts and UIDs
+ * - Completed card counts and UIDs
+ * - Completion status (Unstarted / Partial / Finished)
+ * - Render mode (Normal = question first, AnswerFirst = answer first)
+ */
 import { RecordUid } from './session';
 
 export enum CompletionStatus {

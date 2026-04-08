@@ -313,6 +313,8 @@ export class MockDataBuilder {
       dataPageTitle,
       dailyLimit: settings.dailyLimit,
       isCramming: !!settings.isCramming,
+      shuffleCards: !!settings.shuffleCards,
+      cachedData: {},
     });
 
     return practiceData;
@@ -424,7 +426,7 @@ export const actions = {
 };
 
 export const grade = async (gradeString: string, mockBuilder: MockDataBuilder) => {
-  const promise = new Promise((resolve) => {
+  const promise = new Promise<{ updatedRecord: any; practiceInput: any }>((resolve) => {
     const savePracticeDataSpy = jest.spyOn(queries, 'savePracticeData');
     const practiceSpy = jest.spyOn(practice, 'default');
     practiceSpy.mockClear(); // Reset calls so that if grade is called multiple times in the same test we always get the input from the last call

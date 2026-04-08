@@ -1,9 +1,14 @@
+/**
+ * useCollapseReferenceList Hook
+ *
+ * Auto-collapses the data page reference section in Roam's sidebar
+ * to reduce visual noise. Listens for route changes and DOM mutations
+ * to re-apply collapsing when new references appear.
+ */
 import * as React from 'react';
 import * as asyncUtils from '~/utils/async';
 import * as domUtils from '~/utils/dom';
 
-// Collapse memo data block ref by default (to keep things less noisy)
-// @TODO: Maybe make this configurable
 const useCollapseReferenceList = ({ dataPageTitle }) => {
   const collapseDataReferenceBlock = React.useMemo(() => {
     const fn = async () => {
@@ -13,7 +18,8 @@ const useCollapseReferenceList = ({ dataPageTitle }) => {
       ].filter((elm) => elm.textContent === dataPageTitle);
 
       for (const elm of elmList) {
-        const collapseControlBtn = elm?.parentNode.querySelector('.rm-caret-open');
+        const parentNode = elm?.parentNode as ParentNode | null;
+        const collapseControlBtn = parentNode?.querySelector('.rm-caret-open');
         collapseControlBtn && domUtils.simulateMouseClick(collapseControlBtn);
       }
     };
@@ -23,7 +29,7 @@ const useCollapseReferenceList = ({ dataPageTitle }) => {
   const [currentRoute, setCurrentRoute] = React.useState('');
 
   React.useEffect(() => {
-    collapseDataReferenceBlock(); // trigger on page load
+    collapseDataReferenceBlock();
 
     const onRouteChange = () => {
       setCurrentRoute(location.href);

@@ -643,8 +643,6 @@ const FooterActionsWrapper = styled.div`
   }
 `;
 
-const SetIntervalToggleWrapper = styled.div``;
-
 const ControlButtonWrapper = styled(Blueprint.Button)<{ intent?: string }>`
   /* Semi-transparent overlay background */
   background: ${colors.overlayLight};

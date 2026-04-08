@@ -1,4 +1,12 @@
-export const simulateMouseEvents = (element, events = []) => {
+/**
+ * DOM Utilities
+ *
+ * simulateMouseClick: Dispatches a full mouse click event sequence
+ * (mouseenter → mouseover → mousedown → click → mouseup)
+ * Used to programmatically interact with Roam's DOM elements
+ * (e.g., expanding collapsed blocks where no API exists)
+ */
+export const simulateMouseEvents = (element, events: string[] = []) => {
   events.forEach((mouseEventType) =>
     element.dispatchEvent(
       new MouseEvent(mouseEventType, {

@@ -1,3 +1,10 @@
+/**
+ * usePracticeData Hook
+ *
+ * Fetches and manages practice card data from the Roam data page.
+ * Uses refetchTrigger pattern to avoid stale data from object reference changes.
+ * cachedData is accessed via ref to prevent unnecessary re-fetches.
+ */
 import * as React from 'react';
 import { Today, TodayInitial } from '~/models/practice';
 import { CompleteRecords } from '~/models/session';
@@ -11,12 +18,23 @@ const usePracticeCardsData = ({
   isCramming,
   dailyLimit,
   shuffleCards,
+}: {
+  tagsList: string[];
+  selectedTag: string;
+  dataPageTitle: string;
+  cachedData: any;
+  isCramming: boolean;
+  dailyLimit: number;
+  shuffleCards: boolean;
 }) => {
   const [practiceData, setPracticeData] = React.useState<CompleteRecords>({});
   const [refetchTrigger, setRefetchTrigger] = React.useState(false);
   const [today, setToday] = React.useState<Today>(TodayInitial);
 
-  const refetchTriggerFn = () => setRefetchTrigger((trigger) => !trigger);
+  const refetchTriggerFn = React.useCallback(() => setRefetchTrigger((trigger) => !trigger), []);
+
+  const cachedDataRef = React.useRef(cachedData);
+  cachedDataRef.current = cachedData;
 
   React.useEffect(() => {
     (async () => {
@@ -28,7 +46,7 @@ const usePracticeCardsData = ({
         dailyLimit,
         isCramming,
         shuffleCards,
-        cachedData,
+        cachedData: cachedDataRef.current,
       });
 
       setToday(todayStats);
@@ -42,7 +60,6 @@ const usePracticeCardsData = ({
     dailyLimit,
     tagsList,
     shuffleCards,
-    cachedData,
   ]);
 
   return {

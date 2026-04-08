@@ -12,6 +12,19 @@ const Divider = styled.div`
   border-bottom: 1px solid ${colors.borderSubtle};
 `;
 
+const SessionsTable = ({ sessions }) => (
+  <div className="px-4 py-2">
+    {sessions.map((session, i) => (
+      <div key={i} className="bp3-text-small bp3-text-muted py-1">
+        <span>{session.dateCreated ? new Date(session.dateCreated).toLocaleDateString() : '—'}</span>
+        {' | '}
+        <span>Grade: {session.grade ?? '—'}</span>
+        {session.isRoamSrOldPracticeRecord && <span className="ml-2 text-yellow-600">(imported)</span>}
+      </div>
+    ))}
+  </div>
+);
+
 const Block = ({ uuid, sessions, isLast, isFirst, selectedUids, setSelectedUids, blockInfo }) => {
   const [isSelected, setIsSelected] = React.useState(false);
   const [isExpanded, setIsExpanded] = React.useState(isFirst ? true : false);

@@ -1,3 +1,9 @@
+/**
+ * Responsive Breakpoints
+ *
+ * Tailwind-compatible media query breakpoints for styled-components.
+ * Usage: ${mediaQueries.lg} { ... }
+ */
 const mediaQueries = {
   sm: `@media (min-width: 420px)`,
   md: `@media (min-width: 768px)`,

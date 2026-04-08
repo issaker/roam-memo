@@ -1,7 +1,16 @@
+/**
+ * useOnBlockInteract Hook
+ *
+ * Monitors when users enter/leave Roam block text areas.
+ * Used to detect tag changes on blocks (adding/removing #memo)
+ * and trigger data refresh when tags change.
+ *
+ * Uses the 'arrive' library to detect dynamically created DOM elements.
+ */
 import React from 'react';
 import Arrive from 'arrive';
 
-Arrive; // To prevent tree shaking elimination
+Arrive;
 
 const useOnBlockInteract = ({
   onEnterCallback,

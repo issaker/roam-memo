@@ -1,3 +1,9 @@
+/**
+ * useOnVisibilityStateChange Hook
+ *
+ * Triggers a callback when the browser tab becomes visible again.
+ * Used to refresh practice data when the user returns to Roam.
+ */
 import * as React from 'react';
 
 const useOnVisibilityStateChange = (callback: () => void) => {

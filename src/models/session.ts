@@ -1,3 +1,13 @@
+/**
+ * Session Data Model
+ *
+ * Represents a single review session for a card.
+ * Each card can have multiple sessions (review history).
+ *
+ * Two review modes determine which fields are used:
+ * - SPACED_INTERVAL: grade, repetitions, interval, eFactor (SM2 algorithm)
+ * - FIXED_INTERVAL: intervalMultiplier, intervalMultiplierType, progressiveRepetitions
+ */
 export enum ReviewModes {
   FixedInterval = 'FIXED_INTERVAL',
   DefaultSpacedInterval = 'SPACED_INTERVAL',
@@ -17,7 +27,7 @@ export type Session = {
   grade?: number;
   intervalMultiplier?: number;
   intervalMultiplierType?: IntervalMultiplierType;
-  progressiveRepetitions?: number; // Separate counter for Progressive mode
+  progressiveRepetitions?: number;
 } & SessionCommon;
 
 export interface NewSession extends Omit<Session, 'nextDueDate' | 'grade'> {

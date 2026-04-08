@@ -1,3 +1,19 @@
+/**
+ * Spaced Repetition Algorithm
+ *
+ * Two review modes:
+ *
+ * 1. Spaced Interval (SM2-based):
+ *    Grades: Forgot(0), Hard(2), Good(4), Perfect(5)
+ *    Interval = previous_interval × eFactor × (grade/5)
+ *    eFactor always updated; clamped to min 1.3
+ *    Grade 0 → review again today (interval=0)
+ *    Grades 1-2 → review tomorrow (interval=1)
+ *
+ * 2. Fixed Interval (Progressive Reading):
+ *    Progressive: 2→6→12→24→48→96... days (automatic exponential growth)
+ *    Days/Weeks/Months/Years: manual fixed intervals
+ */
 import { savePracticeData } from '~/queries';
 import * as dateUtils from '~/utils/date';
 import { IntervalMultiplierType, ReviewModes, Session } from '~/models/session';
@@ -8,14 +24,12 @@ export const supermemo = (item, grade) => {
   let nextEfactor;
 
   if (grade === 0) {
-    // If we completely forgot we should review again ASAP.
     nextInterval = 0;
     nextRepetition = 0;
   } else if (grade < 3) {
     nextInterval = 1;
     nextRepetition = 0;
   } else {
-    // grade >= 3
     if (item.repetition === 0) {
       nextInterval = 1;
       nextRepetition = 1;
@@ -29,7 +43,6 @@ export const supermemo = (item, grade) => {
   }
 
   nextEfactor = item.efactor + (0.1 - (5 - grade) * (0.08 + (5 - grade) * 0.02));
-
   if (nextEfactor < 1.3) nextEfactor = 1.3;
 
   return {
@@ -42,46 +55,33 @@ export const supermemo = (item, grade) => {
 type PracticeDataResult = Session & {
   nextDueDateFromNow?: string;
 };
+
 export const generatePracticeData = ({
   dateCreated,
   reviewMode,
   ...props
 }: Session): PracticeDataResult => {
-  const shared = {
-    reviewMode,
-  };
+  const shared = { reviewMode };
 
   if (reviewMode === ReviewModes.FixedInterval) {
     const { intervalMultiplier, intervalMultiplierType, repetitions, progressiveRepetitions } = props;
     const today = new Date();
     let nextDueDate: Date | undefined = undefined;
-    // calculatedIntervalMultiplier: For Progressive mode, this stores the ACTUAL next review interval
-    // (same as what UI displays via nextDueDateFromNow). Used for data persistence and reference.
-    let calculatedIntervalMultiplier = intervalMultiplier; // Default to input value
-    
-    // Progressive mode: uses SM2 algorithm with grade=4 (Good)
+    let calculatedIntervalMultiplier = intervalMultiplier;
+
     if (intervalMultiplierType === IntervalMultiplierType.Progressive) {
-      // Use separate counter for Progressive mode to avoid interference
       const progReps = progressiveRepetitions || 0;
-      
+
       if (progReps === 0) {
-        nextDueDate = dateUtils.addDays(today, 2); // First time: 2 days
-        calculatedIntervalMultiplier = 2; // Actual next review interval
+        nextDueDate = dateUtils.addDays(today, 2);
+        calculatedIntervalMultiplier = 2;
       } else if (progReps === 1) {
-        nextDueDate = dateUtils.addDays(today, 6); // Second time: 6 days
-        calculatedIntervalMultiplier = 6; // Actual next review interval
+        nextDueDate = dateUtils.addDays(today, 6);
+        calculatedIntervalMultiplier = 6;
       } else {
-        // Calculate expected interval based solely on progressiveRepetitions
-        // Standard sequence: 2, 6, 12, 24, 48, 96...
-        // Formula for progReps >= 2: expectedInterval = 6 × 2^(progReps - 2)
-        // This ensures Progressive mode is independent of manual interval settings
         const expectedInterval = 6 * Math.pow(2, progReps - 2);
-        
-        // Apply 2x growth factor for next review interval
         const progressiveInterval = Math.round(expectedInterval * 2.0);
         nextDueDate = dateUtils.addDays(today, progressiveInterval);
-        
-        // Save the actual next review interval (matches UI display)
         calculatedIntervalMultiplier = progressiveInterval;
       }
     } else if (intervalMultiplierType === IntervalMultiplierType.Days) {
@@ -99,8 +99,8 @@ export const generatePracticeData = ({
       reviewMode: ReviewModes.FixedInterval,
       intervalMultiplier: calculatedIntervalMultiplier,
       intervalMultiplierType,
-      progressiveRepetitions: intervalMultiplierType === IntervalMultiplierType.Progressive 
-        ? (progressiveRepetitions || 0) + 1 
+      progressiveRepetitions: intervalMultiplierType === IntervalMultiplierType.Progressive
+        ? (progressiveRepetitions || 0) + 1
         : progressiveRepetitions,
       nextDueDate,
       nextDueDateFromNow: dateUtils.customFromNow(nextDueDate),
@@ -113,7 +113,6 @@ export const generatePracticeData = ({
       efactor: eFactor,
     };
 
-    // call supermemo API
     const supermemoResults = supermemo(supermemoInput, grade);
 
     const nextDueDate = dateUtils.addDays(dateCreated, supermemoResults.interval);
@@ -142,7 +141,7 @@ const practice = async (practiceProps: PracticeProps, isDryRun = false) => {
   const {
     refUid,
     dataPageTitle,
-    dateCreated = null,
+    dateCreated = undefined,
     isCramming,
     grade,
     interval,
@@ -153,7 +152,7 @@ const practice = async (practiceProps: PracticeProps, isDryRun = false) => {
     reviewMode,
   } = practiceProps;
 
-  // Just destructuring nextDueDateFromNow here because I don't want to store it
+  // nextDueDateFromNow is display-only, not persisted
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { nextDueDateFromNow, ...practiceResultData } = generatePracticeData({
     grade,

@@ -1,3 +1,13 @@
+/**
+ * String Utilities
+ *
+ * getStringBetween: Extracts substring between two delimiters
+ * parseRoamDateString: Converts Roam date string to JS Date via Roam API
+ * dateToRoamDateString: Converts JS Date to Roam date string via Roam API
+ * parseConfigString: Splits "key:: value" into [key, value]
+ * pluralize: Returns singular or plural form based on count
+ * isNumeric: Checks if a string represents a valid number
+ */
 export const getStringBetween = (string, from, to) =>
   string.substring(string.indexOf(from) + from.length, string.lastIndexOf(to));
 
@@ -17,11 +27,11 @@ export const pluralize = (value: number, singular: string, plural: string) => {
 };
 
 export const isNumeric = (str) => {
-  if (typeof str != 'string') return false; // we only process strings!
+  if (typeof str != 'string') return false;
 
   return (
     // @ts-expect-error we expect data to not be number
-    !isNaN(str) && // use type coercion to parse the _entirety_ of the string (`parseFloat` alone does not do this)...
+    !isNaN(str) &&
     !isNaN(parseFloat(str))
   );
 };

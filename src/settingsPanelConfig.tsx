@@ -103,6 +103,18 @@ const settingsPanelConfig = ({ settings, setSettings }) => {
           },
         },
       },
+      {
+        id: 'showBreadcrumbs',
+        name: 'Show Breadcrumbs',
+        description:
+          'Show breadcrumb navigation above each card during review. You can also toggle this with the B key during review.',
+        action: {
+          type: 'switch',
+          onChange: (e) => {
+            processChange({ key: 'showBreadcrumbs', value: e.target.checked });
+          },
+        },
+      },
     ],
   };
 };

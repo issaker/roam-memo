@@ -1,3 +1,9 @@
+/**
+ * useCommandPaletteAction Hook
+ *
+ * Registers "Memo: Start Review Session" in Roam's command palette (Cmd+P).
+ * Automatically cleans up the command on unmount.
+ */
 import React from 'react';
 interface CommandPaletteAction {
   onShowPracticeOverlay: () => void;
