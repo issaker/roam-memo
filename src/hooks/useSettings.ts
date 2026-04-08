@@ -8,24 +8,22 @@ export type Settings = {
   rtlEnabled: boolean;
   shuffleCards: boolean;
   forgotReinsertOffset: number;
+  showBreadcrumbs: boolean;
 };
 
 export const defaultSettings: Settings = {
   tagsListString: 'memo',
   dataPageTitle: 'roam/memo',
-  dailyLimit: 0, // 0 = no limit,
+  dailyLimit: 0,
   rtlEnabled: false,
   shuffleCards: false,
   forgotReinsertOffset: 3,
+  showBreadcrumbs: false,
 };
 
-// @TODO: Refactor/Hoist this so we can call useSettings in multiple places
-// without duplicating settings state (ie maybe init state in app and use
-// context to access it anywhere)
 const useSettings = () => {
   const [settings, setSettings] = React.useState(defaultSettings);
 
-  // If tagsListString is empty, set it to the default
   React.useEffect(() => {
     if (!settings.tagsListString.trim()) {
       setSettings((currentSettings) => ({
@@ -35,7 +33,6 @@ const useSettings = () => {
     }
   }, [settings]);
 
-  // Create settings panel
   React.useEffect(() => {
     window.roamMemo.extensionAPI.settings.panel.create(
       settingsPanelConfig({ settings, setSettings })
@@ -45,36 +42,46 @@ const useSettings = () => {
 
   React.useEffect(() => {
     const allSettings = window.roamMemo.extensionAPI.settings.getAll() || {};
-    // Manually set shuffleCards to true if it doesn't exist. Reason: Can't
-    // figure out how to make the switch UI default to on so let's just set it
-    // to true here unless toggled off
     if (!('shuffleCards' in allSettings)) {
       window.roamMemo.extensionAPI.settings.set('shuffleCards', defaultSettings.shuffleCards);
     }
+    if (!('showBreadcrumbs' in allSettings)) {
+      window.roamMemo.extensionAPI.settings.set('showBreadcrumbs', defaultSettings.showBreadcrumbs);
+    }
 
-    // For some reason the getAll() method casts numbers to strings, so here we
-    // map keys in this list back to numbers
     const numbers = ['dailyLimit'];
+    const booleans = ['rtlEnabled', 'shuffleCards', 'showBreadcrumbs'];
 
     const filteredSettings = Object.keys(allSettings).reduce((acc, key) => {
       const value = allSettings[key];
-      acc[key] = numbers.includes(key) ? Number(value) : value;
+      if (numbers.includes(key)) {
+        acc[key] = Number(value);
+      } else if (booleans.includes(key)) {
+        acc[key] = value === true || value === 'true';
+      } else {
+        acc[key] = value;
+      }
       return acc;
     }, {});
 
     setSettings((currentSettings) => ({ ...currentSettings, ...filteredSettings }));
   }, [setSettings]);
 
-  // Listen for settings changes from roam/js mode
   React.useEffect(() => {
     const handleSettingsChange = (event: CustomEvent) => {
-      // Reload all settings when any setting changes
       const allSettings = window.roamMemo.extensionAPI.settings.getAll() || {};
       const numbers = ['dailyLimit'];
+      const booleans = ['rtlEnabled', 'shuffleCards', 'showBreadcrumbs'];
 
       const filteredSettings = Object.keys(allSettings).reduce((acc, key) => {
         const value = allSettings[key];
-        acc[key] = numbers.includes(key) ? Number(value) : value;
+        if (numbers.includes(key)) {
+          acc[key] = Number(value);
+        } else if (booleans.includes(key)) {
+          acc[key] = value === true || value === 'true';
+        } else {
+          acc[key] = value;
+        }
         return acc;
       }, {});
 
@@ -82,7 +89,7 @@ const useSettings = () => {
     };
 
     window.addEventListener('roamMemoSettingsChanged', handleSettingsChange as EventListener);
-    
+
     return () => {
       window.removeEventListener('roamMemoSettingsChanged', handleSettingsChange as EventListener);
     };

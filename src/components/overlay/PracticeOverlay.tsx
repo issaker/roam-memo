@@ -167,6 +167,7 @@ const PracticeOverlay = ({
     rtlEnabled: false,
     shuffleCards: false,
     forgotReinsertOffset: 3,
+    showBreadcrumbs: false,
   });
 
   // Load settings from page on mount and sync with extensionAPI
@@ -294,17 +295,21 @@ const PracticeOverlay = ({
     width: 'auto',
   };
 
-  const [showBreadcrumbs, setShowBreadcrumbs] = React.useState(() => {
-    // Load from localStorage, default to false
-    const saved = localStorage.getItem('roamMemo_showBreadcrumbs');
-    return saved === 'true';
-  });
+  const [showBreadcrumbs, setShowBreadcrumbs] = React.useState(false);
 
-  // Wrapper function to persist breadcrumbs state
-  const toggleBreadcrumbs = () => {
+  React.useEffect(() => {
+    setShowBreadcrumbs(localSettings.showBreadcrumbs);
+  }, [localSettings.showBreadcrumbs]);
+
+  const toggleBreadcrumbs = async () => {
     const newState = !showBreadcrumbs;
     setShowBreadcrumbs(newState);
-    localStorage.setItem('roamMemo_showBreadcrumbs', String(newState));
+    const updatedSettings = { ...localSettings, showBreadcrumbs: newState };
+    setLocalSettings(updatedSettings);
+    await saveSettingsToPage(updatedSettings.dataPageTitle, updatedSettings);
+    if (window.roamMemo?.extensionAPI?.settings) {
+      window.roamMemo.extensionAPI.settings.set('showBreadcrumbs', newState);
+    }
   };
 
   const hotkeys = React.useMemo(
@@ -391,7 +396,7 @@ const PracticeOverlay = ({
           isDone={isDone}
           nextDueDate={nextDueDate}
           showBreadcrumbs={showBreadcrumbs}
-          setShowBreadcrumbs={setShowBreadcrumbs}
+          onToggleBreadcrumbs={toggleBreadcrumbs}
           isCramming={isCramming}
           onSettingsClick={() => setShowSettings(true)}
         />
@@ -564,6 +569,22 @@ const PracticeOverlay = ({
               placeholder="3"
               style={{ width: '100%' }}
             />
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                className="bp3-checkbox"
+                checked={localSettings.showBreadcrumbs}
+                onChange={(e) => setLocalSettings({ ...localSettings, showBreadcrumbs: e.target.checked })}
+                style={{ marginRight: '8px' }}
+              />
+              <span>Show Breadcrumbs</span>
+            </label>
+            <p style={{ fontSize: '12px', color: colors.textMuted, margin: '5px 0 0 0' }}>
+              Show breadcrumb navigation above each card during review. You can also toggle this with the B key.
+            </p>
           </div>
         </div>
 
@@ -916,7 +937,7 @@ const Header = ({
   isDone,
   nextDueDate,
   showBreadcrumbs,
-  setShowBreadcrumbs,
+  onToggleBreadcrumbs,
   isCramming,
   onSettingsClick,
 }) => {
@@ -928,11 +949,8 @@ const Header = ({
   const currentIndexDelta = isCramming ? 0 : completedTodayCount;
   const currentDisplayCount = currentIndexDelta + currentIndex + 1;
 
-  // Wrapper function to persist breadcrumbs state
   const toggleBreadcrumbs = () => {
-    const newState = !showBreadcrumbs;
-    setShowBreadcrumbs(newState);
-    localStorage.setItem('roamMemo_showBreadcrumbs', String(newState));
+    onToggleBreadcrumbs();
   };
 
   return (
