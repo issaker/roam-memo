@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { ReviewModes, Session } from '~/models/session';
-import { generateNewSession, getLatestReviewModeForCard } from '~/queries';
+import { generateNewSession, getPluginPageData } from '~/queries';
 
 export const getResolvedCardData = ({
   sessions,
@@ -71,14 +71,20 @@ export default function useCurrentCardData({
 
     if (!currentCardRefUid || !dataPageTitle) return;
 
-    const liveReviewMode = getLatestReviewModeForCard({
-      dataPageTitle,
-      refUid: currentCardRefUid,
-    });
-
-    if (liveReviewMode && liveReviewMode !== latestSession?.reviewMode) {
-      setReviewModeOverride(liveReviewMode);
-    }
+    (async () => {
+      try {
+        const latestPluginData = await getPluginPageData({ dataPageTitle, limitToLatest: true });
+        const latestSessions = latestPluginData[currentCardRefUid];
+        if (latestSessions && latestSessions.length > 0) {
+          const liveReviewMode = latestSessions[0].reviewMode;
+          if (liveReviewMode && liveReviewMode !== latestSession?.reviewMode) {
+            setReviewModeOverride(liveReviewMode);
+          }
+        }
+      } catch (error) {
+        console.error('Memo: Error getting latest plugin data:', error);
+      }
+    })();
   }, [currentCardRefUid, latestSession, dataPageTitle]);
 
   return {
