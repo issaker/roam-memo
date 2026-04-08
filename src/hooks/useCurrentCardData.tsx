@@ -1,11 +1,7 @@
 import * as React from 'react';
 import { ReviewModes, Session } from '~/models/session';
-import { generateNewSession } from '~/queries';
+import { generateNewSession, getLatestReviewModeForCard } from '~/queries';
 
-/**
- * Find the last session with matching review mode and returns it.
- * If no matching session exists, generate a new session.
- */
 export const getResolvedCardData = ({
   sessions,
   reviewMode,
@@ -34,9 +30,11 @@ export const getResolvedCardData = ({
 export default function useCurrentCardData({
   currentCardRefUid,
   sessions,
+  dataPageTitle,
 }: {
   currentCardRefUid: string | undefined;
   sessions: Session[];
+  dataPageTitle?: string;
 }) {
   const latestSession = sessions[sessions.length - 1] as Session | undefined;
   const [currentCardData, setCurrentCardData] = React.useState<Session | undefined>(latestSession);
@@ -44,8 +42,6 @@ export default function useCurrentCardData({
     latestSession?.reviewMode
   );
 
-  // Create separate review mode override toggle This is to keep the default
-  // case of review mode being the same as the latest session easy to understand
   const [reviewModeOverride, setReviewModeOverride] = React.useState<ReviewModes | undefined>();
 
   React.useEffect(() => {
@@ -69,11 +65,21 @@ export default function useCurrentCardData({
     setReviewMode(latestSession?.reviewMode);
   }, [reviewMode, sessions, currentCardRefUid, latestSession, reviewModeOverride]);
 
-  // Here we just need to reset the override each time we change cards
   React.useEffect(() => {
     setReviewModeOverride(undefined);
     setReviewMode(latestSession?.reviewMode);
-  }, [currentCardRefUid, latestSession]);
+
+    if (!currentCardRefUid || !dataPageTitle) return;
+
+    const liveReviewMode = getLatestReviewModeForCard({
+      dataPageTitle,
+      refUid: currentCardRefUid,
+    });
+
+    if (liveReviewMode && liveReviewMode !== latestSession?.reviewMode) {
+      setReviewModeOverride(liveReviewMode);
+    }
+  }, [currentCardRefUid, latestSession, dataPageTitle]);
 
   return {
     currentCardData,

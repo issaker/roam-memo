@@ -2,6 +2,7 @@ import { getStringBetween, parseConfigString, parseRoamDateString } from '~/util
 import * as stringUtils from '~/utils/string';
 import { CompleteRecords, Records, RecordUid, ReviewModes } from '~/models/session';
 import { Today } from '~/models/practice';
+import { getBlockOnPage, getChildBlock } from './utils';
 import {
   addDueCards,
   addNewCards,
@@ -399,5 +400,46 @@ const limitRemainingPracticeData = ({
       due: selectedCards[tag].dueUids.length,
       new: selectedCards[tag].newUids.length,
     };
+  }
+};
+
+export const getLatestReviewModeForCard = ({
+  dataPageTitle,
+  refUid,
+}: {
+  dataPageTitle: string;
+  refUid: string;
+}): ReviewModes | undefined => {
+  try {
+    const dataBlockUid = getBlockOnPage(dataPageTitle, 'data');
+    if (!dataBlockUid) return undefined;
+
+    const cardRefString = `((${refUid}))`;
+    const cardBlockUid = getChildBlock(dataBlockUid, cardRefString, { exactMatch: true });
+    if (!cardBlockUid) return undefined;
+
+    const pullResult = window.roamAlphaAPI.pull(
+      '[{:block/children [:block/string :block/order {:block/children [:block/string :block/order]}]}]',
+      [':block/uid', cardBlockUid]
+    );
+
+    if (!pullResult?.children) return undefined;
+
+    const latestSession = pullResult.children.find((c) => c.order === 0);
+    if (!latestSession?.children) return undefined;
+
+    for (const child of latestSession.children) {
+      if (child.string?.includes('reviewMode')) {
+        const [, value] = parseConfigString(child.string);
+        if (value === ReviewModes.FixedInterval || value === ReviewModes.DefaultSpacedInterval) {
+          return value as ReviewModes;
+        }
+      }
+    }
+
+    return undefined;
+  } catch (error) {
+    console.error('Memo: Error getting latest review mode for card:', error);
+    return undefined;
   }
 };

@@ -147,6 +147,7 @@ const App = () => {
             rtlEnabled={rtlEnabled}
             today={today}
             forgotReinsertOffset={forgotReinsertOffset}
+            dataPageTitle={dataPageTitle}
           />
         )}
       </>
