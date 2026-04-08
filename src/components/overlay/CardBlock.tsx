@@ -13,12 +13,14 @@ const CardBlock = ({
   setHasCloze,
   breadcrumbs,
   showBreadcrumbs,
+  onRenderComplete,
 }: {
   refUid: string;
   showAnswers: boolean;
   setHasCloze: (hasCloze: boolean) => void;
   breadcrumbs: BreadcrumbsType[];
   showBreadcrumbs: boolean;
+  onRenderComplete?: () => void;
 }) => {
   const ref = React.useRef<HTMLDivElement | null>(null);
   const [renderedBlockElm, setRenderedBlockElm] = React.useState<HTMLElement | null>(null);
@@ -102,6 +104,9 @@ const CardBlock = ({
 
       observer.observe(ref.current, { childList: true, subtree: true });
       observerRef.current = observer;
+
+      // Notify parent that rendering is complete
+      onRenderComplete?.();
     };
 
     // Create the debounced function only once
@@ -125,13 +130,6 @@ const CardBlock = ({
       debouncedFnRef.current();
     }
   }, [refUid, forceUpdate]);
-
-  // Clear content immediately when refUid changes to prevent showing stale content
-  React.useEffect(() => {
-    if (ref.current) {
-      ref.current.innerHTML = '';
-    }
-  }, [refUid]);
 
   return (
     <div>

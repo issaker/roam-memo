@@ -151,6 +151,7 @@ const PracticeOverlay = ({
   const [showAnswers, setShowAnswers] = React.useState(false);
   const [hasCloze, setHasCloze] = React.useState(true);
   const [showSettings, setShowSettings] = React.useState(false);
+  const [isRendered, setIsRendered] = React.useState(false);
 
   const shouldShowAnswerFirst =
     renderMode === RenderMode.AnswerFirst && hasBlockChildrenUids && !showAnswers;
@@ -185,12 +186,19 @@ const PracticeOverlay = ({
 
   // Reset showAnswers state
   React.useEffect(() => {
+    if (!isRendered) return; // Wait for rendering to complete
+    
     if (hasBlockChildren || hasCloze) {
       setShowAnswers(false);
     } else {
       setShowAnswers(true);
     }
-  }, [hasBlockChildren, hasCloze, currentIndex, tagsList, selectedTag]);
+  }, [hasBlockChildren, hasCloze, isRendered]);
+
+  // Reset render flag when card changes
+  React.useEffect(() => {
+    setIsRendered(false);
+  }, [currentCardRefUid]);
 
   const onTagChange = async (tag) => {
     setCurrentIndex(0);
@@ -404,6 +412,7 @@ const PracticeOverlay = ({
                     setHasCloze={setHasCloze}
                     breadcrumbs={blockInfo.breadcrumbs}
                     showBreadcrumbs={false}
+                    onRenderComplete={() => setIsRendered(true)}
                   />
                 ))
               ) : (
@@ -413,6 +422,7 @@ const PracticeOverlay = ({
                   setHasCloze={setHasCloze}
                   breadcrumbs={blockInfo.breadcrumbs}
                   showBreadcrumbs={showBreadcrumbs}
+                  onRenderComplete={() => setIsRendered(true)}
                 />
               )}
             </>
