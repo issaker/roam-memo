@@ -69,15 +69,11 @@ export default function useCurrentCardData({
     setReviewMode(latestSession?.reviewMode);
   }, [reviewMode, sessions, currentCardRefUid, latestSession, reviewModeOverride]);
 
-  // Here we just need to reset the override each time we change cards
-  // BUT: Don't reset if we want persistent per-card reviewMode
-  // The override will be set by PracticeOverlay's real-time detection
+  // Reset reviewMode to latestSession when card changes
+  // The override will be set by PracticeOverlay's detection after rendering
   React.useEffect(() => {
-    // REMOVED: Automatic reset of reviewModeOverride and reviewMode
-    // This allows per-card reviewMode to persist during the session
-    // The first useEffect above already handles setting reviewMode based on override or latestSession
-    // setReviewModeOverride(undefined);
-    // setReviewMode(latestSession?.reviewMode); // REMOVED - this was overriding the detected mode!
+    setReviewModeOverride(undefined);
+    setReviewMode(latestSession?.reviewMode);
   }, [currentCardRefUid, latestSession]);
 
   return {

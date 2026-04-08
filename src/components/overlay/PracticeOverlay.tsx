@@ -200,50 +200,27 @@ const PracticeOverlay = ({
     setIsRendered(false);
   }, [currentCardRefUid]);
 
-  // Real-time reviewMode detection after rendering completes
+  // Check reviewMode from block after rendering
   React.useEffect(() => {
     if (!isRendered || !currentCardRefUid) return;
 
-    const detectReviewMode = async () => {
-      try {
-        // Fetch the current block's children to check for reviewMode attribute
-        const blockData = await window.roamAlphaAPI.q(
-          `[
-            :find (pull ?block [{:block/children [:block/string]}])
-            :in $ ?uid
-            :where
-              [?block :block/uid ?uid]
-          ]`,
-          currentCardRefUid
-        );
-
-        if (!blockData || !blockData[0] || !blockData[0][0]) return;
-
-        const children = blockData[0][0].children || [];
-        
-        // Look for reviewMode:: attribute in children
-        const reviewModeChild = children.find((child: any) => 
-          child.string && child.string.includes('reviewMode::')
-        );
-
-        if (reviewModeChild) {
-          const [, modeValue] = reviewModeChild.string.split('::').map((s: string) => s.trim());
-          
-          // Validate and set the review mode
-          if (modeValue === ReviewModes.FixedInterval || 
-              modeValue === ReviewModes.DefaultSpacedInterval) {
-            console.log('[Memo] Detected reviewMode for card:', currentCardRefUid, '->', modeValue);
-            setReviewModeOverride(modeValue as ReviewModes);
-          }
-        } else {
-          console.log('[Memo] No reviewMode attribute found for card:', currentCardRefUid);
+    window.roamAlphaAPI.q(
+      `[:find (pull ?block [{:block/children [:block/string]}]) :in $ ?uid :where [?block :block/uid ?uid]]`,
+      currentCardRefUid
+    ).then((result) => {
+      if (!result || !result[0] || !result[0][0]) return;
+      
+      const children = result[0][0].children || [];
+      const reviewModeChild = children.find((c: any) => c.string?.includes('reviewMode::'));
+      
+      if (reviewModeChild) {
+        const [, mode] = reviewModeChild.string.split('::').map((s: string) => s.trim());
+        if (mode === ReviewModes.FixedInterval || mode === ReviewModes.DefaultSpacedInterval) {
+          console.log('[Memo] Card', currentCardRefUid, 'mode:', mode);
+          setReviewModeOverride(mode as ReviewModes);
         }
-      } catch (error) {
-        console.error('[Memo] Failed to detect reviewMode:', error);
       }
-    };
-
-    detectReviewMode();
+    });
   }, [isRendered, currentCardRefUid, setReviewModeOverride]);
 
   const onTagChange = async (tag) => {
