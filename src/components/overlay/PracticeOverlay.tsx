@@ -151,9 +151,7 @@ const PracticeOverlay = ({
   const [showAnswers, setShowAnswers] = React.useState(false);
   const [hasCloze, setHasCloze] = React.useState(true);
   const [showSettings, setShowSettings] = React.useState(false);
-  
-  // Use ref to track the current card UID for async safety
-  const currentCardUidRef = React.useRef<string | undefined>(undefined);
+  const [isRendered, setIsRendered] = React.useState(false);
 
   const shouldShowAnswerFirst =
     renderMode === RenderMode.AnswerFirst && hasBlockChildrenUids && !showAnswers;
@@ -186,30 +184,21 @@ const PracticeOverlay = ({
     loadSettings();
   }, []);
 
-  // Update ref when card changes
+  // Reset showAnswers state
   React.useEffect(() => {
-    currentCardUidRef.current = currentCardRefUid;
-  }, [currentCardRefUid]);
-
-  // Reset showAnswers synchronously when card changes
-  React.useEffect(() => {
-    setShowAnswers(false);
-  }, [currentCardRefUid]);
-
-  // Auto-show answers for simple cards after data loads
-  // Uses ref to ensure we only affect the current card
-  React.useEffect(() => {
-    // Don't proceed if no card or data not loaded
-    if (!currentCardRefUid || !blockInfo.refUid) return;
+    if (!isRendered) return; // Wait for rendering to complete
     
-    // Safety check: only proceed if this is still the current card
-    if (blockInfo.refUid !== currentCardUidRef.current) return;
-    
-    // Only auto-show for simple cards (no children AND no cloze)
-    if (!hasBlockChildren && !hasCloze) {
+    if (hasBlockChildren || hasCloze) {
+      setShowAnswers(false);
+    } else {
       setShowAnswers(true);
     }
-  }, [blockInfo.refUid, hasBlockChildren, hasCloze]);
+  }, [hasBlockChildren, hasCloze, isRendered]);
+
+  // Reset render flag when card changes
+  React.useEffect(() => {
+    setIsRendered(false);
+  }, [currentCardRefUid]);
 
   const onTagChange = async (tag) => {
     setCurrentIndex(0);
@@ -419,6 +408,7 @@ const PracticeOverlay = ({
                     setHasCloze={setHasCloze}
                     breadcrumbs={blockInfo.breadcrumbs}
                     showBreadcrumbs={false}
+                    onRenderComplete={() => setIsRendered(true)}
                   />
                 ))
               ) : (
@@ -428,6 +418,7 @@ const PracticeOverlay = ({
                   setHasCloze={setHasCloze}
                   breadcrumbs={blockInfo.breadcrumbs}
                   showBreadcrumbs={showBreadcrumbs}
+                  onRenderComplete={() => setIsRendered(true)}
                 />
               )}
             </>

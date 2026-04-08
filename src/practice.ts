@@ -77,9 +77,8 @@ export const generatePracticeData = ({
         // This ensures Progressive mode is independent of manual interval settings
         const expectedInterval = 6 * Math.pow(2, progReps - 2);
         
-        // Apply simplified SM2 Good logic: interval × 2.0 (efactor=2.5, grade=4)
-        // progressiveInterval is the ACTUAL next review interval
-        const progressiveInterval = Math.round(expectedInterval * 2.5 * 0.8);
+        // Apply 2x growth factor for next review interval
+        const progressiveInterval = Math.round(expectedInterval * 2.0);
         nextDueDate = dateUtils.addDays(today, progressiveInterval);
         
         // Save the actual next review interval (matches UI display)

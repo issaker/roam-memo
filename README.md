@@ -62,7 +62,13 @@ Type "Memo: Start Review Session" in the command palette (`Cmd+P` / `Ctrl+P`).
 The plugin offers two review modes:
 
 ### Spaced Interval Mode (Memory Training)
-Uses the SM2 algorithm to optimize long-term memory retention with grading: Forgot / Hard / Good / Perfect.
+Uses a **modified SM2 algorithm** to optimize long-term memory retention with grading: Forgot / Hard / Good / Perfect.
+
+**Algorithm Modifications:**
+- **Interval Calculation**: Uses `interval × eFactor × (grade/5)` instead of standard `interval × eFactor`
+  - This provides grade-based interval adjustment: Grade 3 → 60%, Grade 4 → 80%, Grade 5 → 100% of standard interval
+- **E-Factor Update**: Only updates when grade ≥ 3 (standard SM2 behavior)
+- **Reset Behavior**: Grade < 3 resets repetition count to 0 and interval to 1 day
 
 ### Fixed Interval Mode (Progressive Reading)
 A relaxed approach for content you want to revisit regularly. Includes **Progressive Mode** with automatic interval growth:
