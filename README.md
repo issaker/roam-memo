@@ -75,6 +75,7 @@ A relaxed approach for content you want to revisit regularly. Includes **Progres
 
 ## Recent Updates
 
+- **2026-04 Card Rendering Flicker Fix** — Fixed UI flickering when navigating between cards with different structures (e.g., from Q&A card to single-block card). Root cause: state judgment was faster than DOM rendering, causing stale content to briefly appear. Solution: Added `isRendered` flag that delays automatic answer display until Roam API completes rendering. This ensures clean transitions without visual artifacts.
 - **2026-04 Breadcrumb Order Fix** — Fixed breadcrumb display order to perfectly match Roam native. Roam's `:block/parents` API returns unordered ancestor array, so the plugin now queries each parent's depth via pull API and sorts by hierarchy depth. This ensures correct root-to-leaf order regardless of API return order.
 - **2026-04 Color Theme System** — Unified color management with CSS variables for automatic light/dark theme adaptation. Eliminated hardcoded colors and duplicate code for better maintainability.
 - **2026-04 Progressive Mode Simplification** — Progressive mode now uses pure function design based solely on `progressiveRepetitions` count. No interval state tracking needed. Simpler and more predictable.
