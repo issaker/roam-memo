@@ -17,7 +17,7 @@ import Footer from '~/components/overlay/Footer';
 import ButtonTags from '~/components/ButtonTags';
 import { CompleteRecords, IntervalMultiplierType, ReviewModes } from '~/models/session';
 import useCurrentCardData from '~/hooks/useCurrentCardData';
-import { generateNewSession } from '~/queries';
+import { generateNewSession, getPluginPageData } from '~/queries';
 import { CompletionStatus, Today, RenderMode } from '~/models/practice';
 import { handlePracticeProps } from '~/app';
 import { useSafeContext } from '~/hooks/useSafeContext';
@@ -201,42 +201,43 @@ const PracticeOverlay = ({
   }, [currentCardRefUid]);
 
   // Re-fetch reviewMode from roam/memo > data page after rendering
-  // This allows real-time detection of reviewMode changes made by user during session
+  // Use existing getPluginPageData function to query latest session data
   React.useEffect(() => {
     if (!isRendered || !currentCardRefUid) return;
 
-    // Query the latest session for this card from roam/memo > data page
-    window.roamAlphaAPI.q(
-      `[:find (pull ?session [:block/string {:block/children [:block/string]}]) 
-        :in $ ?ref-uid 
-        :where 
-        [?page :node/title "roam/memo"]
-        [?data-block :block/page ?page]
-        [?data-block :block/string "data"]
-        [?entry :block/parents ?data-block]
-        [?entry-ref :block/string ?ref-string]
-        [(str "((" ?ref-uid "))") ?expected-ref]
-        [(= ?ref-string ?expected-ref)]
-        [?session :block/parents ?entry]
-        [?session :block/order 0]]`,
-      currentCardRefUid
-    ).then((result) => {
-      if (!result || result.length === 0 || !result[0][0]) return;
+    // Use the plugin's existing query function
+    getPluginPageData({ dataPageTitle: 'roam/memo', limitToLatest: true }).then((latestData) => {
+      if (!latestData || !latestData[currentCardRefUid]) return;
       
-      const session = result[0][0];
-      if (!session.children) return;
+      const cardLatestSession = latestData[currentCardRefUid];
+      const detectedMode = cardLatestSession.reviewMode;
       
-      // Parse reviewMode from session children
-      const reviewModeChild = session.children.find((c: any) => 
-        c.string && c.string.includes('reviewMode::')
-      );
+      console.log('[Memo] Detected reviewMode:', detectedMode);
       
-      if (reviewModeChild) {
-        const [, mode] = reviewModeChild.string.split('::').map((s: string) => s.trim());
-        if (mode === ReviewModes.FixedInterval || mode === ReviewModes.DefaultSpacedInterval) {
-          console.log('[Memo] Real-time reviewMode detected:', mode);
-          setReviewModeOverride(mode as ReviewModes);
-        }
+      if (detectedMode === ReviewModes.FixedInterval || detectedMode === ReviewModes.DefaultSpacedInterval) {
+        console.log('[Memo] Applying reviewMode:', detectedMode);
+        setReviewModeOverride(detectedMode);
+      }
+    });
+  }, [isRendered, currentCardRefUid, setReviewModeOverride]);
+
+  // Re-fetch reviewMode from roam/memo > data page after rendering
+  // Use existing getPluginPageData function to query latest session data
+  React.useEffect(() => {
+    if (!isRendered || !currentCardRefUid) return;
+
+    // Use the plugin's existing query function
+    getPluginPageData({ dataPageTitle: 'roam/memo', limitToLatest: true }).then((latestData) => {
+      if (!latestData || !latestData[currentCardRefUid]) return;
+      
+      const cardLatestSession = latestData[currentCardRefUid];
+      const detectedMode = cardLatestSession.reviewMode;
+      
+      console.log('[Memo] Detected reviewMode:', detectedMode);
+      
+      if (detectedMode === ReviewModes.FixedInterval || detectedMode === ReviewModes.DefaultSpacedInterval) {
+        console.log('[Memo] Applying reviewMode:', detectedMode);
+        setReviewModeOverride(detectedMode);
       }
     });
   }, [isRendered, currentCardRefUid, setReviewModeOverride]);
