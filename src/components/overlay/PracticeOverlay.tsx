@@ -153,9 +153,6 @@ const PracticeOverlay = ({
   const [showSettings, setShowSettings] = React.useState(false);
   const [isRendered, setIsRendered] = React.useState(false);
 
-  // Cache for reviewMode detection to avoid redundant API calls
-  const reviewModeCacheRef = React.useRef<Map<string, ReviewModes>>(new Map());
-
   const shouldShowAnswerFirst =
     renderMode === RenderMode.AnswerFirst && hasBlockChildrenUids && !showAnswers;
 
@@ -208,13 +205,6 @@ const PracticeOverlay = ({
     if (!isRendered || !currentCardRefUid) return;
 
     const detectReviewMode = async () => {
-      // Check cache first to avoid redundant API calls
-      const cached = reviewModeCacheRef.current.get(currentCardRefUid);
-      if (cached) {
-        setReviewModeOverride(cached);
-        return;
-      }
-
       try {
         // Fetch the current block's children to check for reviewMode attribute
         const blockData = await window.roamAlphaAPI.q(
@@ -242,9 +232,7 @@ const PracticeOverlay = ({
           // Validate and set the review mode
           if (modeValue === ReviewModes.FixedInterval || 
               modeValue === ReviewModes.DefaultSpacedInterval) {
-            const detectedMode = modeValue as ReviewModes;
-            reviewModeCacheRef.current.set(currentCardRefUid, detectedMode);
-            setReviewModeOverride(detectedMode);
+            setReviewModeOverride(modeValue as ReviewModes);
           }
         }
       } catch (error) {
@@ -277,8 +265,6 @@ const PracticeOverlay = ({
   React.useEffect(() => {
     setCardQueue(initialCardUids);
     setCurrentIndex(0);
-    // Clear reviewMode cache when switching tags
-    reviewModeCacheRef.current.clear();
   }, [selectedTag]);
 
   const onPracticeClick = React.useCallback(
