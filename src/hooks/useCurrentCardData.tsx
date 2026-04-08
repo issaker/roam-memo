@@ -71,20 +71,30 @@ export default function useCurrentCardData({
 
     if (!currentCardRefUid || !dataPageTitle) return;
 
+    let cancelled = false;
+
     (async () => {
       try {
         const latestPluginData = await getPluginPageData({ dataPageTitle, limitToLatest: true });
-        const latestSessions = latestPluginData[currentCardRefUid];
-        if (latestSessions && latestSessions.length > 0) {
-          const liveReviewMode = latestSessions[0].reviewMode;
-          if (liveReviewMode && liveReviewMode !== latestSession?.reviewMode) {
-            setReviewModeOverride(liveReviewMode);
-          }
+        if (cancelled) return;
+
+        const liveSession = latestPluginData[currentCardRefUid];
+        console.log('[Memo] liveSession for', currentCardRefUid, ':', liveSession);
+        console.log('[Memo] liveSession.reviewMode:', liveSession?.reviewMode);
+        console.log('[Memo] latestSession?.reviewMode:', latestSession?.reviewMode);
+
+        if (liveSession?.reviewMode && liveSession.reviewMode !== latestSession?.reviewMode) {
+          console.log('[Memo] Setting reviewModeOverride to:', liveSession.reviewMode);
+          setReviewModeOverride(liveSession.reviewMode);
         }
       } catch (error) {
-        console.error('Memo: Error getting latest plugin data:', error);
+        console.error('[Memo] Error getting latest plugin data:', error);
       }
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [currentCardRefUid, latestSession, dataPageTitle]);
 
   return {
