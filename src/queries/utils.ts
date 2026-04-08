@@ -44,11 +44,55 @@ export const fetchBlockInfo: (refUid: any) => Promise<BlockInfo> = async (refUid
 
   const sortedChildren = blockInfo.children?.sort((a, b) => a.order - b.order);
 
+  /**
+   * IMPORTANT: Sort breadcrumbs by hierarchy depth to match Roam native order
+   * 
+   * Problem: Roam's `:block/parents` API returns an UNORDERED array of ancestor blocks.
+   * The array does NOT guarantee any specific order (not by depth, not by creation time).
+   * 
+   * Solution: For each parent block, query its ancestor count (depth) using pull API,
+   * then sort by depth ascending to get root-to-leaf order matching Roam's native breadcrumbs.
+   * 
+   * Example hierarchy:
+   *   《合同法》 (depth: 0, page root)
+   *   └─ 第三章 (depth: 1)
+   *      └─ 二、合同的订立 (depth: 2)
+   *         └─ 一、合同订立的程序 (depth: 3)
+   *            └─ （一）要约 (depth: 4)
+   *               └─ 要约的【意思表示】 (depth: 5)
+   *                  └─ [current block]
+   * 
+   * Performance: Requires N additional pull queries where N = parent count (typically 3-6).
+   * This is much faster than complex Datalog queries and more reliable than DOM parsing.
+   */
+  let breadcrumbs = parentChainInfo;
+  
+  if (parentChainInfo.length > 1) {
+    // Get depth for each parent block by querying its ancestor count
+    const breadcrumbsWithDepth = parentChainInfo.map((parent) => {
+      const parentData = window.roamAlphaAPI.pull(
+        '[:block/uid {:block/parents [:block/uid]}]',
+        [':block/uid', parent.uid]
+      );
+      
+      return {
+        ...parent,
+        depth: parentData?.[':block/parents']?.length || 0,
+      };
+    });
+    
+    // Sort by depth ascending: root (depth 0) first, direct parent last
+    // This matches Roam native breadcrumb display order
+    breadcrumbs = breadcrumbsWithDepth
+      .sort((a, b) => a.depth - b.depth)
+      .map(({ uid, title, string }) => ({ uid, title, string }));
+  }
+
   return {
     string: blockInfo.string,
     children: sortedChildren?.map((child) => child.string),
     childrenUids: sortedChildren?.map((child) => child.uid),
-    breadcrumbs: parentChainInfo.reverse(), // Reverse to match Roam native breadcrumb order
+    breadcrumbs,
     refUid,
   };
 };
