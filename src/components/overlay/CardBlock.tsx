@@ -126,6 +126,13 @@ const CardBlock = ({
     }
   }, [refUid, forceUpdate]);
 
+  // Clear content immediately when refUid changes to prevent showing stale content
+  React.useEffect(() => {
+    if (ref.current) {
+      ref.current.innerHTML = '';
+    }
+  }, [refUid]);
+
   return (
     <div>
       {breadcrumbs && showBreadcrumbs && <Breadcrumbs breadcrumbs={breadcrumbs} />}
