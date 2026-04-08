@@ -232,8 +232,11 @@ const PracticeOverlay = ({
           // Validate and set the review mode
           if (modeValue === ReviewModes.FixedInterval || 
               modeValue === ReviewModes.DefaultSpacedInterval) {
+            console.log('[Memo] Detected reviewMode for card:', currentCardRefUid, '->', modeValue);
             setReviewModeOverride(modeValue as ReviewModes);
           }
+        } else {
+          console.log('[Memo] No reviewMode attribute found for card:', currentCardRefUid);
         }
       } catch (error) {
         console.error('[Memo] Failed to detect reviewMode:', error);
