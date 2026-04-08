@@ -15,7 +15,7 @@ import { saveSettingsToPage, loadSettingsFromPage } from '~/queries/settings';
 import CardBlock from '~/components/overlay/CardBlock';
 import Footer from '~/components/overlay/Footer';
 import ButtonTags from '~/components/ButtonTags';
-import { CompleteRecords, IntervalMultiplierType, ReviewModes } from '~/models/session';
+import { CompleteRecords, IntervalMultiplierType, ReviewModes, Session } from '~/models/session';
 import useCurrentCardData from '~/hooks/useCurrentCardData';
 import { generateNewSession, getPluginPageData } from '~/queries';
 import { CompletionStatus, Today, RenderMode } from '~/models/practice';
@@ -209,28 +209,9 @@ const PracticeOverlay = ({
     getPluginPageData({ dataPageTitle: 'roam/memo', limitToLatest: true }).then((latestData) => {
       if (!latestData || !latestData[currentCardRefUid]) return;
       
-      const cardLatestSession = latestData[currentCardRefUid];
-      const detectedMode = cardLatestSession.reviewMode;
+      const cardLatestSession = latestData[currentCardRefUid] as Session | undefined;
+      if (!cardLatestSession) return;
       
-      console.log('[Memo] Detected reviewMode:', detectedMode);
-      
-      if (detectedMode === ReviewModes.FixedInterval || detectedMode === ReviewModes.DefaultSpacedInterval) {
-        console.log('[Memo] Applying reviewMode:', detectedMode);
-        setReviewModeOverride(detectedMode);
-      }
-    });
-  }, [isRendered, currentCardRefUid, setReviewModeOverride]);
-
-  // Re-fetch reviewMode from roam/memo > data page after rendering
-  // Use existing getPluginPageData function to query latest session data
-  React.useEffect(() => {
-    if (!isRendered || !currentCardRefUid) return;
-
-    // Use the plugin's existing query function
-    getPluginPageData({ dataPageTitle: 'roam/memo', limitToLatest: true }).then((latestData) => {
-      if (!latestData || !latestData[currentCardRefUid]) return;
-      
-      const cardLatestSession = latestData[currentCardRefUid];
       const detectedMode = cardLatestSession.reviewMode;
       
       console.log('[Memo] Detected reviewMode:', detectedMode);
