@@ -6,6 +6,12 @@ import * as dateUtils from '~/utils/date';
 import App from '~/app';
 import { IntervalMultiplierType, ReviewModes } from '~/models/session';
 
+/** Check that a Date value is within toleranceMs of the expected Date (default 1s) */
+const expectDateCloseTo = (actual: Date, expected: Date, toleranceMs = 1000) => {
+  expect(actual).toBeInstanceOf(Date);
+  expect(Math.abs(actual.getTime() - expected.getTime())).toBeLessThanOrEqual(toleranceMs);
+};
+
 describe('PracticeOverlay', () => {
   it("renders done state when there's no practice data", async () => {
     new testUtils.MockDataBuilder().mockQueryResults();
@@ -113,18 +119,18 @@ describe('PracticeOverlay', () => {
     });
 
     await act(async () => {
-      testUtils.actions.clickControlButton('Show Answer');
+      await testUtils.actions.clickControlButton('Show Answer');
     });
 
     // Switch to fixed interval mode (do it 3 times to very switching back and forth works)
     await act(async () => {
-      testUtils.actions.clickSwitchReviewModeButton();
+      await testUtils.actions.clickSwitchReviewModeButton();
     });
     await act(async () => {
-      testUtils.actions.clickSwitchReviewModeButton();
+      await testUtils.actions.clickSwitchReviewModeButton();
     });
     await act(async () => {
-      testUtils.actions.clickSwitchReviewModeButton();
+      await testUtils.actions.clickSwitchReviewModeButton();
     });
 
     // Grade the card
@@ -132,12 +138,12 @@ describe('PracticeOverlay', () => {
     expect(result.updatedRecord).toMatchObject({
       reviewMode: ReviewModes.FixedInterval,
       dataPageTitle: testUtils.dataPageTitle,
-      dateCreated: new Date(),
       refUid: 'id_due_1',
       intervalMultiplier: 2,
       intervalMultiplierType: IntervalMultiplierType.Progressive,
-      nextDueDate: dateUtils.addDays(new Date(), 2),
     });
+    expectDateCloseTo(result.updatedRecord.dateCreated, new Date());
+    expectDateCloseTo(result.updatedRecord.nextDueDate, dateUtils.addDays(new Date(), 2));
 
     // Next card should be new
     const statusBadge = screen.queryByTestId('status-badge');
@@ -166,12 +172,12 @@ describe('PracticeOverlay', () => {
     });
 
     await act(async () => {
-      testUtils.actions.clickControlButton('Show Answer');
+      await testUtils.actions.clickControlButton('Show Answer');
     });
 
     // Switch to spaced interval mode
     await act(async () => {
-      testUtils.actions.clickSwitchReviewModeButton();
+      await testUtils.actions.clickSwitchReviewModeButton();
     });
 
     // Grade the card
@@ -179,9 +185,9 @@ describe('PracticeOverlay', () => {
     expect(result.updatedRecord).toMatchObject({
       reviewMode: ReviewModes.DefaultSpacedInterval,
       dataPageTitle: testUtils.dataPageTitle,
-      dateCreated: new Date(),
       refUid: 'id_due_1',
-      nextDueDate: dateUtils.addDays(new Date(), 1),
     });
+    expectDateCloseTo(result.updatedRecord.dateCreated, new Date());
+    expectDateCloseTo(result.updatedRecord.nextDueDate, dateUtils.addDays(new Date(), 1));
   });
 });

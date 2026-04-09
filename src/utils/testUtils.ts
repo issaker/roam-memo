@@ -401,27 +401,19 @@ export const actions = {
 
     tagSelectorElm?.click();
   },
-  clickControlButton: (buttonText: string) => {
+  clickControlButton: async (buttonText: string) => {
     const footerActionsElm = screen.getByTestId('footer-actions-wrapper');
     const showAnswerButton = within(footerActionsElm).getByText(buttonText);
-
-    // The button click sets a timeout to visually show the hover state when using keyboard shortcuts.
-    // So we need to manually run the timers here
-    jest.useFakeTimers();
     const buttonElm = showAnswerButton.closest<HTMLButtonElement>('button');
     buttonElm?.click();
-    jest.runAllTimers();
+    await new Promise(resolve => setTimeout(resolve, 200));
   },
-  clickSwitchReviewModeButton: () => {
+  clickSwitchReviewModeButton: async () => {
     const footerActionsElm = screen.getByTestId('footer-actions-wrapper');
     const reviewModeToggleButton = within(footerActionsElm).getByTestId('review-mode-button');
-
-    // The button click sets a timeout to visually show the hover state when using keyboard shortcuts.
-    // So we need to manually run the timers here
-    jest.useFakeTimers();
     const buttonElm = reviewModeToggleButton.closest<HTMLButtonElement>('button');
     buttonElm?.click();
-    jest.runAllTimers();
+    await new Promise(resolve => setTimeout(resolve, 200));
   },
 };
 
@@ -442,7 +434,7 @@ export const grade = async (gradeString: string, mockBuilder: MockDataBuilder) =
   });
 
   await act(async () => {
-    actions.clickControlButton(gradeString);
+    await actions.clickControlButton(gradeString);
   });
 
   return promise;

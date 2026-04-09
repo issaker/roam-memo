@@ -133,6 +133,39 @@ roam/memo (page)
     └── ...
 ```
 
+## Real-Time Data Synchronization
+
+### Problem
+
+When a user modifies card history on the Data Page (e.g., deleting a session record) during an active review session, the UI displayed stale expected review times (e.g., "Review in 24 days") because the session data was only read once at session start.
+
+### Architecture
+
+The `useCurrentCardData` hook implements a **dual-layer data resolution** strategy:
+
+```
+Session Queue (one-time read)     Data Page (real-time polling, 200ms)
+        │                                    │
+        ▼                                    ▼
+  Card queue + sessions[]           getPluginPageData()
+  (captured at session start)       (reads latest session per card)
+        │                                    │
+        └──────────┬─────────────────────────┘
+                   ▼
+          currentCardData (displayed in UI)
+```
+
+**Layer 1 — Session Queue (one-time read):** The card queue and full session history are read once when the review session starts and remain fixed until the session closes. This ensures stable card ordering and prevents queue disruption.
+
+**Layer 2 — Data Page Polling (real-time):** Every 200ms, the hook reads the latest session data for the current card directly from the Data Page via `getPluginPageData({ limitToLatest: true })`. This detects external changes (history deletion, reviewMode edits) and updates the display immediately.
+
+### Key Design Decisions
+
+- **Shallow comparison (`isSessionDataChanged`):** Polling compares only key session fields (interval, repetitions, eFactor, reviewMode, nextDueDate, dateCreated) to avoid unnecessary re-renders when data hasn't meaningfully changed.
+- **No immediate fetch on mount:** The first poll fires after 200ms, not immediately. Effect 1 already provides initial data from the sessions array, so the brief delay is imperceptible.
+- **Review mode override:** When the user toggles reviewMode in the UI, a temporary override takes precedence over live data. The override is automatically cleared once the Data Page reflects the persisted change.
+- **Refs for polling stability:** `reviewModeOverrideRef` and `reviewModeRef` allow the polling callback to access the latest state values without restarting the interval on every state change.
+
 ## Development
 
 ### Build
@@ -194,7 +227,7 @@ src/
 ├── hooks/
 │   ├── useSettings.ts     # Settings management with dual-mode support
 │   ├── usePracticeData.tsx # Practice data fetching with ref-based caching
-│   ├── useCurrentCardData.tsx # Active card session data resolution
+│   ├── useCurrentCardData.tsx # Active card data with real-time Data Page polling
 │   ├── useBlockInfo.tsx   # Block content + breadcrumbs
 │   ├── useCloze.tsx       # Cloze deletion ({text} masking)
 │   ├── useCachedData.ts   # Per-tag cache management
