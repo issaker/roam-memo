@@ -50,6 +50,51 @@ const isSessionDataChanged = (prev: Session | undefined, next: Session | undefin
   );
 };
 
+/**
+ * Merge live session data with mode-specific fields from the sessions history.
+ *
+ * When the latest session on Data Page uses a different reviewMode than the
+ * current UI mode (e.g., user switched from Progressive to Days and back),
+ * the live session lacks mode-specific fields (e.g., progressiveRepetitions).
+ * This function resolves the correct data by:
+ *   1. Using live session as the base (for real-time fields like nextDueDate)
+ *   2. Overlaying mode-specific fields from the latest session matching currentReviewMode
+ *
+ * Three review modes are independent — each tracks its own state:
+ *   - SPACED_INTERVAL: interval, repetitions, eFactor (SM2 algorithm)
+ *   - FIXED_INTERVAL + Progressive: progressiveRepetitions (exponential growth)
+ *   - FIXED_INTERVAL + Days/Weeks/Months/Years: intervalMultiplier (manual fixed)
+ */
+const resolveModeAwareSessionData = (
+  liveSession: Session,
+  sessions: Session[],
+  currentReviewMode: ReviewModes
+): Session => {
+  if (liveSession.reviewMode === currentReviewMode) {
+    return liveSession;
+  }
+
+  const modeMatch = getResolvedCardData({ sessions, reviewMode: currentReviewMode });
+
+  if (currentReviewMode === ReviewModes.DefaultSpacedInterval) {
+    return {
+      ...liveSession,
+      reviewMode: currentReviewMode,
+      interval: modeMatch.interval,
+      repetitions: modeMatch.repetitions,
+      eFactor: modeMatch.eFactor,
+    };
+  }
+
+  return {
+    ...liveSession,
+    reviewMode: currentReviewMode,
+    intervalMultiplier: modeMatch.intervalMultiplier,
+    intervalMultiplierType: modeMatch.intervalMultiplierType,
+    progressiveRepetitions: modeMatch.progressiveRepetitions,
+  };
+};
+
 export const getResolvedCardData = ({
   sessions,
   reviewMode,
@@ -91,6 +136,9 @@ export default function useCurrentCardData({
 
   const reviewModeRef = React.useRef<ReviewModes | undefined>();
   reviewModeRef.current = reviewMode;
+
+  const sessionsRef = React.useRef<Session[]>(sessions);
+  sessionsRef.current = sessions;
 
   // Track previous currentCardData to avoid unnecessary re-renders
   // when polling returns identical data (shallow comparison by key fields)
@@ -193,12 +241,19 @@ export default function useCurrentCardData({
         }
 
         // Case 2: Valid live session data exists.
-        // Only update if data has meaningfully changed to avoid unnecessary re-renders.
-        const liveSessionData = liveSession as Session;
-        if (isSessionDataChanged(prevCardDataRef.current, liveSessionData)) {
-          setCurrentCardData(liveSessionData);
-          setReviewMode(liveSessionData.reviewMode);
-          prevCardDataRef.current = liveSessionData;
+        // Resolve mode-aware data: when the live session's reviewMode differs from
+        // the current UI mode, merge mode-specific fields from sessions history
+        // to preserve independent state across mode switches.
+        const currentReviewMode = reviewModeRef.current || ReviewModes.DefaultSpacedInterval;
+        const resolvedData = resolveModeAwareSessionData(
+          liveSession as Session,
+          sessionsRef.current,
+          currentReviewMode
+        );
+        if (isSessionDataChanged(prevCardDataRef.current, resolvedData)) {
+          setCurrentCardData(resolvedData);
+          setReviewMode(currentReviewMode);
+          prevCardDataRef.current = resolvedData;
         }
       } catch (error) {
         console.error('[Memo] Error polling live card data:', error);
