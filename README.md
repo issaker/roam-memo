@@ -194,6 +194,25 @@ Session Queue (one-time read)     Data Page (real-time polling, 200ms)
 - **`useCurrentCardData.tsx`:** New `resolveModeSpecificData()` function searches backward through session history for the last valid value of a mode-specific field (e.g., `progressiveRepetitions` for Progressive, `intervalMultiplier` for Days/Weeks/Months/Years, `repetitions`/`interval`/`eFactor` for SM2)
 - **`PracticeOverlay.tsx`:** `resolvedCardData` applies `resolveModeSpecificData()` before passing data to the Footer and `onPracticeClick`; the interval state initialisation effect now only runs when the card changes (tracked via `prevCardRefUidRef`), not on every polling update
 
+### Review Mode Inheritance Bug Fix
+
+**Problem:** During a review session, when the previous card used Progressive mode and the user clicked "Next", the next card would incorrectly inherit the Progressive mode even though its most recent history record explicitly specified `reviewMode:: SPACED_INTERVAL`. This caused users to be unable to correctly identify the current card's review mode, impacting learning experience and review effectiveness.
+
+**Root causes:**
+1. **`reviewModeOverride` not cleared on card navigation (useCurrentCardData.tsx):** Effect 2 only cleared `reviewModeOverride` when `dataPageTitle` was unavailable. When Data Page access was available, the effect relied on the polling effect (Effect 3) to clear the override. However, the polling effect only checks whether the **current** card's data matches the override — after navigating to a new card, the new card's `reviewMode` typically doesn't match the stale override, so the override was **never cleared** and incorrectly applied to the new card.
+2. **Stale `currentCardData` in intervalMultiplierType reset effect (PracticeOverlay.tsx):** The reset effect depended on `currentCardData`, which is updated asynchronously by `useCurrentCardData`'s Effect 1. During the first render after a card change, `currentCardData` still contained the **previous** card's data. The effect used this stale data to set `intervalMultiplierType`, copying the previous card's Progressive type to the new card. On the next render, `cardChanged` was `false`, preventing correction.
+
+**Fix (2 files):**
+- **`useCurrentCardData.tsx`:** Effect 2 now **always** clears `reviewModeOverride` and resets `reviewMode` to `latestSession?.reviewMode` on card navigation, regardless of whether `dataPageTitle` is available. Additionally, `latestSession` is now exposed as a return value for use by `PracticeOverlay`.
+- **`PracticeOverlay.tsx`:** The `intervalMultiplierType` reset effect now uses `latestSession` (derived immediately from sessions via `useMemo`) instead of the asynchronously-updated `currentCardData`. This ensures the effect always operates on the correct new card's data during card transitions.
+
+**Test coverage (5 new tests):**
+- Progressive → SPACED_INTERVAL card navigation loads correct mode
+- Multiple cards with different modes switch correctly in sequence
+- Review history consistency with actual review mode
+- `reviewModeOverride` cleared on card navigation to prevent mode inheritance
+- `latestSession` correctly derived from sessions
+
 ## Development
 
 ### Build
