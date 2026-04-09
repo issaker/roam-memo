@@ -173,7 +173,7 @@ const Footer = ({
       return;
     }
     const grades = [0, 1, 2, 3, 4, 5];
-    const { interval, repetitions, eFactor } = currentCardData;
+    const { interval, repetitions, eFactor, progressiveRepetitions } = currentCardData;
     const estimates = {};
 
     const iterateCount = reviewMode === ReviewModes.FixedInterval ? 1 : grades.length;
@@ -188,6 +188,7 @@ const Footer = ({
         reviewMode,
         intervalMultiplier,
         intervalMultiplierType,
+        progressiveRepetitions,
       });
       estimates[grade] = practiceResultData;
     }

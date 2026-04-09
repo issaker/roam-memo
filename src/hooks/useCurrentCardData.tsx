@@ -26,6 +26,8 @@ const CARD_DATA_POLL_INTERVAL = 200;
 /**
  * Shallow comparison of key session fields to detect meaningful changes.
  * Avoids unnecessary re-renders when polling returns structurally identical data.
+ * Covers both Spaced Interval (interval, repetitions, eFactor) and
+ * Fixed Interval (intervalMultiplier, intervalMultiplierType, progressiveRepetitions) fields.
  */
 const isSessionDataChanged = (prev: Session | undefined, next: Session | undefined): boolean => {
   if (prev === next) return false;
@@ -41,7 +43,10 @@ const isSessionDataChanged = (prev: Session | undefined, next: Session | undefin
     prev.eFactor !== next.eFactor ||
     prev.reviewMode !== next.reviewMode ||
     !isSameDate(prev.nextDueDate, next.nextDueDate) ||
-    !isSameDate(prev.dateCreated, next.dateCreated)
+    !isSameDate(prev.dateCreated, next.dateCreated) ||
+    prev.intervalMultiplier !== next.intervalMultiplier ||
+    prev.intervalMultiplierType !== next.intervalMultiplierType ||
+    prev.progressiveRepetitions !== next.progressiveRepetitions
   );
 };
 
