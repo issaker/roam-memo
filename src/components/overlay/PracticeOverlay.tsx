@@ -216,13 +216,24 @@ const PracticeOverlay = ({
     setCurrentIndex(0);
   }, [practiceData]);
 
-  const initialCardUidsKey = initialCardUids.join(',');
-
-  // When selected tag changes or card UIDs data loads, reset cardQueue and currentIndex
+  // When selected tag changes, reset cardQueue and currentIndex
   React.useEffect(() => {
     setCardQueue(initialCardUids);
     setCurrentIndex(0);
-  }, [selectedTag, initialCardUidsKey]);
+  }, [selectedTag]);
+
+  // When today data loads and initialCardUids becomes available, sync cardQueue
+  const initialCardUidsLengthRef = React.useRef(initialCardUids.length);
+  React.useEffect(() => {
+    const wasEmpty = initialCardUidsLengthRef.current === 0;
+    const nowHasCards = initialCardUids.length > 0;
+    initialCardUidsLengthRef.current = initialCardUids.length;
+
+    if (wasEmpty && nowHasCards) {
+      setCardQueue(initialCardUids);
+      setCurrentIndex(0);
+    }
+  }, [todaySelectedTag]);
 
   const onPracticeClick = React.useCallback(
     (gradeData) => {
