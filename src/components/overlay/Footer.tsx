@@ -644,19 +644,19 @@ const FooterActionsWrapper = styled.div`
 `;
 
 const ControlButtonWrapper = styled(Blueprint.Button)<{ intent?: string }>`
-  /* Semi-transparent overlay background */
-  background: ${colors.overlayLight};
-  
-  /* Use intent colors from theme system */
+  background: ${colors.overlayLight} !important;
+  border: none !important;
+  box-shadow: inset 0 0 0 1px ${colors.borderSubtle} !important;
+
   color: ${(props) => getIntentColor(props.intent)};
 
   & .bp3-button-text {
     color: ${(props) => getIntentColor(props.intent)};
   }
 
-  /* Hover effect */
   &:hover {
-    background: ${colors.overlayLightHover};
+    background: ${colors.overlayLightHover} !important;
+    box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.3) !important;
   }
 `;
 
