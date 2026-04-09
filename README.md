@@ -18,7 +18,7 @@ This is a modified and upgraded version of the original Memo plugin. It cannot b
       if (!window.roamMemoLoaded) {
         window.roamMemoLoaded = true;
         const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/gh/issaker/roam-memo@main/extension.js';
+        script.src = 'https://cdn.jsdelivr.net/gh/issaker/roam-memo-Supermemo@main/extension.js';
         script.onload = function() {
           if (window.RoamMemo && window.RoamMemo.onload) {
             window.RoamMemo.onload({ extensionAPI: window.roamAlphaAPI });
@@ -221,7 +221,7 @@ src/
 
 ## Bug Reports & Feature Requests
 
-Create issues at https://github.com/issaker/roam-memo
+Create issues at https://github.com/issaker/roam-memo-Supermemo
 
 ---
 
