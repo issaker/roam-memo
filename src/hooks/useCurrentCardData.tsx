@@ -208,10 +208,15 @@ export default function useCurrentCardData({
     prevCardDataRef.current = latestSession;
   }, [sessions, currentCardRefUid, latestSession, reviewModeOverride]);
 
-  // Effect 2: When dataPageTitle is not available, clear reviewModeOverride on card change.
-  // With Data Page access, the polling effect (Effect 3) handles override clearing
-  // automatically by detecting persisted changes. Without Data Page, we must clear
-  // it explicitly to prevent stale overrides from persisting across card navigation.
+  // Effect 2: Reset reviewModeOverride and reviewMode on card navigation.
+  // When navigating to a new card, any active reviewModeOverride from the
+  // previous card must be cleared to prevent it from incorrectly applying
+  // to the new card. Previously, when dataPageTitle was available, this
+  // effect relied on the polling effect (Effect 3) to clear the override —
+  // but the polling effect only checks the CURRENT card's data against the
+  // override, so after navigation the override would never match the new
+  // card's reviewMode and would persist indefinitely, causing the new card
+  // to inherit the previous card's review mode.
   React.useEffect(() => {
     if (!currentCardRefUid) {
       setReviewModeOverride(undefined);
@@ -219,10 +224,8 @@ export default function useCurrentCardData({
       return;
     }
 
-    if (!dataPageTitle) {
-      setReviewModeOverride(undefined);
-      setReviewMode(latestSession?.reviewMode);
-    }
+    setReviewModeOverride(undefined);
+    setReviewMode(latestSession?.reviewMode);
   }, [currentCardRefUid, latestSession, dataPageTitle]);
 
   // Effect 3: Poll Data Page for real-time card session data.
@@ -305,5 +308,6 @@ export default function useCurrentCardData({
     currentCardData,
     reviewMode,
     setReviewModeOverride,
+    latestSession,
   };
 }

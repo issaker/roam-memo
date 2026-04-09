@@ -94,7 +94,7 @@ const PracticeOverlay = ({
     if (!sessions) return [];
     return sessions;
   }, [currentCardRefUid, practiceData]);
-  const { currentCardData, reviewMode, setReviewModeOverride } = useCurrentCardData({
+  const { currentCardData, reviewMode, setReviewModeOverride, latestSession } = useCurrentCardData({
     currentCardRefUid,
     sessions,
     dataPageTitle,
@@ -134,25 +134,31 @@ const PracticeOverlay = ({
   // user's manual intervalMultiplierType selection.
   const prevCardRefUidRef = React.useRef<string | undefined>();
 
+  // Reset interval state when navigating to a different card.
+  // Uses latestSession (derived immediately from sessions via useMemo) instead
+  // of currentCardData, because currentCardData is updated asynchronously by
+  // useCurrentCardData's Effect 1 and is stale during the first render after
+  // a card change. Using stale currentCardData would copy the PREVIOUS card's
+  // intervalMultiplierType into the new card, and the cardChanged guard would
+  // prevent correction on the subsequent render.
   React.useEffect(() => {
     const cardChanged = prevCardRefUidRef.current !== currentCardRefUid;
     prevCardRefUidRef.current = currentCardRefUid;
 
-    if (!currentCardData) return;
+    if (!latestSession) return;
 
-    // Only reset interval state when navigating to a different card
     if (!cardChanged) return;
 
-    if (currentCardData?.reviewMode === ReviewModes.FixedInterval) {
-      setIntervalMultiplier(currentCardData.intervalMultiplier as number);
-      setIntervalMultiplierType(currentCardData.intervalMultiplierType as IntervalMultiplierType);
+    if (latestSession.reviewMode === ReviewModes.FixedInterval) {
+      setIntervalMultiplier(latestSession.intervalMultiplier as number);
+      setIntervalMultiplierType(latestSession.intervalMultiplierType as IntervalMultiplierType);
     } else {
       setIntervalMultiplier(newFixedSessionDefaults.intervalMultiplier as number);
       setIntervalMultiplierType(
         newFixedSessionDefaults.intervalMultiplierType as IntervalMultiplierType
       );
     }
-  }, [currentCardData, currentCardRefUid, newFixedSessionDefaults]);
+  }, [latestSession, currentCardRefUid, newFixedSessionDefaults]);
 
   const hasNextDueDate = currentCardData && 'nextDueDate' in currentCardData;
   const isNew = currentCardData && 'isNew' in currentCardData && currentCardData.isNew;

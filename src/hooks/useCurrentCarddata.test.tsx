@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react-hooks';
 import useCurrentCardData from './useCurrentCardData';
 import { generateNewSession } from '~/queries';
-import { NewSession, ReviewModes, Session } from '~/models/session';
+import { IntervalMultiplierType, NewSession, ReviewModes, Session } from '~/models/session';
 import * as testUtils from '~/utils/testUtils';
 import React from 'react';
 
@@ -294,6 +294,234 @@ describe('useCurrentCardData', () => {
         reviewMode: ReviewModes.FixedInterval,
         grade: 2,
       });
+    });
+
+    it('Clears reviewModeOverride on card navigation to prevent mode inheritance', async () => {
+      const cardAUid = 'card_progressive';
+      const cardBUid = 'card_spaced';
+
+      const mockBuilder = new testUtils.MockDataBuilder()
+        .withCard({ uid: cardAUid })
+        .withSession(cardAUid, {
+          grade: 3,
+          reviewMode: ReviewModes.FixedInterval,
+          intervalMultiplierType: IntervalMultiplierType.Progressive,
+        })
+        .withCard({ uid: cardBUid })
+        .withSession(cardBUid, {
+          grade: 4,
+          reviewMode: ReviewModes.DefaultSpacedInterval,
+        });
+
+      mockBuilder.mockQueryResults();
+      const { practiceData } = await mockBuilder.getPracticeData();
+
+      const { result } = renderHook(() => {
+        const [currentCardRefUid, setCurrentCardRefUid] = React.useState(cardAUid);
+        const { reviewMode, setReviewModeOverride, currentCardData } = useCurrentCardData({
+          sessions: practiceData[currentCardRefUid],
+          currentCardRefUid,
+        });
+
+        return {
+          reviewMode,
+          setReviewModeOverride,
+          currentCardData,
+          currentCardRefUid,
+          setCurrentCardRefUid,
+        };
+      });
+
+      expect(result.current.reviewMode).toEqual(ReviewModes.FixedInterval);
+
+      act(() => {
+        result.current.setReviewModeOverride(ReviewModes.DefaultSpacedInterval);
+      });
+
+      expect(result.current.reviewMode).toEqual(ReviewModes.DefaultSpacedInterval);
+
+      act(() => {
+        result.current.setCurrentCardRefUid(cardBUid);
+      });
+
+      expect(result.current.reviewMode).toEqual(ReviewModes.DefaultSpacedInterval);
+      expect(result.current.currentCardData).toMatchObject({
+        refUid: cardBUid,
+        reviewMode: ReviewModes.DefaultSpacedInterval,
+      });
+    });
+
+    it('Returns latestSession derived from sessions', async () => {
+      const currentCardRefUid = 'id_0';
+      const mockBuilder = new testUtils.MockDataBuilder()
+        .withCard({ uid: currentCardRefUid })
+        .withSession(currentCardRefUid, {
+          grade: 1,
+          reviewMode: ReviewModes.DefaultSpacedInterval,
+        })
+        .withSession(currentCardRefUid, {
+          grade: 2,
+          reviewMode: ReviewModes.FixedInterval,
+        });
+
+      mockBuilder.mockQueryResults();
+      const { practiceData } = await mockBuilder.getPracticeData();
+
+      const { result } = renderHook(() =>
+        useCurrentCardData({ sessions: practiceData[currentCardRefUid], currentCardRefUid })
+      );
+
+      expect(result.current.latestSession).toBeDefined();
+      expect(result.current.latestSession!.reviewMode).toEqual(ReviewModes.FixedInterval);
+    });
+  });
+
+  describe('Review mode isolation between cards', () => {
+    it('Progressive card followed by SPACED_INTERVAL card loads correct mode', async () => {
+      const progressiveCardUid = 'card_progressive';
+      const spacedCardUid = 'card_spaced';
+
+      const mockBuilder = new testUtils.MockDataBuilder()
+        .withCard({ uid: progressiveCardUid })
+        .withSession(progressiveCardUid, {
+          grade: 3,
+          reviewMode: ReviewModes.FixedInterval,
+          intervalMultiplierType: IntervalMultiplierType.Progressive,
+        })
+        .withCard({ uid: spacedCardUid })
+        .withSession(spacedCardUid, {
+          grade: 4,
+          reviewMode: ReviewModes.DefaultSpacedInterval,
+        });
+
+      mockBuilder.mockQueryResults();
+      const { practiceData } = await mockBuilder.getPracticeData();
+
+      const { result } = renderHook(() => {
+        const [currentCardRefUid, setCurrentCardRefUid] = React.useState(progressiveCardUid);
+        const { reviewMode, currentCardData } = useCurrentCardData({
+          sessions: practiceData[currentCardRefUid],
+          currentCardRefUid,
+        });
+
+        return {
+          reviewMode,
+          currentCardData,
+          currentCardRefUid,
+          setCurrentCardRefUid,
+        };
+      });
+
+      expect(result.current.reviewMode).toEqual(ReviewModes.FixedInterval);
+      expect(result.current.currentCardData?.intervalMultiplierType).toEqual(
+        IntervalMultiplierType.Progressive
+      );
+
+      act(() => {
+        result.current.setCurrentCardRefUid(spacedCardUid);
+      });
+
+      expect(result.current.reviewMode).toEqual(ReviewModes.DefaultSpacedInterval);
+      expect(result.current.currentCardData).toMatchObject({
+        refUid: spacedCardUid,
+        reviewMode: ReviewModes.DefaultSpacedInterval,
+      });
+    });
+
+    it('Multiple cards with different modes switch correctly', async () => {
+      const cardAUid = 'card_a_progressive';
+      const cardBUid = 'card_b_spaced';
+      const cardCUid = 'card_c_days';
+
+      const mockBuilder = new testUtils.MockDataBuilder()
+        .withCard({ uid: cardAUid })
+        .withSession(cardAUid, {
+          grade: 3,
+          reviewMode: ReviewModes.FixedInterval,
+          intervalMultiplierType: IntervalMultiplierType.Progressive,
+        })
+        .withCard({ uid: cardBUid })
+        .withSession(cardBUid, {
+          grade: 4,
+          reviewMode: ReviewModes.DefaultSpacedInterval,
+        })
+        .withCard({ uid: cardCUid })
+        .withSession(cardCUid, {
+          grade: 2,
+          reviewMode: ReviewModes.FixedInterval,
+          intervalMultiplierType: IntervalMultiplierType.Days,
+        });
+
+      mockBuilder.mockQueryResults();
+      const { practiceData } = await mockBuilder.getPracticeData();
+
+      const { result } = renderHook(() => {
+        const [currentCardRefUid, setCurrentCardRefUid] = React.useState(cardAUid);
+        const { reviewMode, currentCardData } = useCurrentCardData({
+          sessions: practiceData[currentCardRefUid],
+          currentCardRefUid,
+        });
+
+        return {
+          reviewMode,
+          currentCardData,
+          currentCardRefUid,
+          setCurrentCardRefUid,
+        };
+      });
+
+      expect(result.current.reviewMode).toEqual(ReviewModes.FixedInterval);
+
+      act(() => {
+        result.current.setCurrentCardRefUid(cardBUid);
+      });
+      expect(result.current.reviewMode).toEqual(ReviewModes.DefaultSpacedInterval);
+
+      act(() => {
+        result.current.setCurrentCardRefUid(cardCUid);
+      });
+      expect(result.current.reviewMode).toEqual(ReviewModes.FixedInterval);
+      expect(result.current.currentCardData?.intervalMultiplierType).toEqual(
+        IntervalMultiplierType.Days
+      );
+    });
+
+    it('Review history consistency with actual review mode', async () => {
+      const cardUid = 'card_history_test';
+
+      const mockBuilder = new testUtils.MockDataBuilder()
+        .withCard({ uid: cardUid })
+        .withSession(cardUid, {
+          grade: 1,
+          reviewMode: ReviewModes.FixedInterval,
+          intervalMultiplierType: IntervalMultiplierType.Progressive,
+        })
+        .withSession(cardUid, {
+          grade: 2,
+          reviewMode: ReviewModes.DefaultSpacedInterval,
+        })
+        .withSession(cardUid, {
+          grade: 3,
+          reviewMode: ReviewModes.FixedInterval,
+          intervalMultiplierType: IntervalMultiplierType.Days,
+        });
+
+      mockBuilder.mockQueryResults();
+      const { practiceData } = await mockBuilder.getPracticeData();
+
+      const { result } = renderHook(() =>
+        useCurrentCardData({ sessions: practiceData[cardUid], currentCardRefUid: cardUid })
+      );
+
+      expect(result.current.latestSession!.reviewMode).toEqual(ReviewModes.FixedInterval);
+      expect(result.current.latestSession!.intervalMultiplierType).toEqual(
+        IntervalMultiplierType.Days
+      );
+      expect(result.current.reviewMode).toEqual(ReviewModes.FixedInterval);
+      expect(result.current.currentCardData?.reviewMode).toEqual(ReviewModes.FixedInterval);
+      expect(result.current.currentCardData?.intervalMultiplierType).toEqual(
+        IntervalMultiplierType.Days
+      );
     });
   });
 });
