@@ -10,7 +10,36 @@ Spaced repetition reviews information based on how well you remember it, focusin
 
 ## Installation
 
-Install "Memo" via Roam Depot.
+This is a modified and upgraded version of the original Memo plugin. It cannot be installed via Roam Depot. Instead, load it using the `{{[[roam/js]]}}` block on any page in your Roam graph:
+
+```
+- {{[[roam/js]]}}
+    - ```javascript
+      if (!window.roamMemoLoaded) {
+        window.roamMemoLoaded = true;
+        
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/gh/issaker/roam-memo@main/extension.js';
+        script.type = 'text/javascript';
+        script.crossOrigin = 'anonymous';
+        
+        script.onload = function() {
+          console.log('✅ Roam Memo loaded successfully');
+          if (window.RoamMemo && window.RoamMemo.onload) {
+            window.RoamMemo.onload({ extensionAPI: window.roamAlphaAPI });
+          }
+        };
+        
+        script.onerror = function(e) {
+          console.error('❌ Failed to load Roam Memo', e);
+          console.error('Please check your network connection or try using the offline method');
+          window.roamMemoLoaded = false;
+        };
+        
+        document.head.appendChild(script);
+      }
+      ```
+```
 
 ## Getting Started
 
@@ -149,18 +178,7 @@ output: {
 
 ### roam/js Loading
 
-This plugin supports loading via `[[roam/js]]` page:
-
-```javascript
-if (!window.roamMemoLoaded) {
-  window.roamMemoLoaded = true;
-  const script = document.createElement('script');
-  script.src = 'https://cdn.jsdelivr.net/gh/issaker/roam-memo@main/extension.js';
-  script.type = 'text/javascript';
-  script.onload = () => window.RoamMemo?.onload({ extensionAPI: window.roamAlphaAPI });
-  document.head.appendChild(script);
-}
-```
+This plugin is loaded via `{{[[roam/js]]}}` as described in the Installation section above.
 
 **roam/js Limitations:**
 - Settings are persisted to the `roam/memo` page (not Roam Depot's settings panel)
