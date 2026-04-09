@@ -80,7 +80,8 @@ const settingsPanelConfig = ({ settings, setSettings }) => {
       {
         id: 'shuffleCards',
         name: 'Shuffle Cards',
-        description: 'Randomly shuffle the order of new and due cards during review.',
+        description:
+          'OFF: Due cards sorted by urgency (most overdue → hardest → least mature). New cards in reverse creation order. ON: All cards randomly shuffled.',
         action: {
           type: 'switch',
           onChange: (e) => {

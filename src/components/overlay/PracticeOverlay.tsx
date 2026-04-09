@@ -586,7 +586,7 @@ const PracticeOverlay = ({
               <span>Shuffle Cards</span>
             </label>
             <p style={{ fontSize: '12px', color: colors.textMuted, margin: '5px 0 0 0' }}>
-              Randomly shuffle the order of new and due cards during review.
+              OFF: Due cards sorted by urgency (most overdue → hardest → least mature). New cards in reverse creation order. ON: All cards randomly shuffled.
             </p>
           </div>
 
