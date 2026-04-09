@@ -192,16 +192,34 @@ export const getDueCardUids = (currentTagSessionData: CompleteRecords, isCrammin
     }
   });
 
+  // Urgency-based three-level sort for due cards:
+  //   1. nextDueDate (ascending) — more overdue cards first
+  //   2. eFactor (ascending) — harder-to-remember cards first (lower eFactor = faster forgetting)
+  //   3. repetitions (ascending) — less mature memories first (fewer reps = less stable)
   results.sort((a, b) => {
     const aCards = currentTagSessionData[a] as Session[];
     const aLatestSession = aCards[aCards.length - 1];
     const bCards = currentTagSessionData[b] as Session[];
     const bLatestSession = bCards[bCards.length - 1];
 
+    // Level 1: Overdue days — earlier dueDate = more overdue = higher urgency
     const aDueDate = aLatestSession?.nextDueDate || new Date(0);
     const bDueDate = bLatestSession?.nextDueDate || new Date(0);
+    if (aDueDate.getTime() !== bDueDate.getTime()) {
+      return aDueDate.getTime() - bDueDate.getTime();
+    }
 
-    return aDueDate < bDueDate ? 1 : -1;
+    // Level 2: Material difficulty — lower eFactor = faster forgetting = higher urgency
+    const aEfactor = aLatestSession?.eFactor ?? 2.5;
+    const bEfactor = bLatestSession?.eFactor ?? 2.5;
+    if (aEfactor !== bEfactor) {
+      return aEfactor - bEfactor;
+    }
+
+    // Level 3: Memory maturity — fewer repetitions = less stable = higher urgency
+    const aReps = aLatestSession?.repetitions ?? 0;
+    const bReps = bLatestSession?.repetitions ?? 0;
+    return aReps - bReps;
   });
 
   return results;

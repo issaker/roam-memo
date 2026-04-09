@@ -108,6 +108,20 @@ A relaxed approach for content you want to revisit regularly. Includes **Progres
 
 Each card's `reviewMode` is read from the Data Page in real-time on every card navigation. Changes to `reviewMode::` on the Data Page take effect immediately — no session restart required.
 
+### Urgency-Based Due Card Sorting
+
+Due cards are sorted by **memory urgency** using a three-level priority system, ensuring the most at-risk cards are always reviewed first:
+
+| Priority | Sort Key | Direction | Rationale |
+|----------|----------|-----------|-----------|
+| 1st | `nextDueDate` | Earlier first | More overdue → lower retrieval strength → higher urgency |
+| 2nd | `eFactor` | Lower first | Lower eFactor → faster forgetting rate → higher urgency |
+| 3rd | `repetitions` | Fewer first | Fewer reps → less stable memory → higher urgency |
+
+**Example:** A card 5 days overdue with eFactor 1.3 and 1 repetition will appear before a card 1 day overdue with eFactor 2.5 and 5 repetitions — because it has the highest risk of being forgotten.
+
+When `shuffleCards` is enabled, this sort is overridden by random shuffling.
+
 ## Data Storage
 
 All practice data is stored on a Roam page (default: `roam/memo`) with this structure:
