@@ -221,8 +221,8 @@ src/
 
 ## Bug Reports & Feature Requests
 
-Create issues at https://github.com/kingfengji/roam-memo
+Create issues at https://github.com/issaker/roam-memo
 
 ---
 
-Original author: [kingfengji](https://github.com/kingfengji/roam-memo)
+Original author: [digitalmaster](https://github.com/digitalmaster/roam-memo)
