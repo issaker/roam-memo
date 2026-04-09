@@ -216,11 +216,13 @@ const PracticeOverlay = ({
     setCurrentIndex(0);
   }, [practiceData]);
 
-  // When selected tag changes, reset cardQueue and currentIndex
+  const initialCardUidsKey = initialCardUids.join(',');
+
+  // When selected tag changes or card UIDs data loads, reset cardQueue and currentIndex
   React.useEffect(() => {
     setCardQueue(initialCardUids);
     setCurrentIndex(0);
-  }, [selectedTag]);
+  }, [selectedTag, initialCardUidsKey]);
 
   const onPracticeClick = React.useCallback(
     (gradeData) => {
