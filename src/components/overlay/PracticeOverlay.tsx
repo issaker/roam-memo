@@ -16,7 +16,7 @@ import CardBlock from '~/components/overlay/CardBlock';
 import Footer from '~/components/overlay/Footer';
 import ButtonTags from '~/components/ButtonTags';
 import { CompleteRecords, IntervalMultiplierType, ReviewModes } from '~/models/session';
-import useCurrentCardData from '~/hooks/useCurrentCardData';
+import useCurrentCardData, { resolveModeSpecificData } from '~/hooks/useCurrentCardData';
 import { generateNewSession } from '~/queries';
 import { CompletionStatus, Today, RenderMode } from '~/models/practice';
 import { handlePracticeProps } from '~/app';
@@ -102,12 +102,12 @@ const PracticeOverlay = ({
 
   const totalCardsCount = (todaySelectedTag?.new || 0) + (todaySelectedTag?.due || 0);
   const hasCards = totalCardsCount > 0;
-  const isDone = todaySelectedTag?.status === CompletionStatus.Finished || !currentCardData;
 
   const newFixedSessionDefaults = React.useMemo(
     () => generateNewSession({ reviewMode: ReviewModes.FixedInterval }),
     []
   );
+
   const [intervalMultiplier, setIntervalMultiplier] = React.useState<number>(
     currentCardData?.intervalMultiplier || (newFixedSessionDefaults.intervalMultiplier as number)
   );
@@ -117,22 +117,42 @@ const PracticeOverlay = ({
         (newFixedSessionDefaults.intervalMultiplierType as IntervalMultiplierType)
     );
 
-  // When card changes, update multiplier state
+  // Resolve mode-specific data fields via historical lookback so that
+  // switching intervalMultiplierType (e.g. Days → Progressive) recovers
+  // the correct progressiveRepetitions from earlier sessions instead of
+  // treating undefined as 0 and producing wrong intervals.
+  const resolvedCardData = React.useMemo(() => {
+    if (!currentCardData) return currentCardData;
+    return resolveModeSpecificData(currentCardData, sessions, intervalMultiplierType);
+  }, [currentCardData, sessions, intervalMultiplierType]);
+
+  const isDone = todaySelectedTag?.status === CompletionStatus.Finished || !currentCardData;
+
+  // Track previous card UID so the interval state is only initialised
+  // when the card changes — not on every polling update that touches
+  // currentCardData.  This prevents the 200 ms poll from overwriting a
+  // user's manual intervalMultiplierType selection.
+  const prevCardRefUidRef = React.useRef<string | undefined>();
+
   React.useEffect(() => {
+    const cardChanged = prevCardRefUidRef.current !== currentCardRefUid;
+    prevCardRefUidRef.current = currentCardRefUid;
+
     if (!currentCardData) return;
 
+    // Only reset interval state when navigating to a different card
+    if (!cardChanged) return;
+
     if (currentCardData?.reviewMode === ReviewModes.FixedInterval) {
-      // If card has multiplier, use that
       setIntervalMultiplier(currentCardData.intervalMultiplier as number);
       setIntervalMultiplierType(currentCardData.intervalMultiplierType as IntervalMultiplierType);
     } else {
-      // Otherwise, just reset to default
       setIntervalMultiplier(newFixedSessionDefaults.intervalMultiplier as number);
       setIntervalMultiplierType(
         newFixedSessionDefaults.intervalMultiplierType as IntervalMultiplierType
       );
     }
-  }, [currentCardData, newFixedSessionDefaults]);
+  }, [currentCardData, currentCardRefUid, newFixedSessionDefaults]);
 
   const hasNextDueDate = currentCardData && 'nextDueDate' in currentCardData;
   const isNew = currentCardData && 'isNew' in currentCardData && currentCardData.isNew;
@@ -238,8 +258,10 @@ const PracticeOverlay = ({
   const onPracticeClick = React.useCallback(
     (gradeData) => {
       if (isDone) return;
+      // Use resolvedCardData so that mode-specific fields (e.g. progressiveRepetitions)
+      // are recovered from history instead of being undefined from a different mode's session
       const practiceProps = {
-        ...currentCardData,
+        ...resolvedCardData,
         ...gradeData,
         intervalMultiplier,
         intervalMultiplierType,
@@ -266,7 +288,7 @@ const PracticeOverlay = ({
       handlePracticeClick,
       isDone,
       currentIndex,
-      currentCardData,
+      resolvedCardData,
       intervalMultiplier,
       intervalMultiplierType,
       currentCardRefUid,
@@ -478,7 +500,7 @@ const PracticeOverlay = ({
           isDone={isDone}
           hasCards={hasCards}
           onCloseCallback={onCloseCallback}
-          currentCardData={currentCardData}
+          currentCardData={resolvedCardData}
           onStartCrammingClick={onStartCrammingClick}
         />
       </Dialog>

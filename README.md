@@ -166,6 +166,20 @@ Session Queue (one-time read)     Data Page (real-time polling, 200ms)
 - **Review mode override:** When the user toggles reviewMode in the UI, a temporary override takes precedence over live data. The override is automatically cleared once the Data Page reflects the persisted change.
 - **Refs for polling stability:** `reviewModeOverrideRef` and `reviewModeRef` allow the polling callback to access the latest state values without restarting the interval on every state change.
 
+### Mode-Specific Data Isolation (Bug Fix)
+
+**Problem:** When a card had Progressive mode data (`progressiveRepetitions: 1`) and the user switched to Days mode to set a manual interval, then switched back to Progressive mode, the system incorrectly calculated the next review date because `progressiveRepetitions` was `undefined` in the Days session — causing the Progressive counter to reset to 0.
+
+**Root causes:**
+1. `practice()` did not forward `progressiveRepetitions` to `generatePracticeData()`, so the field was always `undefined` regardless of history
+2. No historical lookback: when a mode-specific field was `undefined`, the system used `|| 0` instead of searching earlier sessions for the last valid value
+3. The 200ms polling effect in `PracticeOverlay` reset `intervalMultiplierType` from the latest session on every update, overriding the user's manual mode switch
+
+**Fix (3 files):**
+- **`practice.ts`:** `progressiveRepetitions` is now destructured and passed to `generatePracticeData()`, preserving the counter across sessions
+- **`useCurrentCardData.tsx`:** New `resolveModeSpecificData()` function searches backward through session history for the last valid value of a mode-specific field (e.g., `progressiveRepetitions` for Progressive, `intervalMultiplier` for Days/Weeks/Months/Years, `repetitions`/`interval`/`eFactor` for SM2)
+- **`PracticeOverlay.tsx`:** `resolvedCardData` applies `resolveModeSpecificData()` before passing data to the Footer and `onPracticeClick`; the interval state initialisation effect now only runs when the card changes (tracked via `prevCardRefUidRef`), not on every polling update
+
 ## Development
 
 ### Build

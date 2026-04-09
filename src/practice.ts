@@ -149,6 +149,7 @@ const practice = async (practiceProps: PracticeProps, isDryRun = false) => {
     eFactor,
     intervalMultiplier,
     intervalMultiplierType,
+    progressiveRepetitions,
     reviewMode,
   } = practiceProps;
 
@@ -163,6 +164,7 @@ const practice = async (practiceProps: PracticeProps, isDryRun = false) => {
     reviewMode,
     intervalMultiplier,
     intervalMultiplierType,
+    progressiveRepetitions,
   });
 
   if (!isDryRun && !isCramming) {
