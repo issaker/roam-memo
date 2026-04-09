@@ -281,12 +281,13 @@ const PracticeOverlay = ({
     autoplay: true,
     animationData: doneAnimationData,
     rendererSettings: {
-      preserveAspectRatio: 'xMidYMid slice',
+      preserveAspectRatio: 'xMidYMid meet',
     },
   };
   const lottieStyle = {
-    height: 200,
+    height: 150,
     width: 'auto',
+    maxHeight: '40vh',
   };
 
   const [showBreadcrumbs, setShowBreadcrumbs] = React.useState(false);
