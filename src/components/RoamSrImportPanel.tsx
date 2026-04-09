@@ -3,7 +3,6 @@ import * as Blueprint from '@blueprintjs/core';
 import * as queries from '~/queries';
 import * as asyncUtils from '~/utils/async';
 import styled from '@emotion/styled';
-import * as stringUtils from '~/utils/string';
 import { CompleteRecords } from '~/models/session';
 import { colors } from '~/theme';
 

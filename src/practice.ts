@@ -64,7 +64,7 @@ export const generatePracticeData = ({
   const shared = { reviewMode };
 
   if (reviewMode === ReviewModes.FixedInterval) {
-    const { intervalMultiplier, intervalMultiplierType, repetitions, progressiveRepetitions } = props;
+    const { intervalMultiplier, intervalMultiplierType, progressiveRepetitions } = props;
     const today = new Date();
     let nextDueDate: Date | undefined = undefined;
     let calculatedIntervalMultiplier = intervalMultiplier;

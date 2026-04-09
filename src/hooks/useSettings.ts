@@ -68,7 +68,7 @@ const useSettings = () => {
     window.roamMemo.extensionAPI.settings.panel.create(
       settingsPanelConfig({ settings, setSettings })
     );
-  }, [setSettings, settings.dataPageTitle]);
+  }, [setSettings, settings]);
 
   const syncSettingsFromAPI = React.useCallback(() => {
     const allSettings = window.roamMemo.extensionAPI.settings.getAll() || {};

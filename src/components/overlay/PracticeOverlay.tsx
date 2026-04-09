@@ -77,22 +77,16 @@ const PracticeOverlay = ({
 }: Props) => {
   const todaySelectedTag = today.tags[selectedTag];
   
-  // Handle case where tag data hasn't loaded yet (e.g., when settings just changed)
-  // Return null to prevent crash - component will re-render when data is available
-  if (!todaySelectedTag) {
-    return null;
-  }
-  
-  const newCardsUids = todaySelectedTag.newUids;
-  const dueCardsUids = todaySelectedTag.dueUids;
+  const newCardsUids = todaySelectedTag?.newUids || [];
+  const dueCardsUids = todaySelectedTag?.dueUids || [];
   const initialCardUids = [...dueCardsUids, ...newCardsUids];
-  const renderMode = todaySelectedTag.renderMode;
+  const renderMode = todaySelectedTag?.renderMode;
 
   const [cardQueue, setCardQueue] = React.useState<string[]>(initialCardUids);
   const [currentIndex, setCurrentIndex] = React.useState(0);
 
   const isFirst = currentIndex === 0;
-  const completedTodayCount = todaySelectedTag.completed;
+  const completedTodayCount = todaySelectedTag?.completed;
 
   const currentCardRefUid = cardQueue[currentIndex] as string | undefined;
   const sessions = React.useMemo(() => {
@@ -106,9 +100,9 @@ const PracticeOverlay = ({
     dataPageTitle,
   });
 
-  const totalCardsCount = todaySelectedTag.new + todaySelectedTag.due;
+  const totalCardsCount = (todaySelectedTag?.new || 0) + (todaySelectedTag?.due || 0);
   const hasCards = totalCardsCount > 0;
-  const isDone = todaySelectedTag.status === CompletionStatus.Finished || !currentCardData;
+  const isDone = todaySelectedTag?.status === CompletionStatus.Finished || !currentCardData;
 
   const newFixedSessionDefaults = React.useMemo(
     () => generateNewSession({ reviewMode: ReviewModes.FixedInterval }),
@@ -361,6 +355,10 @@ const PracticeOverlay = ({
     };
   }, [isOpen]);
 
+  if (!todaySelectedTag) {
+    return null;
+  }
+
   return (
     <MainContext.Provider
       value={{
@@ -482,7 +480,7 @@ const PracticeOverlay = ({
           <div style={{ marginBottom: '20px' }}>
             <h5 style={{ margin: '0 0 10px 0' }}>Tag Pages (Decks)</h5>
             <p style={{ fontSize: '12px', color: colors.textMuted, margin: '0 0 5px 0' }}>
-              Separate multiple decks with commas. Example: "memo, sr, 🐘, french exam"
+              Separate multiple decks with commas. Example: &quot;memo, sr, 🐘, french exam&quot;
             </p>
             <input
               type="text"
@@ -497,7 +495,7 @@ const PracticeOverlay = ({
           <div style={{ marginBottom: '20px' }}>
             <h5 style={{ margin: '0 0 10px 0' }}>Data Page Title</h5>
             <p style={{ fontSize: '12px', color: colors.textMuted, margin: '0 0 5px 0' }}>
-              Name of page where we'll store all your data
+              Name of page where we&apos;ll store all your data
             </p>
             <input
               type="text"
@@ -557,9 +555,9 @@ const PracticeOverlay = ({
           </div>
 
           <div style={{ marginBottom: '20px' }}>
-            <h5 style={{ margin: '0 0 10px 0' }}>Reinsert "Forgot" Cards After N Cards</h5>
+            <h5 style={{ margin: '0 0 10px 0' }}>Reinsert &quot;Forgot&quot; Cards After N Cards</h5>
             <p style={{ fontSize: '12px', color: colors.textMuted, margin: '0 0 5px 0' }}>
-              When you mark a card as "Forgot", it will be reinserted into the current review session N cards later. Set to 0 to disable.
+              When you mark a card as &quot;Forgot&quot;, it will be reinserted into the current review session N cards later. Set to 0 to disable.
             </p>
             <input
               type="number"
@@ -641,7 +639,7 @@ const Dialog = styled(Blueprint.Dialog)<{ $isEditing?: boolean }>`
   }
 `;
 
-const mobileOverlayStyles = (isEditing: boolean) => `
+const mobileOverlayStyles = (_isEditing: boolean) => `
   @media (max-width: 768px) {
     /* Mobile: Make backdrop transparent and clickable-through */
     .bp3-overlay.bp3-overlay-open > .bp3-overlay-backdrop {
@@ -658,7 +656,7 @@ const mobileOverlayStyles = (isEditing: boolean) => `
     /* Dialog content remains interactive */
     .bp3-overlay.bp3-overlay-open .bp3-dialog-container,
     .bp3-overlay.bp3-overlay-open .bp3-dialog,
-    .bp3-overlay.bp3-overlay-open [role=\"dialog\"],
+    .bp3-overlay.bp3-overlay-open [role="dialog"],
     .bp3-overlay.bp3-overlay-open .bp3-dialog * {
       pointer-events: auto !important;
     }
