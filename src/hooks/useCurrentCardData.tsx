@@ -51,50 +51,15 @@ const isSessionDataChanged = (prev: Session | undefined, next: Session | undefin
 };
 
 /**
- * Merge live session data with mode-specific fields from the sessions history.
+ * Resolve card data for a specific reviewMode by searching session history.
  *
- * When the latest session on Data Page uses a different reviewMode than the
- * current UI mode (e.g., user switched from Progressive to Days and back),
- * the live session lacks mode-specific fields (e.g., progressiveRepetitions).
- * This function resolves the correct data by:
- *   1. Using live session as the base (for real-time fields like nextDueDate)
- *   2. Overlaying mode-specific fields from the latest session matching currentReviewMode
+ * Mode isolation: Each review mode (SM2, Fixed Interval subtypes) maintains
+ * independent data. When switching modes, we find the latest session matching
+ * the target mode. If a mode-specific field (e.g., progressiveRepetitions)
+ * is undefined in that session, we backfill from earlier sessions of the same mode.
  *
- * Three review modes are independent — each tracks its own state:
- *   - SPACED_INTERVAL: interval, repetitions, eFactor (SM2 algorithm)
- *   - FIXED_INTERVAL + Progressive: progressiveRepetitions (exponential growth)
- *   - FIXED_INTERVAL + Days/Weeks/Months/Years: intervalMultiplier (manual fixed)
+ * If no matching session exists, generates a fresh session for that mode.
  */
-const resolveModeAwareSessionData = (
-  liveSession: Session,
-  sessions: Session[],
-  currentReviewMode: ReviewModes
-): Session => {
-  if (liveSession.reviewMode === currentReviewMode) {
-    return liveSession;
-  }
-
-  const modeMatch = getResolvedCardData({ sessions, reviewMode: currentReviewMode });
-
-  if (currentReviewMode === ReviewModes.DefaultSpacedInterval) {
-    return {
-      ...liveSession,
-      reviewMode: currentReviewMode,
-      interval: modeMatch.interval,
-      repetitions: modeMatch.repetitions,
-      eFactor: modeMatch.eFactor,
-    };
-  }
-
-  return {
-    ...liveSession,
-    reviewMode: currentReviewMode,
-    intervalMultiplier: modeMatch.intervalMultiplier,
-    intervalMultiplierType: modeMatch.intervalMultiplierType,
-    progressiveRepetitions: modeMatch.progressiveRepetitions,
-  };
-};
-
 export const getResolvedCardData = ({
   sessions,
   reviewMode,
@@ -102,14 +67,68 @@ export const getResolvedCardData = ({
   sessions: Session[];
   reviewMode: ReviewModes;
 }) => {
-  for (let i = sessions.length - 1; i >= 0; i--) {
-    const data = sessions[i];
-    if (data.reviewMode === reviewMode) {
-      return data;
-    }
+  const matchingSessions = sessions.filter((s) => s.reviewMode === reviewMode);
+  if (matchingSessions.length === 0) {
+    return generateNewSession({ reviewMode });
   }
 
-  return generateNewSession({ reviewMode });
+  const latest = matchingSessions[matchingSessions.length - 1];
+
+  if (reviewMode === ReviewModes.FixedInterval) {
+    let progressiveRepetitions = latest.progressiveRepetitions;
+    let intervalMultiplier = latest.intervalMultiplier;
+    let intervalMultiplierType = latest.intervalMultiplierType;
+
+    for (let i = matchingSessions.length - 2; i >= 0; i--) {
+      const prev = matchingSessions[i];
+      if (progressiveRepetitions === undefined && prev.progressiveRepetitions !== undefined) {
+        progressiveRepetitions = prev.progressiveRepetitions;
+      }
+      if (intervalMultiplier === undefined && prev.intervalMultiplier !== undefined) {
+        intervalMultiplier = prev.intervalMultiplier;
+      }
+      if (intervalMultiplierType === undefined && prev.intervalMultiplierType !== undefined) {
+        intervalMultiplierType = prev.intervalMultiplierType;
+      }
+      if (
+        progressiveRepetitions !== undefined &&
+        intervalMultiplier !== undefined &&
+        intervalMultiplierType !== undefined
+      ) {
+        break;
+      }
+    }
+
+    return {
+      ...latest,
+      progressiveRepetitions,
+      intervalMultiplier,
+      intervalMultiplierType,
+    };
+  }
+
+  if (reviewMode === ReviewModes.DefaultSpacedInterval) {
+    let interval = latest.interval;
+    let repetitions = latest.repetitions;
+    let eFactor = latest.eFactor;
+
+    for (let i = matchingSessions.length - 2; i >= 0; i--) {
+      const prev = matchingSessions[i];
+      if (interval === undefined && prev.interval !== undefined) interval = prev.interval;
+      if (repetitions === undefined && prev.repetitions !== undefined) repetitions = prev.repetitions;
+      if (eFactor === undefined && prev.eFactor !== undefined) eFactor = prev.eFactor;
+      if (interval !== undefined && repetitions !== undefined && eFactor !== undefined) break;
+    }
+
+    return {
+      ...latest,
+      interval,
+      repetitions,
+      eFactor,
+    };
+  }
+
+  return latest;
 };
 
 export default function useCurrentCardData({
@@ -136,9 +155,6 @@ export default function useCurrentCardData({
 
   const reviewModeRef = React.useRef<ReviewModes | undefined>();
   reviewModeRef.current = reviewMode;
-
-  const sessionsRef = React.useRef<Session[]>(sessions);
-  sessionsRef.current = sessions;
 
   // Track previous currentCardData to avoid unnecessary re-renders
   // when polling returns identical data (shallow comparison by key fields)
@@ -191,9 +207,11 @@ export default function useCurrentCardData({
   }, [currentCardRefUid, latestSession, dataPageTitle]);
 
   // Effect 3: Poll Data Page for real-time card session data.
-  // Every 200ms, reads the latest session for the current card from Data Page.
-  // This detects external changes (history deletion, reviewMode edits) and
-  // updates the display immediately — achieving "what you see is what you get".
+  // Every 200ms, reads ALL session history for the current card from Data Page,
+  // then resolves data matching the current reviewMode via getResolvedCardData.
+  // This ensures mode isolation: switching from Days back to Progressive correctly
+  // finds the latest Progressive record with valid progressiveRepetitions,
+  // rather than using the Days record's undefined value.
   React.useEffect(() => {
     if (!currentCardRefUid || !dataPageTitle) {
       return;
@@ -203,10 +221,10 @@ export default function useCurrentCardData({
 
     const fetchLiveData = async () => {
       try {
-        const latestPluginData = await getPluginPageData({ dataPageTitle, limitToLatest: true });
+        const allPluginData = await getPluginPageData({ dataPageTitle, limitToLatest: false });
         if (cancelled) return;
 
-        const liveSession = latestPluginData[currentCardRefUid] as Session | NewSession | undefined;
+        const liveSessions = allPluginData[currentCardRefUid] as Session[] | undefined;
 
         // When user has manually overridden reviewMode in the UI,
         // don't override currentCardData from live data.
@@ -214,22 +232,25 @@ export default function useCurrentCardData({
         // (i.e., user graded the card with the overridden mode),
         // in which case we clear the override.
         if (reviewModeOverrideRef.current) {
-          if (
-            liveSession &&
-            'reviewMode' in liveSession &&
-            liveSession.reviewMode === reviewModeOverrideRef.current
-          ) {
-            setReviewModeOverride(undefined);
+          if (liveSessions && liveSessions.length > 0) {
+            const latestLiveSession = liveSessions[liveSessions.length - 1];
+            if (
+              latestLiveSession &&
+              'reviewMode' in latestLiveSession &&
+              latestLiveSession.reviewMode === reviewModeOverrideRef.current
+            ) {
+              setReviewModeOverride(undefined);
+            }
           }
           return;
         }
 
-        // No user override active — update currentCardData with live data.
+        // No user override active — resolve data for the current reviewMode.
 
-        // Case 1: Card data deleted or invalid (no reviewMode field).
+        // Case 1: Card data deleted or no sessions exist.
         // This happens when user deletes card history on Data Page.
         // Generate a fresh session to reflect the reset state.
-        if (!liveSession || !('reviewMode' in liveSession)) {
+        if (!liveSessions || liveSessions.length === 0) {
           const currentReviewMode = reviewModeRef.current || ReviewModes.DefaultSpacedInterval;
           const newSession = generateNewSession({ reviewMode: currentReviewMode });
           if (isSessionDataChanged(prevCardDataRef.current, newSession)) {
@@ -240,19 +261,16 @@ export default function useCurrentCardData({
           return;
         }
 
-        // Case 2: Valid live session data exists.
-        // Resolve mode-aware data: when the live session's reviewMode differs from
-        // the current UI mode, merge mode-specific fields from sessions history
-        // to preserve independent state across mode switches.
-        const currentReviewMode = reviewModeRef.current || ReviewModes.DefaultSpacedInterval;
-        const resolvedData = resolveModeAwareSessionData(
-          liveSession as Session,
-          sessionsRef.current,
-          currentReviewMode
-        );
+        // Case 2: Session history exists.
+        // Resolve data for the current reviewMode with backfill for undefined fields.
+        const currentReviewMode = reviewModeRef.current || liveSessions[liveSessions.length - 1]?.reviewMode || ReviewModes.DefaultSpacedInterval;
+        const resolvedData = getResolvedCardData({
+          sessions: liveSessions,
+          reviewMode: currentReviewMode,
+        });
         if (isSessionDataChanged(prevCardDataRef.current, resolvedData)) {
           setCurrentCardData(resolvedData);
-          setReviewMode(currentReviewMode);
+          setReviewMode(resolvedData.reviewMode);
           prevCardDataRef.current = resolvedData;
         }
       } catch (error) {
