@@ -645,9 +645,12 @@ const FooterActionsWrapper = styled.div`
 `;
 
 const ControlButtonWrapper = styled(Blueprint.Button)<{ intent?: string }>`
-  background: ${colors.overlayLight} !important;
-  border: none !important;
-  box-shadow: inset 0 0 0 1px ${colors.borderSubtle} !important;
+  && {
+    background: ${colors.overlayLight} !important;
+    background-color: ${colors.overlayLight} !important;
+    border: none !important;
+    box-shadow: inset 0 0 0 1px ${colors.borderSubtle} !important;
+  }
 
   color: ${(props) => getIntentColor(props.intent)};
 
@@ -655,8 +658,9 @@ const ControlButtonWrapper = styled(Blueprint.Button)<{ intent?: string }>`
     color: ${(props) => getIntentColor(props.intent)};
   }
 
-  &:hover {
+  &&:hover {
     background: ${colors.overlayLightHover} !important;
+    background-color: ${colors.overlayLightHover} !important;
     box-shadow: inset 0 0 0 1px rgba(128, 128, 128, 0.3) !important;
   }
 `;
