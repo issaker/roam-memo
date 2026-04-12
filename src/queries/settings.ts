@@ -27,7 +27,7 @@ export const saveSettingsToPage = async (dataPageTitle: string, settings: Settin
       forgotReinsertOffset: settings.forgotReinsertOffset.toString(),
       showBreadcrumbs: settings.showBreadcrumbs.toString(),
       borderColorEnabled: settings.borderColorEnabled.toString(),
-      borderColorBrightness: settings.borderColorBrightness.toString(),
+      borderColorOpacity: settings.borderColorOpacity.toString(),
     };
 
     for (const [key, value] of Object.entries(settingsToSave)) {
@@ -137,8 +137,8 @@ export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Setti
             case 'borderColorEnabled':
               loadedSettings.borderColorEnabled = value === 'true';
               break;
-            case 'borderColorBrightness':
-              loadedSettings.borderColorBrightness = Number(value) || 50;
+            case 'borderColorOpacity':
+              loadedSettings.borderColorOpacity = Math.min(1, Math.max(0, Number(value) || 0.5));
               break;
           }
         }

@@ -20,7 +20,7 @@ export type Settings = {
   forgotReinsertOffset: number;
   showBreadcrumbs: boolean;
   borderColorEnabled: boolean;
-  borderColorBrightness: number;
+  borderColorOpacity: number;
 };
 
 export const defaultSettings: Settings = {
@@ -32,7 +32,7 @@ export const defaultSettings: Settings = {
   forgotReinsertOffset: 3,
   showBreadcrumbs: false,
   borderColorEnabled: true,
-  borderColorBrightness: 50,
+  borderColorOpacity: 0.5,
 };
 
 const SETTING_TYPES = {
@@ -41,7 +41,7 @@ const SETTING_TYPES = {
   shuffleCards: 'boolean',
   showBreadcrumbs: 'boolean',
   borderColorEnabled: 'boolean',
-  borderColorBrightness: 'number',
+  borderColorOpacity: 'number',
 } as const;
 
 const coerceSettingValue = (key: string, value: any): any => {

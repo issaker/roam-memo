@@ -42,4 +42,8 @@ export const colors = {
   // Card mode indicator colors (aligned with intent colors for visual consistency)
   modeSpaced: 'var(--roam-success-color, #56d364)',
   modeFixed: 'var(--roam-warning-color, #d29922)',
+
+  // RGB components for rgba() opacity control in dark mode
+  modeSpacedRgb: '86, 211, 100',
+  modeFixedRgb: '210, 153, 34',
 };

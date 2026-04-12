@@ -189,7 +189,7 @@ const PracticeOverlay = ({
     forgotReinsertOffset: 3,
     showBreadcrumbs: false,
     borderColorEnabled: true,
-    borderColorBrightness: 50,
+    borderColorOpacity: 0.5,
   });
 
   // Detect dark mode for border brightness adjustment
@@ -439,7 +439,7 @@ const PracticeOverlay = ({
         $reviewMode={reviewMode}
         $darkMode={isDarkMode}
         $borderColorEnabled={localSettings.borderColorEnabled}
-        $borderColorBrightness={localSettings.borderColorBrightness}
+        $borderColorOpacity={localSettings.borderColorOpacity}
         isOpen={isOpen}
         onClose={onCloseCallback}
         className="pb-0"
@@ -658,29 +658,29 @@ const PracticeOverlay = ({
               <span>Mode Border Color</span>
             </label>
             <p style={{ fontSize: '12px', color: colors.textMuted, margin: '5px 0 0 0' }}>
-              Color the dialog border to match the current card&apos;s review mode (green for Spaced, orange for Fixed). In dark mode, the border color brightness is reduced according to the slider below.
+              Color the dialog border to match the current card&apos;s review mode (green for Spaced, orange for Fixed). In dark mode, the border opacity is controlled by the slider below.
             </p>
           </div>
 
           {localSettings.borderColorEnabled && (
             <div style={{ marginBottom: '20px', paddingLeft: '16px' }}>
               <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <span style={{ fontSize: '13px' }}>Dark Mode Brightness</span>
+                <span style={{ fontSize: '13px' }}>Dark Mode Opacity</span>
                 <span style={{ fontSize: '12px', color: colors.textMuted, minWidth: '36px', textAlign: 'right' }}>
-                  {localSettings.borderColorBrightness}%
+                  {localSettings.borderColorOpacity.toFixed(2)}
                 </span>
               </label>
               <input
                 type="range"
-                min={10}
-                max={100}
-                step={5}
-                value={localSettings.borderColorBrightness}
-                onChange={(e) => setLocalSettings({ ...localSettings, borderColorBrightness: Number(e.target.value) })}
+                min={0}
+                max={1}
+                step={0.05}
+                value={localSettings.borderColorOpacity}
+                onChange={(e) => setLocalSettings({ ...localSettings, borderColorOpacity: Math.min(1, Math.max(0, Number(e.target.value))) })}
                 style={{ width: '100%' }}
               />
               <p style={{ fontSize: '11px', color: colors.textMuted, margin: '4px 0 0 0' }}>
-                Adjust border color brightness in dark mode. Lower values = dimmer border, 100% = same as light mode.
+                Adjust border color opacity in dark mode. 0.0 = fully transparent, 1.0 = fully opaque (same as light mode).
               </p>
             </div>
           )}
@@ -717,7 +717,7 @@ const Dialog = styled(Blueprint.Dialog)<{
   $reviewMode?: ReviewModes;
   $darkMode?: boolean;
   $borderColorEnabled?: boolean;
-  $borderColorBrightness?: number;
+  $borderColorOpacity?: number;
 }>`
   display: grid;
   grid-template-rows: 50px 1fr auto;
@@ -726,7 +726,7 @@ const Dialog = styled(Blueprint.Dialog)<{
   /* Background and text color inherit from Roam body automatically */
 
   /* Dynamic border color based on card review mode */
-  border: 2px solid ${({ $reviewMode, $darkMode, $borderColorEnabled, $borderColorBrightness }) => {
+  border: 2px solid ${({ $reviewMode, $darkMode, $borderColorEnabled, $borderColorOpacity }) => {
     if (!$borderColorEnabled) return colors.borderSubtle;
     const baseColor =
       $reviewMode === ReviewModes.DefaultSpacedInterval
@@ -735,8 +735,12 @@ const Dialog = styled(Blueprint.Dialog)<{
           ? colors.modeFixed
           : colors.borderSubtle;
     if ($darkMode && baseColor !== colors.borderSubtle) {
-      const brightness = $borderColorBrightness ?? 50;
-      return `color-mix(in srgb, ${baseColor} ${brightness}%, black)`;
+      const rgb =
+        $reviewMode === ReviewModes.DefaultSpacedInterval
+          ? colors.modeSpacedRgb
+          : colors.modeFixedRgb;
+      const opacity = Math.min(1, Math.max(0, $borderColorOpacity ?? 0.5));
+      return `rgba(${rgb}, ${opacity})`;
     }
     return baseColor;
   }};
