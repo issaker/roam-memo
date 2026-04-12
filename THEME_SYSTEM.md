@@ -60,7 +60,37 @@ Buttons (primary/success/warning/danger)
     ↓ 使用模式颜色
 ModeBadge (success=Spaced / warning=Fixed)
 Dialog 边框 (modeSpaced / modeFixed)
+    ↓ 暗色模式处理
+color-mix(in srgb, <color> 50%, black)  // 暗色模式下亮度降低 50%
 ```
+
+### 4. 暗色模式边框颜色处理
+
+Dialog 边框颜色根据当前主题模式动态调整：
+
+| 条件 | 边框颜色 |
+|------|----------|
+| `borderColorEnabled = false` | `colors.borderSubtle`（默认灰色） |
+| `borderColorEnabled = true` + 白天模式 | 原始模式颜色（绿色/橙色） |
+| `borderColorEnabled = true` + 暗色模式 | `color-mix(in srgb, <color> 50%, black)` |
+
+实现方式：
+```tsx
+border: 2px solid ${({ $reviewMode, $darkMode, $borderColorEnabled }) => {
+  if (!$borderColorEnabled) return colors.borderSubtle;
+  const baseColor = $reviewMode === ReviewModes.DefaultSpacedInterval
+    ? colors.modeSpaced
+    : $reviewMode === ReviewModes.FixedInterval
+      ? colors.modeFixed
+      : colors.borderSubtle;
+  if ($darkMode && baseColor !== colors.borderSubtle) {
+    return `color-mix(in srgb, ${baseColor} 50%, black)`;
+  }
+  return baseColor;
+}};
+```
+
+暗色模式检测通过 `MutationObserver` 监听 `document.body` 的 `rs-dark` 类名变化实现实时响应。
 
 ## 文件结构
 
@@ -68,8 +98,12 @@ Dialog 边框 (modeSpaced / modeFixed)
 src/
 ├── theme.ts              # 唯一的颜色定义文件（含 modeSpaced/modeFixed 模式颜色）
 ├── app.tsx               # 主应用（无主题相关逻辑）
+├── hooks/
+│   └── useSettings.ts    # 设置管理（含 borderColorEnabled 开关）
+├── queries/
+│   └── settings.ts       # 设置持久化（支持 borderColorEnabled 读写）
 └── components/overlay/
-    ├── PracticeOverlay.tsx  # Dialog 继承背景色 + 动态边框颜色（基于 reviewMode）
+    ├── PracticeOverlay.tsx  # Dialog 继承背景色 + 动态边框颜色（基于 reviewMode + darkMode）
     ├── Footer.tsx           # 按钮使用 intent 颜色
     └── CardBlock.tsx        # 填空题遮罩使用固定色
 ```
@@ -138,3 +172,11 @@ export const colors = {
 
 **最后更新**: 2026-04-12
 **简化目标**: 移除过度工程化，保持简单直接
+
+## 更新日志
+
+### 2026-04-12
+- 新增 `borderColorEnabled` 设置项，允许用户控制边框颜色功能
+- 暗色模式下边框颜色亮度自动降低 50%（使用 CSS `color-mix()`）
+- 通过 `MutationObserver` 实现暗色模式实时检测
+- 更新文档说明暗色模式边框处理逻辑

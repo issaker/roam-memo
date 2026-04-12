@@ -74,6 +74,10 @@ The header bar displays a color-coded mode badge to the left of the status tags 
 
 The dialog border color also dynamically matches the mode badge color, reinforcing the visual cue across the entire window.
 
+**Dark Mode Adaptation:** In dark mode, the border color brightness is automatically reduced by 50% using CSS `color-mix()` to minimize visual stimulation while maintaining mode visibility.
+
+**Settings Control:** The "Mode Border Color" toggle in Memo Settings allows users to enable/disable this feature. Changes take effect immediately without restarting the session.
+
 ### Keyboard Shortcuts
 
 | Action          | Shortcut   |
