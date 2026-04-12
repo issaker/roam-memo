@@ -38,4 +38,8 @@ export const colors = {
   
   // Text colors
   textMuted: 'var(--roam-text-muted-color, #888)',
+
+  // Card mode indicator colors (aligned with intent colors for visual consistency)
+  modeSpaced: 'var(--roam-success-color, #56d364)',
+  modeFixed: 'var(--roam-warning-color, #d29922)',
 };

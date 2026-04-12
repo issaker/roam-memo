@@ -63,6 +63,17 @@ After finishing due cards, continue reviewing all cards in the deck without affe
 
 Show the block's page hierarchy as breadcrumbs for context. Toggle with `b` key. Visibility preference is persisted across sessions.
 
+### Mode Indicator Badge
+
+The header bar displays a color-coded mode badge to the left of the status tags (New / Past Due / etc.), providing instant visual identification of the current card's review mode:
+
+| Mode Badge | Review Mode | Color | Aligned With |
+|------------|-------------|-------|--------------|
+| **Spaced** | Spaced Interval Mode | Green | Same as "New" tag |
+| **Fixed** | Fixed Interval Mode | Orange | Same as "Past Due" tag |
+
+The dialog border color also dynamically matches the mode badge color, reinforcing the visual cue across the entire window.
+
 ### Keyboard Shortcuts
 
 | Action          | Shortcut   |

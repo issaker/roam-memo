@@ -422,6 +422,7 @@ const PracticeOverlay = ({
       {/* @ts-ignore */}
       <Dialog
         $isEditing={isEditing}
+        $reviewMode={reviewMode}
         isOpen={isOpen}
         onClose={onCloseCallback}
         className="pb-0"
@@ -439,6 +440,7 @@ const PracticeOverlay = ({
           onToggleBreadcrumbs={toggleBreadcrumbs}
           isCramming={isCramming}
           onSettingsClick={() => setShowSettings(true)}
+          reviewMode={reviewMode}
         />
 
         <DialogBody
@@ -654,12 +656,20 @@ const PracticeOverlay = ({
   );
 };
 
-const Dialog = styled(Blueprint.Dialog)<{ $isEditing?: boolean }>`
+const Dialog = styled(Blueprint.Dialog)<{ $isEditing?: boolean; $reviewMode?: ReviewModes }>`
   display: grid;
   grid-template-rows: 50px 1fr auto;
   max-height: 80vh;
   width: 90vw;
   /* Background and text color inherit from Roam body automatically */
+
+  /* Dynamic border color based on card review mode */
+  border: 2px solid ${({ $reviewMode }) =>
+    $reviewMode === ReviewModes.DefaultSpacedInterval
+      ? colors.modeSpaced
+      : $reviewMode === ReviewModes.FixedInterval
+        ? colors.modeFixed
+        : colors.borderSubtle};
 
   ${mediaQueries.lg} {
     width: 80vw;
@@ -951,6 +961,25 @@ const StatusBadge = ({ status, nextDueDate, isCramming }) => {
   }
 };
 
+const ModeBadge = ({ reviewMode }) => {
+  if (!reviewMode) return null;
+  if (reviewMode === ReviewModes.DefaultSpacedInterval) {
+    return (
+      <Blueprint.Tag intent="success" minimal>
+        Spaced
+      </Blueprint.Tag>
+    );
+  }
+  if (reviewMode === ReviewModes.FixedInterval) {
+    return (
+      <Blueprint.Tag intent="warning" minimal>
+        Fixed
+      </Blueprint.Tag>
+    );
+  }
+  return null;
+};
+
 const BoxIcon = styled(Blueprint.Icon)`
   margin-right: 5px !important;
 `;
@@ -980,6 +1009,7 @@ const Header = ({
   onToggleBreadcrumbs,
   isCramming,
   onSettingsClick,
+  reviewMode,
 }) => {
   const { selectedTag, today, currentIndex } = useSafeContext(MainContext);
   const todaySelectedTag = today.tags[selectedTag];
@@ -1022,6 +1052,9 @@ const Header = ({
             <Blueprint.Icon icon="cog" />
           </Tooltip>
         </div>
+        <span data-testid="mode-badge">
+          {!isDone && <ModeBadge reviewMode={reviewMode} />}
+        </span>
         <span data-testid="status-badge">
           <StatusBadge
             status={status}

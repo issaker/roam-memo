@@ -32,6 +32,10 @@ export const colors = {
   
   // 边框颜色
   borderSubtle: 'rgba(128, 128, 128, 0.15)',
+
+  // 卡片模式指示颜色（与 intent 颜色对齐，用于 ModeBadge 和 Dialog 边框）
+  modeSpaced: 'var(--roam-success-color, #56d364)',  // Spaced 模式 = 绿色 = 与 "New" 标签一致
+  modeFixed: 'var(--roam-warning-color, #d29922)',    // Fixed 模式 = 橙色 = 与 "Past Due" 标签一致
 };
 
 // Intent 颜色映射（使用 Roam CSS 变量）
@@ -53,16 +57,19 @@ Dialog 容器
 Header / Footer / CardBlock
     ↓ 使用 intent 颜色
 Buttons (primary/success/warning/danger)
+    ↓ 使用模式颜色
+ModeBadge (success=Spaced / warning=Fixed)
+Dialog 边框 (modeSpaced / modeFixed)
 ```
 
 ## 文件结构
 
 ```
 src/
-├── theme.ts              # 唯一的颜色定义文件
+├── theme.ts              # 唯一的颜色定义文件（含 modeSpaced/modeFixed 模式颜色）
 ├── app.tsx               # 主应用（无主题相关逻辑）
 └── components/overlay/
-    ├── PracticeOverlay.tsx  # Dialog 继承背景色
+    ├── PracticeOverlay.tsx  # Dialog 继承背景色 + 动态边框颜色（基于 reviewMode）
     ├── Footer.tsx           # 按钮使用 intent 颜色
     └── CardBlock.tsx        # 填空题遮罩使用固定色
 ```
@@ -129,5 +136,5 @@ export const colors = {
 
 ---
 
-**最后更新**: 2026-04-08
+**最后更新**: 2026-04-12
 **简化目标**: 移除过度工程化，保持简单直接
