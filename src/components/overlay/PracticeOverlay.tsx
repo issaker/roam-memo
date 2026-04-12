@@ -188,21 +188,7 @@ const PracticeOverlay = ({
     shuffleCards: false,
     forgotReinsertOffset: 3,
     showBreadcrumbs: false,
-    borderColorEnabled: true,
-    borderColorOpacity: 0.5,
   });
-
-  // Detect dark mode for border brightness adjustment
-  const [isDarkMode, setIsDarkMode] = React.useState(false);
-  React.useEffect(() => {
-    const checkDarkMode = () => {
-      setIsDarkMode(document.body.classList.contains('rs-dark'));
-    };
-    checkDarkMode();
-    const observer = new MutationObserver(checkDarkMode);
-    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
 
   // Load settings from page on mount and sync with extensionAPI
   React.useEffect(() => {
@@ -437,9 +423,6 @@ const PracticeOverlay = ({
       <Dialog
         $isEditing={isEditing}
         $reviewMode={reviewMode}
-        $darkMode={isDarkMode}
-        $borderColorEnabled={localSettings.borderColorEnabled}
-        $borderColorOpacity={localSettings.borderColorOpacity}
         isOpen={isOpen}
         onClose={onCloseCallback}
         className="pb-0"
@@ -645,45 +628,6 @@ const PracticeOverlay = ({
               Show breadcrumb navigation above each card during review. You can also toggle this with the B key.
             </p>
           </div>
-
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                className="bp3-checkbox"
-                checked={localSettings.borderColorEnabled}
-                onChange={(e) => setLocalSettings({ ...localSettings, borderColorEnabled: e.target.checked })}
-                style={{ marginRight: '8px' }}
-              />
-              <span>Mode Border Color</span>
-            </label>
-            <p style={{ fontSize: '12px', color: colors.textMuted, margin: '5px 0 0 0' }}>
-              Color the dialog border to match the current card&apos;s review mode (green for Spaced, orange for Fixed). In dark mode, the border opacity is controlled by the slider below.
-            </p>
-          </div>
-
-          {localSettings.borderColorEnabled && (
-            <div style={{ marginBottom: '20px', paddingLeft: '16px' }}>
-              <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                <span style={{ fontSize: '13px' }}>Dark Mode Opacity</span>
-                <span style={{ fontSize: '12px', color: colors.textMuted, minWidth: '36px', textAlign: 'right' }}>
-                  {localSettings.borderColorOpacity.toFixed(2)}
-                </span>
-              </label>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={localSettings.borderColorOpacity}
-                onChange={(e) => setLocalSettings({ ...localSettings, borderColorOpacity: Math.min(1, Math.max(0, Number(e.target.value))) })}
-                style={{ width: '100%' }}
-              />
-              <p style={{ fontSize: '11px', color: colors.textMuted, margin: '4px 0 0 0' }}>
-                Adjust border color opacity in dark mode. 0.0 = fully transparent, 1.0 = fully opaque (same as light mode).
-              </p>
-            </div>
-          )}
         </div>
 
         <div className="bp3-dialog-footer">
@@ -712,13 +656,7 @@ const PracticeOverlay = ({
   );
 };
 
-const Dialog = styled(Blueprint.Dialog)<{
-  $isEditing?: boolean;
-  $reviewMode?: ReviewModes;
-  $darkMode?: boolean;
-  $borderColorEnabled?: boolean;
-  $borderColorOpacity?: number;
-}>`
+const Dialog = styled(Blueprint.Dialog)<{ $isEditing?: boolean; $reviewMode?: ReviewModes }>`
   display: grid;
   grid-template-rows: 50px 1fr auto;
   max-height: 80vh;
@@ -726,24 +664,12 @@ const Dialog = styled(Blueprint.Dialog)<{
   /* Background and text color inherit from Roam body automatically */
 
   /* Dynamic border color based on card review mode */
-  border: 2px solid ${({ $reviewMode, $darkMode, $borderColorEnabled, $borderColorOpacity }) => {
-    if (!$borderColorEnabled) return colors.borderSubtle;
-    const baseColor =
-      $reviewMode === ReviewModes.DefaultSpacedInterval
-        ? colors.modeSpaced
-        : $reviewMode === ReviewModes.FixedInterval
-          ? colors.modeFixed
-          : colors.borderSubtle;
-    if ($darkMode && baseColor !== colors.borderSubtle) {
-      const rgb =
-        $reviewMode === ReviewModes.DefaultSpacedInterval
-          ? colors.modeSpacedRgb
-          : colors.modeFixedRgb;
-      const opacity = Math.min(1, Math.max(0, $borderColorOpacity ?? 0.5));
-      return `rgba(${rgb}, ${opacity})`;
-    }
-    return baseColor;
-  }};
+  border: 2px solid ${({ $reviewMode }) =>
+    $reviewMode === ReviewModes.DefaultSpacedInterval
+      ? colors.modeSpaced
+      : $reviewMode === ReviewModes.FixedInterval
+        ? colors.modeFixed
+        : colors.borderSubtle};
 
   ${mediaQueries.lg} {
     width: 80vw;

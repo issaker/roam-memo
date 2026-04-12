@@ -19,8 +19,6 @@ export type Settings = {
   shuffleCards: boolean;
   forgotReinsertOffset: number;
   showBreadcrumbs: boolean;
-  borderColorEnabled: boolean;
-  borderColorOpacity: number;
 };
 
 export const defaultSettings: Settings = {
@@ -31,8 +29,6 @@ export const defaultSettings: Settings = {
   shuffleCards: false,
   forgotReinsertOffset: 3,
   showBreadcrumbs: false,
-  borderColorEnabled: true,
-  borderColorOpacity: 0.5,
 };
 
 const SETTING_TYPES = {
@@ -40,8 +36,6 @@ const SETTING_TYPES = {
   rtlEnabled: 'boolean',
   shuffleCards: 'boolean',
   showBreadcrumbs: 'boolean',
-  borderColorEnabled: 'boolean',
-  borderColorOpacity: 'number',
 } as const;
 
 const coerceSettingValue = (key: string, value: any): any => {
