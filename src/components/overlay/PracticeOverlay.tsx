@@ -188,7 +188,20 @@ const PracticeOverlay = ({
     shuffleCards: false,
     forgotReinsertOffset: 3,
     showBreadcrumbs: false,
+    borderColorEnabled: true,
   });
+
+  // Detect dark mode for border brightness adjustment
+  const [isDarkMode, setIsDarkMode] = React.useState(false);
+  React.useEffect(() => {
+    const checkDarkMode = () => {
+      setIsDarkMode(document.body.classList.contains('rs-dark'));
+    };
+    checkDarkMode();
+    const observer = new MutationObserver(checkDarkMode);
+    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   // Load settings from page on mount and sync with extensionAPI
   React.useEffect(() => {
@@ -423,6 +436,8 @@ const PracticeOverlay = ({
       <Dialog
         $isEditing={isEditing}
         $reviewMode={reviewMode}
+        $darkMode={isDarkMode}
+        $borderColorEnabled={localSettings.borderColorEnabled}
         isOpen={isOpen}
         onClose={onCloseCallback}
         className="pb-0"
@@ -628,6 +643,22 @@ const PracticeOverlay = ({
               Show breadcrumb navigation above each card during review. You can also toggle this with the B key.
             </p>
           </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                className="bp3-checkbox"
+                checked={localSettings.borderColorEnabled}
+                onChange={(e) => setLocalSettings({ ...localSettings, borderColorEnabled: e.target.checked })}
+                style={{ marginRight: '8px' }}
+              />
+              <span>Mode Border Color</span>
+            </label>
+            <p style={{ fontSize: '12px', color: colors.textMuted, margin: '5px 0 0 0' }}>
+              Color the dialog border to match the current card&apos;s review mode (green for Spaced, orange for Fixed). In dark mode, the border color brightness is automatically reduced by 50%.
+            </p>
+          </div>
         </div>
 
         <div className="bp3-dialog-footer">
@@ -656,7 +687,12 @@ const PracticeOverlay = ({
   );
 };
 
-const Dialog = styled(Blueprint.Dialog)<{ $isEditing?: boolean; $reviewMode?: ReviewModes }>`
+const Dialog = styled(Blueprint.Dialog)<{
+  $isEditing?: boolean;
+  $reviewMode?: ReviewModes;
+  $darkMode?: boolean;
+  $borderColorEnabled?: boolean;
+}>`
   display: grid;
   grid-template-rows: 50px 1fr auto;
   max-height: 80vh;
@@ -664,12 +700,19 @@ const Dialog = styled(Blueprint.Dialog)<{ $isEditing?: boolean; $reviewMode?: Re
   /* Background and text color inherit from Roam body automatically */
 
   /* Dynamic border color based on card review mode */
-  border: 2px solid ${({ $reviewMode }) =>
-    $reviewMode === ReviewModes.DefaultSpacedInterval
-      ? colors.modeSpaced
-      : $reviewMode === ReviewModes.FixedInterval
-        ? colors.modeFixed
-        : colors.borderSubtle};
+  border: 2px solid ${({ $reviewMode, $darkMode, $borderColorEnabled }) => {
+    if (!$borderColorEnabled) return colors.borderSubtle;
+    const baseColor =
+      $reviewMode === ReviewModes.DefaultSpacedInterval
+        ? colors.modeSpaced
+        : $reviewMode === ReviewModes.FixedInterval
+          ? colors.modeFixed
+          : colors.borderSubtle;
+    if ($darkMode && baseColor !== colors.borderSubtle) {
+      return `color-mix(in srgb, ${baseColor} 50%, black)`;
+    }
+    return baseColor;
+  }};
 
   ${mediaQueries.lg} {
     width: 80vw;

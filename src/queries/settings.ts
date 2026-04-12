@@ -26,6 +26,7 @@ export const saveSettingsToPage = async (dataPageTitle: string, settings: Settin
       shuffleCards: settings.shuffleCards.toString(),
       forgotReinsertOffset: settings.forgotReinsertOffset.toString(),
       showBreadcrumbs: settings.showBreadcrumbs.toString(),
+      borderColorEnabled: settings.borderColorEnabled.toString(),
     };
 
     for (const [key, value] of Object.entries(settingsToSave)) {
@@ -131,6 +132,9 @@ export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Setti
               break;
             case 'showBreadcrumbs':
               loadedSettings.showBreadcrumbs = value === 'true';
+              break;
+            case 'borderColorEnabled':
+              loadedSettings.borderColorEnabled = value === 'true';
               break;
           }
         }
