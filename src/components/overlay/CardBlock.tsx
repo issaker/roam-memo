@@ -14,6 +14,7 @@ const CardBlock = ({
   breadcrumbs,
   showBreadcrumbs,
   onRenderComplete,
+  hideChildren,
 }: {
   refUid: string;
   showAnswers: boolean;
@@ -21,6 +22,7 @@ const CardBlock = ({
   breadcrumbs: BreadcrumbsType[];
   showBreadcrumbs: boolean;
   onRenderComplete?: () => void;
+  hideChildren?: boolean;
 }) => {
   const ref = React.useRef<HTMLDivElement | null>(null);
   const [renderedBlockElm, setRenderedBlockElm] = React.useState<HTMLElement | null>(null);
@@ -134,13 +136,14 @@ const CardBlock = ({
   return (
     <div>
       {breadcrumbs && showBreadcrumbs && <Breadcrumbs breadcrumbs={breadcrumbs} />}
-      <ContentWrapper ref={ref} showAnswers={showAnswers}></ContentWrapper>
+      <ContentWrapper ref={ref} showAnswers={showAnswers} hideChildren={hideChildren}></ContentWrapper>
     </div>
   );
 };
 
 const ContentWrapper = styled.div<{
   showAnswers: boolean;
+  hideChildren?: boolean;
 }>`
   // To align bullet on the left + ref count on the right correctly
   position: relative;
@@ -148,7 +151,7 @@ const ContentWrapper = styled.div<{
   width: calc(100% + 19px);
 
   & .rm-block-children {
-    display: ${(props) => (props.showAnswers ? 'flex' : 'none')};
+    display: ${(props) => (props.showAnswers && !props.hideChildren) ? 'flex' : 'none'};
   }
 
   & .rm-block-separator {

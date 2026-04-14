@@ -46,7 +46,9 @@ const isSessionDataChanged = (prev: Session | undefined, next: Session | undefin
     !isSameDate(prev.dateCreated, next.dateCreated) ||
     prev.intervalMultiplier !== next.intervalMultiplier ||
     prev.intervalMultiplierType !== next.intervalMultiplierType ||
-    prev.progressiveRepetitions !== next.progressiveRepetitions
+    prev.progressiveRepetitions !== next.progressiveRepetitions ||
+    prev.lineByLineReview !== next.lineByLineReview ||
+    prev.lineByLineProgress !== next.lineByLineProgress
   );
 };
 
@@ -143,6 +145,15 @@ export const resolveModeSpecificData = (
             break;
           }
         }
+      }
+    }
+  }
+
+  if (resolved.lineByLineReview === 'Y' && resolved.lineByLineProgress === undefined) {
+    for (let i = sessions.length - 1; i >= 0; i--) {
+      if (sessions[i].lineByLineProgress !== undefined) {
+        resolved.lineByLineProgress = sessions[i].lineByLineProgress;
+        break;
       }
     }
   }

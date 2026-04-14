@@ -28,6 +28,8 @@ export type Session = {
   intervalMultiplier?: number;
   intervalMultiplierType?: IntervalMultiplierType;
   progressiveRepetitions?: number;
+  lineByLineReview?: string;
+  lineByLineProgress?: string;
 } & SessionCommon;
 
 export interface NewSession extends Omit<Session, 'nextDueDate' | 'grade'> {
@@ -55,3 +57,12 @@ export enum IntervalMultiplierType {
   Years = 'Years',
   Progressive = 'Progressive',
 }
+
+export interface LineByLineChildData {
+  nextDueDate: string;
+  interval: number;
+  repetitions: number;
+  eFactor: number;
+}
+
+export type LineByLineProgressMap = Record<string, LineByLineChildData>;

@@ -1,6 +1,6 @@
 import * as stringUtils from '~/utils/string';
 import * as dateUtils from '~/utils/date';
-import { CompleteRecords } from '~/models/session';
+import { CompleteRecords, LineByLineProgressMap } from '~/models/session';
 import {
   createChildBlock,
   getChildBlock,
@@ -184,5 +184,117 @@ export const bulkSavePracticeData = async ({
     });
   } catch (error) {
     console.error('Error Bulk Saving', error);
+  }
+};
+
+export const updateLineByLineProgress = async ({
+  refUid,
+  dataPageTitle,
+  progress,
+}: {
+  refUid: string;
+  dataPageTitle: string;
+  progress: LineByLineProgressMap;
+}) => {
+  await getOrCreatePage(dataPageTitle);
+  const dataBlockUid = await getOrCreateBlockOnPage(dataPageTitle, 'data', -1, {
+    open: false,
+    heading: 3,
+  });
+
+  const cardDataBlockUid = await getChildBlock(dataBlockUid, `((${refUid}))`);
+  if (!cardDataBlockUid) return;
+
+  const sessionHeadingQuery = `
+    [:find ?childUid ?childOrder
+     :where
+     [?parent :block/uid "${cardDataBlockUid}"]
+     [?child :block/parents ?parent]
+     [?child :block/uid ?childUid]
+     [?child :block/order ?childOrder]
+    ]
+  `;
+  const sessionHeadings = window.roamAlphaAPI.q(sessionHeadingQuery);
+  if (!sessionHeadings || !sessionHeadings.length) return;
+
+  sessionHeadings.sort((a, b) => a[1] - b[1]);
+  const latestSessionUid = sessionHeadings[0][0];
+
+  const progressString = JSON.stringify(progress);
+  const existingProgressBlockUid = await getChildBlock(latestSessionUid, 'lineByLineProgress::', {
+    exactMatch: false,
+  });
+
+  if (existingProgressBlockUid) {
+    await window.roamAlphaAPI.updateBlock({
+      block: { uid: existingProgressBlockUid, string: `lineByLineProgress:: ${progressString}` },
+    });
+  } else {
+    await createChildBlock(latestSessionUid, `lineByLineProgress:: ${progressString}`, -1);
+  }
+
+  const earliestDueDate = Object.values(progress).reduce((earliest, child) => {
+    const d = new Date(child.nextDueDate);
+    return !earliest || d < earliest ? d : earliest;
+  }, null as Date | null);
+
+  if (earliestDueDate) {
+    const dueDateString = `[[${stringUtils.dateToRoamDateString(earliestDueDate)}]]`;
+    const existingDueDateBlockUid = await getChildBlock(latestSessionUid, 'nextDueDate::', {
+      exactMatch: false,
+    });
+    if (existingDueDateBlockUid) {
+      await window.roamAlphaAPI.updateBlock({
+        block: { uid: existingDueDateBlockUid, string: `nextDueDate:: ${dueDateString}` },
+      });
+    }
+  }
+};
+
+export const updateLineByLineFlag = async ({
+  refUid,
+  dataPageTitle,
+  enabled,
+}: {
+  refUid: string;
+  dataPageTitle: string;
+  enabled: boolean;
+}) => {
+  await getOrCreatePage(dataPageTitle);
+  const dataBlockUid = await getOrCreateBlockOnPage(dataPageTitle, 'data', -1, {
+    open: false,
+    heading: 3,
+  });
+
+  const cardDataBlockUid = await getOrCreateChildBlock(dataBlockUid, `((${refUid}))`, 0, {
+    open: false,
+  });
+
+  const sessionHeadingQuery = `
+    [:find ?childUid ?childOrder
+     :where
+     [?parent :block/uid "${cardDataBlockUid}"]
+     [?child :block/parents ?parent]
+     [?child :block/uid ?childUid]
+     [?child :block/order ?childOrder]
+    ]
+  `;
+  const sessionHeadings = window.roamAlphaAPI.q(sessionHeadingQuery);
+  if (!sessionHeadings || !sessionHeadings.length) return;
+
+  sessionHeadings.sort((a, b) => a[1] - b[1]);
+  const latestSessionUid = sessionHeadings[0][0];
+
+  const flagValue = enabled ? 'Y' : 'N';
+  const existingFlagBlockUid = await getChildBlock(latestSessionUid, 'lineByLineReview::', {
+    exactMatch: false,
+  });
+
+  if (existingFlagBlockUid) {
+    await window.roamAlphaAPI.updateBlock({
+      block: { uid: existingFlagBlockUid, string: `lineByLineReview:: ${flagValue}` },
+    });
+  } else {
+    await createChildBlock(latestSessionUid, `lineByLineReview:: ${flagValue}`, -1);
   }
 };

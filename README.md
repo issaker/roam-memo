@@ -133,6 +133,34 @@ Due cards are sorted by **memory urgency** using a three-level priority system, 
 
 When `shuffleCards` is enabled, this sort is overridden by random shuffling.
 
+### Line-by-Line Review
+
+A specialized review mode for cards with multiple child blocks (outline structure). When enabled, each child block is treated as an independent Q&A item with its own spaced repetition schedule.
+
+**How it works:**
+1. Mark a card as line-by-line via the **LBL** checkbox in the header (only visible when a card has child blocks)
+2. On review, the parent block (question) is shown with all children hidden
+3. Click "Show Answer" to reveal one child block at a time
+4. After each child is revealed, grade it using the standard SM2 buttons (Forgot/Hard/Good/Perfect)
+5. Each child's review schedule is tracked independently via the SM2 algorithm
+6. Already-mastered children (not yet due for review) are shown directly with a subtle visual indicator
+7. Review automatically skips to the first unmastered/due child
+
+**Memory state tracking:**
+- Children with `nextDueDate` in the future are considered mastered — shown directly, no "Show Answer" needed
+- Children with no review history or past-due `nextDueDate` require active review
+- The card's main `nextDueDate` is set to the earliest child due date, ensuring the card appears as "due" when any child needs review
+
+**Data Page fields:**
+- `lineByLineReview:: Y` or `N` — marks the card as line-by-line review type
+- `lineByLineProgress::` — JSON object tracking per-child SM2 data: `{childUid: {nextDueDate, interval, repetitions, eFactor}}`
+
+**Visual indicators:**
+- **LBL checkbox** in the header toggles line-by-line mode for the current card
+- **L2/5** tag shows current line progress (current line / total lines)
+- Mastered lines display with reduced opacity and a subtle left border
+- The current active line has a green left border highlight
+
 ## Data Storage
 
 All practice data is stored on a Roam page (default: `roam/memo`) with this structure:

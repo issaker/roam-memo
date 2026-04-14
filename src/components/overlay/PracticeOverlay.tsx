@@ -15,9 +15,10 @@ import { saveSettingsToPage, loadSettingsFromPage } from '~/queries/settings';
 import CardBlock from '~/components/overlay/CardBlock';
 import Footer from '~/components/overlay/Footer';
 import ButtonTags from '~/components/ButtonTags';
-import { CompleteRecords, IntervalMultiplierType, ReviewModes } from '~/models/session';
+import { CompleteRecords, IntervalMultiplierType, ReviewModes, LineByLineProgressMap } from '~/models/session';
 import useCurrentCardData, { resolveModeSpecificData } from '~/hooks/useCurrentCardData';
-import { generateNewSession } from '~/queries';
+import { generateNewSession, updateLineByLineProgress, updateLineByLineFlag } from '~/queries';
+import { supermemo } from '~/practice';
 import { CompletionStatus, Today, RenderMode } from '~/models/practice';
 import { handlePracticeProps } from '~/app';
 import { useSafeContext } from '~/hooks/useSafeContext';
@@ -36,6 +37,9 @@ interface MainContextProps {
   currentIndex: number;
   renderMode: RenderMode;
   setRenderMode: (tag: string, mode: RenderMode) => void;
+  isLineByLine: boolean;
+  lineByLineCurrentIndex: number;
+  lineByLineTotal: number;
 }
 
 export const MainContext = React.createContext<MainContextProps>({} as MainContextProps);
@@ -179,6 +183,105 @@ const PracticeOverlay = ({
   const shouldShowAnswerFirst =
     renderMode === RenderMode.AnswerFirst && hasBlockChildrenUids && !showAnswers;
 
+  const isLineByLine = currentCardData?.lineByLineReview === 'Y' && hasBlockChildrenUids;
+
+  const parseLineByLineProgress = (progressStr?: string): LineByLineProgressMap => {
+    if (!progressStr) return {};
+    try {
+      return JSON.parse(progressStr);
+    } catch {
+      return {};
+    }
+  };
+
+  const lineByLineProgress = React.useMemo(
+    () => parseLineByLineProgress(currentCardData?.lineByLineProgress),
+    [currentCardData?.lineByLineProgress]
+  );
+
+  const childUidsList = React.useMemo(() => blockInfo.childrenUids || [], [blockInfo.childrenUids]);
+
+  const [lineByLineRevealedCount, setLineByLineRevealedCount] = React.useState(0);
+  const [lineByLineCurrentChildIndex, setLineByLineCurrentChildIndex] = React.useState(0);
+
+  React.useEffect(() => {
+    if (!isLineByLine || !childUidsList.length) {
+      setLineByLineRevealedCount(0);
+      setLineByLineCurrentChildIndex(0);
+      return;
+    }
+    const now = new Date();
+    let firstDueIndex = childUidsList.length;
+    for (let i = 0; i < childUidsList.length; i++) {
+      const uid = childUidsList[i];
+      const childData = lineByLineProgress[uid];
+      if (!childData) { firstDueIndex = i; break; }
+      if (new Date(childData.nextDueDate) <= now) { firstDueIndex = i; break; }
+    }
+    setLineByLineRevealedCount(firstDueIndex);
+    setLineByLineCurrentChildIndex(firstDueIndex);
+  }, [isLineByLine, currentCardRefUid, childUidsList, lineByLineProgress]);
+
+  const lineByLineIsCardComplete = isLineByLine && lineByLineCurrentChildIndex >= childUidsList.length;
+
+  const onLineByLineGrade = React.useCallback(
+    async (grade: number) => {
+      if (!currentCardRefUid || lineByLineCurrentChildIndex >= childUidsList.length) return;
+
+      const childUid = childUidsList[lineByLineCurrentChildIndex];
+      const existingData = lineByLineProgress[childUid];
+
+      const sm2Input = {
+        interval: existingData?.interval || 0,
+        repetition: existingData?.repetitions || 0,
+        efactor: existingData?.eFactor || 2.5,
+      };
+      const sm2Result = supermemo(sm2Input, grade);
+
+      const now = new Date();
+      const nextDueDate = dateUtils.addDays(now, sm2Result.interval);
+
+      const updatedProgress: LineByLineProgressMap = {
+        ...lineByLineProgress,
+        [childUid]: {
+          nextDueDate: nextDueDate.toISOString(),
+          interval: sm2Result.interval,
+          repetitions: sm2Result.repetition,
+          eFactor: sm2Result.efactor,
+        },
+      };
+
+      await updateLineByLineProgress({
+        refUid: currentCardRefUid,
+        dataPageTitle,
+        progress: updatedProgress,
+      });
+
+      const nextIndex = lineByLineCurrentChildIndex + 1;
+      setLineByLineCurrentChildIndex(nextIndex);
+      setLineByLineRevealedCount(nextIndex);
+      setShowAnswers(false);
+    },
+    [currentCardRefUid, lineByLineCurrentChildIndex, childUidsList, lineByLineProgress, dataPageTitle]
+  );
+
+  const onLineByLineShowAnswer = React.useCallback(() => {
+    setLineByLineRevealedCount((prev) => prev + 1);
+    setShowAnswers(true);
+  }, []);
+
+  const onToggleLineByLine = React.useCallback(
+    async (enabled: boolean) => {
+      if (!currentCardRefUid) return;
+      await updateLineByLineFlag({
+        refUid: currentCardRefUid,
+        dataPageTitle,
+        enabled,
+      });
+    },
+    [currentCardRefUid, dataPageTitle]
+  );
+
   // Local settings state for roam/js mode
   const [localSettings, setLocalSettings] = React.useState({
     tagsListString: 'memo',
@@ -264,8 +367,12 @@ const PracticeOverlay = ({
   const onPracticeClick = React.useCallback(
     (gradeData) => {
       if (isDone) return;
-      // Use resolvedCardData so that mode-specific fields (e.g. progressiveRepetitions)
-      // are recovered from history instead of being undefined from a different mode's session
+
+      if (isLineByLine && !lineByLineIsCardComplete) {
+        onLineByLineGrade(gradeData.grade);
+        return;
+      }
+
       const practiceProps = {
         ...resolvedCardData,
         ...gradeData,
@@ -299,6 +406,9 @@ const PracticeOverlay = ({
       intervalMultiplierType,
       currentCardRefUid,
       forgotReinsertOffset,
+      isLineByLine,
+      lineByLineIsCardComplete,
+      onLineByLineGrade,
     ]
   );
 
@@ -416,6 +526,9 @@ const PracticeOverlay = ({
         currentIndex,
         renderMode,
         setRenderMode,
+        isLineByLine,
+        lineByLineCurrentIndex: isLineByLine ? lineByLineCurrentChildIndex + 1 : 0,
+        lineByLineTotal: isLineByLine ? childUidsList.length : 0,
       }}
     >
       <style>{mobileOverlayStyles(isEditing)}</style>
@@ -441,6 +554,12 @@ const PracticeOverlay = ({
           isCramming={isCramming}
           onSettingsClick={() => setShowSettings(true)}
           reviewMode={reviewMode}
+          isLineByLine={isLineByLine}
+          hasBlockChildren={hasBlockChildren}
+          lineByLineChecked={currentCardData?.lineByLineReview === 'Y'}
+          onToggleLineByLine={onToggleLineByLine}
+          lineByLineCurrentIndex={isLineByLine ? lineByLineCurrentChildIndex + 1 : 0}
+          lineByLineTotal={childUidsList.length}
         />
 
         <DialogBody
@@ -449,7 +568,39 @@ const PracticeOverlay = ({
         >
           {currentCardRefUid ? (
             <>
-              {shouldShowAnswerFirst ? (
+              {isLineByLine && !lineByLineIsCardComplete ? (
+                <>
+                  <CardBlock
+                    refUid={currentCardRefUid}
+                    showAnswers={true}
+                    setHasCloze={setHasCloze}
+                    breadcrumbs={blockInfo.breadcrumbs}
+                    showBreadcrumbs={showBreadcrumbs}
+                    onRenderComplete={() => setIsRendered(true)}
+                    hideChildren={true}
+                  />
+                  <LineByLineSeparator>
+                    Line {lineByLineCurrentChildIndex + 1} / {childUidsList.length}
+                  </LineByLineSeparator>
+                  {childUidsList.slice(0, lineByLineRevealedCount).map((uid, index) => {
+                    const isCurrentLine = index === lineByLineCurrentChildIndex;
+                    const childProgress = lineByLineProgress[uid];
+                    const isMastered = childProgress && new Date(childProgress.nextDueDate) > new Date();
+                    return (
+                      <LineByLineItem key={uid} $isCurrent={isCurrentLine} $isMastered={isMastered}>
+                        <CardBlock
+                          refUid={uid}
+                          showAnswers={true}
+                          setHasCloze={setHasCloze}
+                          breadcrumbs={[]}
+                          showBreadcrumbs={false}
+                          onRenderComplete={() => setIsRendered(true)}
+                        />
+                      </LineByLineItem>
+                    );
+                  })}
+                </>
+              ) : shouldShowAnswerFirst ? (
                 blockInfo.childrenUids?.map((uid) => (
                   <CardBlock
                     key={uid}
@@ -503,9 +654,9 @@ const PracticeOverlay = ({
           onPracticeClick={onPracticeClick}
           onSkipClick={onSkipClick}
           onPrevClick={onPrevClick}
-          setShowAnswers={setShowAnswers}
-          showAnswers={showAnswers}
-          isDone={isDone}
+          setShowAnswers={isLineByLine && !lineByLineIsCardComplete ? onLineByLineShowAnswer : setShowAnswers}
+          showAnswers={isLineByLine ? (lineByLineRevealedCount > lineByLineCurrentChildIndex) : showAnswers}
+          isDone={isDone || lineByLineIsCardComplete}
           hasCards={hasCards}
           onCloseCallback={onCloseCallback}
           currentCardData={resolvedCardData}
@@ -745,6 +896,24 @@ const mobileOverlayStyles = (_isEditing: boolean) => `
 const DialogBody = styled.div`
   overflow-x: hidden; // because of tweaks we do in ContentWrapper container overflows
   min-height: 200px;
+`;
+
+const LineByLineSeparator = styled.div`
+  font-size: 11px;
+  opacity: 0.5;
+  text-align: center;
+  padding: 4px 0;
+  border-top: 1px dashed ${colors.borderSubtle};
+  margin-top: 8px;
+`;
+
+const LineByLineItem = styled.div<{ $isCurrent: boolean; $isMastered: boolean }>`
+  border-left: 3px solid ${(props) =>
+    props.$isCurrent ? colors.modeSpaced : props.$isMastered ? 'rgba(128, 128, 128, 0.15)' : colors.borderSubtle};
+  padding-left: 8px;
+  margin-left: 4px;
+  margin-top: 4px;
+  opacity: ${(props) => (props.$isMastered && !props.$isCurrent ? 0.6 : 1)};
 `;
 
 const HeaderWrapper = styled.div`
@@ -1010,6 +1179,12 @@ const Header = ({
   isCramming,
   onSettingsClick,
   reviewMode,
+  isLineByLine,
+  hasBlockChildren,
+  lineByLineChecked,
+  onToggleLineByLine,
+  lineByLineCurrentIndex,
+  lineByLineTotal,
 }) => {
   const { selectedTag, today, currentIndex } = useSafeContext(MainContext);
   const todaySelectedTag = today.tags[selectedTag];
@@ -1023,6 +1198,10 @@ const Header = ({
     onToggleBreadcrumbs();
   };
 
+  const handleLineByLineToggle = () => {
+    onToggleLineByLine(!lineByLineChecked);
+  };
+
   return (
     <HeaderWrapper className={className} tabIndex={0}>
       <div className="flex items-center">
@@ -1032,6 +1211,23 @@ const Header = ({
         </div>
       </div>
       <div className="flex items-center justify-end">
+        {!isDone && hasBlockChildren && (
+          <Tooltip content="Line-by-Line Review" placement="left">
+            <Blueprint.Checkbox
+              checked={lineByLineChecked}
+              onChange={handleLineByLineToggle}
+              className="mr-1 mb-0"
+              style={{ fontSize: '11px' }}
+            >
+              <span style={{ fontSize: '11px' }}>LBL</span>
+            </Blueprint.Checkbox>
+          </Tooltip>
+        )}
+        {isLineByLine && !isDone && (
+          <Blueprint.Tag intent="none" minimal style={{ fontSize: '10px', marginRight: '4px' }}>
+            L{lineByLineCurrentIndex}/{lineByLineTotal}
+          </Blueprint.Tag>
+        )}
         {!isDone && (
           <div onClick={toggleBreadcrumbs} className="px-1 cursor-pointer">
             {/* @ts-ignore */}
