@@ -135,31 +135,46 @@ When `shuffleCards` is enabled, this sort is overridden by random shuffling.
 
 ### Line-by-Line Review
 
-A specialized review mode for cards with multiple child blocks (outline structure). When enabled, each child block is treated as an independent Q&A item with its own spaced repetition schedule.
+A specialized card-level review mode for cards with multiple child blocks (outline structure). When enabled, each child block is treated as an independent Q&A item with its own spaced repetition schedule.
 
 **How it works:**
 1. Mark a card as line-by-line via the **LBL** checkbox in the header (only visible when a card has child blocks)
-2. On review, the parent block (question) is shown with all children hidden
-3. Click "Show Answer" to reveal one child block at a time
-4. After each child is revealed, grade it using the standard SM2 buttons (Forgot/Hard/Good/Perfect)
-5. Each child's review schedule is tracked independently via the SM2 algorithm
-6. Already-mastered children (not yet due for review) are shown directly with a subtle visual indicator
-7. Review automatically skips to the first unmastered/due child
+2. The `LBL` switch belongs to the current card itself, not to a global session flag
+3. On review, the parent block (question) is shown with all children hidden
+4. Click "Show Answer" to reveal one child block at a time in outline order
+5. After each child is revealed, grade it using the standard SM2 buttons (Forgot/Hard/Good/Perfect)
+6. Each child block keeps its own independent SM2 data
+7. Every time the card appears, review starts from the top and skips directly to the first child that is still due
+8. After the last due child is graded, the session automatically advances to the next card
+9. The line-by-line interaction only activates in `Spaced Interval Mode`; in `Fixed Interval Mode` the same card remains a fully expanded reading card
 
 **Memory state tracking:**
 - Children with `nextDueDate` in the future are considered mastered — shown directly, no "Show Answer" needed
 - Children with no review history or past-due `nextDueDate` require active review
 - The card's main `nextDueDate` is set to the earliest child due date, ensuring the card appears as "due" when any child needs review
+- `lineByLineReview`, `lineByLineProgress`, and the line-by-line parent `nextDueDate` are stored in a dedicated card-level `meta` block, so card metadata stays structurally separate from historical review sessions
 
 **Data Page fields:**
-- `lineByLineReview:: Y` or `N` — marks the card as line-by-line review type
-- `lineByLineProgress::` — JSON object tracking per-child SM2 data: `{childUid: {nextDueDate, interval, repetitions, eFactor}}`
+- Card-level `meta > lineByLineReview:: Y` or `N` — marks the current card as line-by-line review type
+- Card-level `meta > lineByLineProgress::` — JSON object tracking per-child SM2 data: `{childUid: {nextDueDate, interval, repetitions, eFactor}}`
+- Card-level `meta > nextDueDate::` — earliest child due date for line-by-line scheduling
 
 **Visual indicators:**
 - **LBL checkbox** in the header toggles line-by-line mode for the current card
 - **L2/5** tag shows current line progress (current line / total lines)
 - Mastered lines display with reduced opacity and a subtle left border
 - The current active line has a green left border highlight
+
+### 2026-04-14 Line-by-Line Review Fix
+
+- `Line-by-Line Review` now behaves as a card-scoped property, so toggling `LBL` on the current card survives review-mode switching
+- New or unreviewed cards can be converted to line-by-line immediately because the metadata is stored in a dedicated `meta` block under the card container on the Data Page
+- Child progress still uses independent SM2 records per block, while parent-card scheduling follows the earliest due child
+- Completing the final due child now advances directly to the next card instead of leaving the user on the same card
+- Added a `Show Review Mode Borders` setting so users can hide or show the green/orange mode border, with the default set to enabled
+- When a card's history is manually deleted during polling, the card now resets to the default `Fixed Interval` reading mode
+- `Fixed Interval` cards now open fully expanded without requiring `Show Answer`
+- `Line-by-Line Review` is now only activated in `Spaced Interval Mode`; in `Fixed Interval Mode` the card keeps normal expanded reading behavior
 
 ## Data Storage
 
@@ -169,6 +184,10 @@ All practice data is stored on a Roam page (default: `roam/memo`) with this stru
 roam/memo (page)
 ├── data (heading block)
 │   ├── ((cardUid1))
+│   │   ├── meta
+│   │   │   ├── lineByLineReview:: Y
+│   │   │   ├── lineByLineProgress:: {"childUid": {...}}
+│   │   │   └── nextDueDate:: [[Date]]
 │   │   ├── [[Date]] 🟢        ← session heading (emoji = grade)
 │   │   │   ├── nextDueDate:: [[Date]]
 │   │   │   ├── grade:: 5

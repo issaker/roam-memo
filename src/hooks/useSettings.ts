@@ -19,6 +19,7 @@ export type Settings = {
   shuffleCards: boolean;
   forgotReinsertOffset: number;
   showBreadcrumbs: boolean;
+  showModeBorders: boolean;
 };
 
 export const defaultSettings: Settings = {
@@ -29,6 +30,7 @@ export const defaultSettings: Settings = {
   shuffleCards: false,
   forgotReinsertOffset: 3,
   showBreadcrumbs: false,
+  showModeBorders: true,
 };
 
 const SETTING_TYPES = {
@@ -36,6 +38,7 @@ const SETTING_TYPES = {
   rtlEnabled: 'boolean',
   shuffleCards: 'boolean',
   showBreadcrumbs: 'boolean',
+  showModeBorders: 'boolean',
 } as const;
 
 const coerceSettingValue = (key: string, value: any): any => {
@@ -78,6 +81,9 @@ const useSettings = () => {
     }
     if (!('showBreadcrumbs' in allSettings)) {
       window.roamMemo.extensionAPI.settings.set('showBreadcrumbs', defaultSettings.showBreadcrumbs);
+    }
+    if (!('showModeBorders' in allSettings)) {
+      window.roamMemo.extensionAPI.settings.set('showModeBorders', defaultSettings.showModeBorders);
     }
 
     const filteredSettings = coerceAllSettings(allSettings);

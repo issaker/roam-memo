@@ -62,11 +62,49 @@ export const getResolvedCardData = ({
   for (let i = sessions.length - 1; i >= 0; i--) {
     const data = sessions[i];
     if (data.reviewMode === reviewMode) {
-      return data;
+      return resolveLineByLineData(data, sessions);
     }
   }
 
-  return generateNewSession({ reviewMode });
+  return resolveLineByLineData(generateNewSession({ reviewMode }), sessions);
+};
+
+/**
+ * Line-by-line metadata is card-scoped, not review-mode-scoped.
+ * Carry it forward when resolving a different mode or synthesising a new session
+ * so the current card keeps its LBL identity across mode switches.
+ */
+export const resolveLineByLineData = <T extends Session | NewSession>(
+  session: T,
+  sessions: Session[]
+): T => {
+  if (!session) return session;
+
+  const resolved = { ...session };
+
+  for (let i = sessions.length - 1; i >= 0; i--) {
+    const historicalSession = sessions[i];
+
+    if (resolved.lineByLineReview === undefined && historicalSession.lineByLineReview !== undefined) {
+      resolved.lineByLineReview = historicalSession.lineByLineReview;
+    }
+
+    if (
+      resolved.lineByLineProgress === undefined &&
+      historicalSession.lineByLineProgress !== undefined
+    ) {
+      resolved.lineByLineProgress = historicalSession.lineByLineProgress;
+    }
+
+    if (
+      resolved.lineByLineReview !== undefined &&
+      resolved.lineByLineProgress !== undefined
+    ) {
+      break;
+    }
+  }
+
+  return resolved;
 };
 
 /**
@@ -149,25 +187,7 @@ export const resolveModeSpecificData = (
     }
   }
 
-  if (resolved.lineByLineReview === undefined) {
-    for (let i = sessions.length - 1; i >= 0; i--) {
-      if (sessions[i].lineByLineReview !== undefined) {
-        resolved.lineByLineReview = sessions[i].lineByLineReview;
-        break;
-      }
-    }
-  }
-
-  if (resolved.lineByLineReview === 'Y' && resolved.lineByLineProgress === undefined) {
-    for (let i = sessions.length - 1; i >= 0; i--) {
-      if (sessions[i].lineByLineProgress !== undefined) {
-        resolved.lineByLineProgress = sessions[i].lineByLineProgress;
-        break;
-      }
-    }
-  }
-
-  return resolved;
+  return resolveLineByLineData(resolved, sessions);
 };
 
 export default function useCurrentCardData({
@@ -288,8 +308,9 @@ export default function useCurrentCardData({
         // This happens when user deletes card history on Data Page.
         // Generate a fresh session to reflect the reset state.
         if (!liveSession || !('reviewMode' in liveSession)) {
-          const currentReviewMode = reviewModeRef.current || ReviewModes.DefaultSpacedInterval;
-          const newSession = generateNewSession({ reviewMode: currentReviewMode });
+          // If the user deleted all data for the current card, fall back to the
+          // product default reading mode instead of inheriting the stale mode.
+          const newSession = generateNewSession({ reviewMode: ReviewModes.FixedInterval });
           if (isSessionDataChanged(prevCardDataRef.current, newSession)) {
             setCurrentCardData(newSession);
             setReviewMode(newSession.reviewMode);

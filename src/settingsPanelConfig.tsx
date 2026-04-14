@@ -116,6 +116,18 @@ const settingsPanelConfig = ({ settings, setSettings }) => {
           },
         },
       },
+      {
+        id: 'showModeBorders',
+        name: 'Show Review Mode Borders',
+        description:
+          'Show the green/orange dialog border that indicates whether the current card is in Spaced Interval or Fixed Interval mode.',
+        action: {
+          type: 'switch',
+          onChange: (e) => {
+            processChange({ key: 'showModeBorders', value: e.target.checked });
+          },
+        },
+      },
     ],
   };
 };

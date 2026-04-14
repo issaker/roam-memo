@@ -61,7 +61,8 @@ export const generatePracticeData = ({
   reviewMode,
   ...props
 }: Session): PracticeDataResult => {
-  const shared = { reviewMode };
+  const { lineByLineReview, lineByLineProgress } = props;
+  const shared = { reviewMode, lineByLineReview, lineByLineProgress };
 
   if (reviewMode === ReviewModes.FixedInterval) {
     const { intervalMultiplier, intervalMultiplierType, progressiveRepetitions } = props;
@@ -151,6 +152,8 @@ const practice = async (practiceProps: PracticeProps, isDryRun = false) => {
     intervalMultiplierType,
     progressiveRepetitions,
     reviewMode,
+    lineByLineReview,
+    lineByLineProgress,
   } = practiceProps;
 
   // nextDueDateFromNow is display-only, not persisted
@@ -165,6 +168,8 @@ const practice = async (practiceProps: PracticeProps, isDryRun = false) => {
     intervalMultiplier,
     intervalMultiplierType,
     progressiveRepetitions,
+    lineByLineReview,
+    lineByLineProgress,
   });
 
   if (!isDryRun && !isCramming) {

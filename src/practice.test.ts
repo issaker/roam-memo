@@ -1,4 +1,5 @@
 import * as practice from '~/practice';
+import { ReviewModes } from '~/models/session';
 
 describe('supermemo: simulate practice', () => {
   let initInput;
@@ -106,6 +107,24 @@ describe('supermemo: simulate practice', () => {
     test('Grade 4 should be relative to Grade 5', () => {
       expect(result4.efactor).toBeLessThan(result5.efactor);
       expect(result4.interval).toBeLessThan(result5.interval);
+    });
+  });
+
+  describe('Line-by-line metadata', () => {
+    test('generatePracticeData preserves card-scoped line-by-line fields', () => {
+      const result = practice.generatePracticeData({
+        dateCreated: new Date('2026-04-14T00:00:00.000Z'),
+        reviewMode: ReviewModes.DefaultSpacedInterval,
+        grade: 5,
+        interval: 0,
+        repetitions: 0,
+        eFactor: 2.5,
+        lineByLineReview: 'Y',
+        lineByLineProgress: '{"child-1":{"interval":1}}',
+      });
+
+      expect(result.lineByLineReview).toBe('Y');
+      expect(result.lineByLineProgress).toBe('{"child-1":{"interval":1}}');
     });
   });
 });

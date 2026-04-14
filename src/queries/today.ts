@@ -72,6 +72,7 @@ export const calculateCompletedTodayCounts = async ({ today, tagsList, sessionDa
     Object.keys(currentTagSessionData).forEach((cardUid) => {
       const cardData = currentTagSessionData[cardUid];
       const latestSession = cardData[cardData.length - 1];
+      if (latestSession?.isNew) return;
       const isCompletedToday =
         latestSession && dateUtils.isSameDay(latestSession.dateCreated, new Date());
 
@@ -154,9 +155,18 @@ export const addNewCards = ({
     const newCardsUids: RecordUid[] = [];
 
     allSelectedTagCardsUids.forEach((referenceId) => {
-      if (!pluginPageData[referenceId] || !pluginPageData[referenceId].length) {
+      const latestSession = pluginPageData[referenceId]?.[
+        pluginPageData[referenceId].length - 1
+      ] as Session & { isNew?: boolean };
+      if (
+        !pluginPageData[referenceId] ||
+        !pluginPageData[referenceId].length ||
+        (latestSession?.isNew && !latestSession?.nextDueDate)
+      ) {
         newCardsUids.push(referenceId);
-        pluginPageData[referenceId] = [generateNewSession()];
+        if (!pluginPageData[referenceId] || !pluginPageData[referenceId].length) {
+          pluginPageData[referenceId] = [generateNewSession()];
+        }
       }
     });
 

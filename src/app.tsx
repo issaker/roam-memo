@@ -23,22 +23,26 @@ import useOnBlockInteract from '~/hooks/useOnBlockInteract';
 import useCommandPaletteAction from '~/hooks/useCommandPaletteAction';
 import useCachedData from '~/hooks/useCachedData';
 import useOnVisibilityStateChange from '~/hooks/useOnVisibilityStateChange';
-import { IntervalMultiplierType, ReviewModes } from '~/models/session';
+import { Session } from '~/models/session';
 import { RenderMode } from '~/models/practice';
 
-export interface handlePracticeProps {
+export type handlePracticeProps = Session & {
   refUid: string;
-  grade: number;
-  reviewMode: ReviewModes;
-  intervalMultiplier: number;
-  intervalMultiplierType: IntervalMultiplierType;
-}
+};
 
 const App = () => {
   const [showPracticeOverlay, setShowPracticeOverlay] = React.useState(false);
   const [isCramming, setIsCramming] = React.useState(false);
 
-  const { tagsListString, dataPageTitle, dailyLimit, rtlEnabled, shuffleCards, forgotReinsertOffset } = useSettings();
+  const {
+    tagsListString,
+    dataPageTitle,
+    dailyLimit,
+    rtlEnabled,
+    shuffleCards,
+    forgotReinsertOffset,
+    showModeBorders,
+  } = useSettings();
   const { selectedTag, setSelectedTag, tagsList } = useTags({ tagsListString });
 
   const { fetchCacheData, saveCacheData, data: cachedData } = useCachedData({ dataPageTitle });
@@ -156,6 +160,7 @@ const App = () => {
             today={today}
             forgotReinsertOffset={forgotReinsertOffset}
             dataPageTitle={dataPageTitle}
+            showModeBorders={showModeBorders}
           />
         )}
       </>

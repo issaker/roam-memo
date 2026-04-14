@@ -60,6 +60,7 @@ interface Props {
   setRenderMode: (tag: string, mode: RenderMode) => void;
   forgotReinsertOffset: number;
   dataPageTitle: string;
+  showModeBorders: boolean;
 }
 
 const PracticeOverlay = ({
@@ -78,6 +79,7 @@ const PracticeOverlay = ({
   setRenderMode,
   forgotReinsertOffset,
   dataPageTitle,
+  showModeBorders,
 }: Props) => {
   const todaySelectedTag = today.tags[selectedTag];
   
@@ -183,15 +185,25 @@ const PracticeOverlay = ({
   const shouldShowAnswerFirst =
     renderMode === RenderMode.AnswerFirst && hasBlockChildrenUids && !showAnswers;
 
-  const [lineByLineLocalOverride, setLineByLineLocalOverride] = React.useState<string | undefined>(undefined);
+  const [lineByLineLocalOverride, setLineByLineLocalOverride] = React.useState<string | undefined>(
+    undefined
+  );
 
   React.useEffect(() => {
     setLineByLineLocalOverride(undefined);
   }, [currentCardRefUid]);
 
-  const isLineByLine = (lineByLineLocalOverride !== undefined
-    ? lineByLineLocalOverride === 'Y'
-    : currentCardData?.lineByLineReview === 'Y') && hasBlockChildrenUids;
+  const lineByLineChecked =
+    lineByLineLocalOverride !== undefined
+      ? lineByLineLocalOverride === 'Y'
+      : currentCardData?.lineByLineReview === 'Y';
+
+  // LBL remains a card-level flag, but the actual line-by-line interaction
+  // only runs in Spaced mode. Fixed mode stays a fully expanded reading card.
+  const isLineByLine =
+    lineByLineChecked &&
+    reviewMode === ReviewModes.DefaultSpacedInterval &&
+    hasBlockChildrenUids;
 
   const parseLineByLineProgress = (progressStr?: string): LineByLineProgressMap => {
     if (!progressStr) return {};
@@ -266,11 +278,31 @@ const PracticeOverlay = ({
       });
 
       const nextIndex = lineByLineCurrentChildIndex + 1;
+      const isCardFinished = nextIndex >= childUidsList.length;
+
+      if (isCardFinished) {
+        // Line-by-line review is still a normal card in the session queue.
+        // After the final due child is graded, advance to the next card instead
+        // of leaving the user on a terminal "done" footer for the same card.
+        setCurrentIndex((prev) => prev + 1);
+        setLineByLineCurrentChildIndex(nextIndex);
+        setLineByLineRevealedCount(nextIndex);
+        setShowAnswers(false);
+        return;
+      }
+
       setLineByLineCurrentChildIndex(nextIndex);
       setLineByLineRevealedCount(nextIndex);
       setShowAnswers(false);
     },
-    [currentCardRefUid, lineByLineCurrentChildIndex, childUidsList, lineByLineProgress, dataPageTitle]
+    [
+      currentCardRefUid,
+      lineByLineCurrentChildIndex,
+      childUidsList,
+      lineByLineProgress,
+      dataPageTitle,
+      setCurrentIndex,
+    ]
   );
 
   const onLineByLineShowAnswer = React.useCallback(() => {
@@ -281,8 +313,7 @@ const PracticeOverlay = ({
   const onToggleLineByLine = React.useCallback(
     async (enabled: boolean) => {
       if (!currentCardRefUid) return;
-      const flagValue = enabled ? 'Y' : 'N';
-      setLineByLineLocalOverride(flagValue);
+      setLineByLineLocalOverride(enabled ? 'Y' : 'N');
       await updateLineByLineFlag({
         refUid: currentCardRefUid,
         dataPageTitle,
@@ -301,6 +332,7 @@ const PracticeOverlay = ({
     shuffleCards: false,
     forgotReinsertOffset: 3,
     showBreadcrumbs: false,
+    showModeBorders: true,
   });
 
   // Load settings from page on mount and sync with extensionAPI
@@ -323,14 +355,15 @@ const PracticeOverlay = ({
 
   // Reset showAnswers state
   React.useEffect(() => {
-    if (!isRendered) return; // Wait for rendering to complete
-    
-    if (hasBlockChildren || hasCloze) {
+    if (isLineByLine || reviewMode === ReviewModes.FixedInterval) {
+      // Fixed Interval is a reading mode, so cards should open expanded by default.
+      setShowAnswers(true);
+    } else if (hasBlockChildren || hasCloze) {
       setShowAnswers(false);
     } else {
       setShowAnswers(true);
     }
-  }, [hasBlockChildren, hasCloze, isRendered]);
+  }, [hasBlockChildren, hasCloze, isLineByLine, reviewMode, currentCardRefUid]);
 
   // Reset render flag when card changes
   React.useEffect(() => {
@@ -546,6 +579,7 @@ const PracticeOverlay = ({
       <Dialog
         $isEditing={isEditing}
         $reviewMode={reviewMode}
+        $showModeBorders={showModeBorders}
         isOpen={isOpen}
         onClose={onCloseCallback}
         className="pb-0"
@@ -566,7 +600,7 @@ const PracticeOverlay = ({
           reviewMode={reviewMode}
           isLineByLine={isLineByLine}
           hasBlockChildren={hasBlockChildren}
-          lineByLineChecked={lineByLineLocalOverride !== undefined ? lineByLineLocalOverride === 'Y' : currentCardData?.lineByLineReview === 'Y'}
+          lineByLineChecked={lineByLineChecked}
           onToggleLineByLine={onToggleLineByLine}
           lineByLineCurrentIndex={isLineByLine ? lineByLineCurrentChildIndex + 1 : 0}
           lineByLineTotal={childUidsList.length}
@@ -789,6 +823,24 @@ const PracticeOverlay = ({
               Show breadcrumb navigation above each card during review. You can also toggle this with the B key.
             </p>
           </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                className="bp3-checkbox"
+                checked={localSettings.showModeBorders}
+                onChange={(e) =>
+                  setLocalSettings({ ...localSettings, showModeBorders: e.target.checked })
+                }
+                style={{ marginRight: '8px' }}
+              />
+              <span>Show Review Mode Borders</span>
+            </label>
+            <p style={{ fontSize: '12px', color: colors.textMuted, margin: '5px 0 0 0' }}>
+              Show the green/orange dialog border that marks the current card&apos;s review mode.
+            </p>
+          </div>
         </div>
 
         <div className="bp3-dialog-footer">
@@ -797,6 +849,12 @@ const PracticeOverlay = ({
               className="bp3-button bp3-intent-primary"
               onClick={async () => {
                 await saveSettingsToPage(localSettings.dataPageTitle, localSettings);
+                if (window.roamMemo?.extensionAPI?.settings) {
+                  Object.entries(localSettings).forEach(([key, value]) => {
+                    window.roamMemo.extensionAPI.settings.set(key, value);
+                  });
+                }
+                window.dispatchEvent(new Event('roamMemoSettingsChanged'));
                 setShowSettings(false);
               }}
             >
@@ -817,7 +875,11 @@ const PracticeOverlay = ({
   );
 };
 
-const Dialog = styled(Blueprint.Dialog)<{ $isEditing?: boolean; $reviewMode?: ReviewModes }>`
+const Dialog = styled(Blueprint.Dialog)<{
+  $isEditing?: boolean;
+  $reviewMode?: ReviewModes;
+  $showModeBorders?: boolean;
+}>`
   display: grid;
   grid-template-rows: 50px 1fr auto;
   max-height: 80vh;
@@ -831,6 +893,14 @@ const Dialog = styled(Blueprint.Dialog)<{ $isEditing?: boolean; $reviewMode?: Re
       : $reviewMode === ReviewModes.FixedInterval
         ? colors.modeFixed
         : colors.borderSubtle};
+  border-color: ${({ $showModeBorders, $reviewMode }) =>
+    $showModeBorders === false
+      ? colors.borderSubtle
+      : $reviewMode === ReviewModes.DefaultSpacedInterval
+        ? colors.modeSpaced
+        : $reviewMode === ReviewModes.FixedInterval
+          ? colors.modeFixed
+          : colors.borderSubtle};
 
   ${mediaQueries.lg} {
     width: 80vw;
@@ -919,7 +989,11 @@ const LineByLineSeparator = styled.div`
 
 const LineByLineItem = styled.div<{ $isCurrent: boolean; $isMastered: boolean }>`
   border-left: 3px solid ${(props) =>
-    props.$isCurrent ? colors.modeSpaced : props.$isMastered ? 'rgba(128, 128, 128, 0.15)' : colors.borderSubtle};
+    props.$isCurrent
+      ? colors.lineByLineCurrentBorder
+      : props.$isMastered
+        ? colors.lineByLineMasteredBorder
+        : colors.borderSubtle};
   padding-left: 8px;
   margin-left: 4px;
   margin-top: 4px;

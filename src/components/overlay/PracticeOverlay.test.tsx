@@ -171,10 +171,6 @@ describe('PracticeOverlay', () => {
       testUtils.actions.launchModal();
     });
 
-    await act(async () => {
-      await testUtils.actions.clickControlButton('Show Answer');
-    });
-
     // Switch to spaced interval mode
     await act(async () => {
       await testUtils.actions.clickSwitchReviewModeButton();
@@ -189,5 +185,56 @@ describe('PracticeOverlay', () => {
     });
     expectDateCloseTo(result.updatedRecord.dateCreated, new Date());
     expectDateCloseTo(result.updatedRecord.nextDueDate, dateUtils.addDays(new Date(), 1));
+  });
+
+  it('Fixed Interval cards are expanded immediately without Show Answer', async () => {
+    const mockBuilder = new testUtils.MockDataBuilder();
+    const dueCard1 = 'id_due_fixed_1';
+
+    mockBuilder.withCard({ uid: dueCard1 }).withSession(dueCard1, {
+      reviewMode: ReviewModes.FixedInterval,
+      grade: 1,
+      dateCreated: dateUtils.subtractDays(new Date(), 1),
+      nextDueDate: new Date(),
+    });
+
+    mockBuilder.mockQueryResults();
+    await act(async () => {
+      render(<App />);
+    });
+
+    await act(async () => {
+      testUtils.actions.launchModal();
+    });
+
+    expect(screen.queryByText('Show Answer')).not.toBeInTheDocument();
+    expect(screen.getByText('Next')).toBeInTheDocument();
+  });
+
+  it('Fixed Interval cards keep expanded reading behavior even when LBL is checked', async () => {
+    const mockBuilder = new testUtils.MockDataBuilder();
+    const dueCard1 = 'id_due_fixed_lbl';
+
+    mockBuilder.withCard({ uid: dueCard1 }).withSession(dueCard1, {
+      reviewMode: ReviewModes.FixedInterval,
+      lineByLineReview: 'Y',
+      lineByLineProgress: JSON.stringify({}),
+      grade: 1,
+      dateCreated: dateUtils.subtractDays(new Date(), 1),
+      nextDueDate: new Date(),
+    });
+
+    mockBuilder.mockQueryResults();
+    await act(async () => {
+      render(<App />);
+    });
+
+    await act(async () => {
+      testUtils.actions.launchModal();
+    });
+
+    expect(screen.queryByText('Show Answer')).not.toBeInTheDocument();
+    expect(screen.getByText('Next')).toBeInTheDocument();
+    expect(screen.queryByText(/Line 1 \//)).not.toBeInTheDocument();
   });
 });

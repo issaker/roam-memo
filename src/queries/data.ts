@@ -7,6 +7,10 @@
  *   roam/memo (page)
  *   ├── data (heading block)
  *   │   ├── ((cardUid1))
+ *   │   │   ├── meta
+ *   │   │   │   ├── lineByLineReview:: Y
+ *   │   │   │   ├── lineByLineProgress:: {...}
+ *   │   │   │   └── nextDueDate:: [[Date]]
  *   │   │   ├── [[Date]] 🟢  (session heading, emoji = grade)
  *   │   │   │   ├── nextDueDate:: [[Date]]
  *   │   │   │   ├── grade:: 5
@@ -36,7 +40,9 @@ import {
   initializeToday,
   restoreCompletedUids,
 } from '~/queries/today';
-import { getChildBlocksOnPage } from './utils';
+import { generateNewSession, getChildBlocksOnPage } from './utils';
+
+const CARD_META_BLOCK_NAME = 'meta';
 
 export const getPracticeData = async ({
   tagsList,
@@ -133,8 +139,14 @@ const ensureReviewModeField = (record) => {
   return { ...record, children };
 };
 
-const parseFieldValues = (object, node) => {
-  for (const field of ensureReviewModeField(node).children) {
+const parseFieldValuesFromChildren = (
+  object,
+  children,
+  { ensureReviewMode = false }: { ensureReviewMode?: boolean } = {}
+) => {
+  const fieldSource = ensureReviewMode ? ensureReviewModeField({ children }).children : children;
+
+  for (const field of fieldSource) {
     const [key, value] = parseConfigString(field.string);
 
     if (key === 'nextDueDate') {
@@ -149,20 +161,52 @@ const parseFieldValues = (object, node) => {
   }
 };
 
+const isSessionHeadingBlock = (child) => {
+  if (!child?.string) return false;
+  const headingDateString = getStringBetween(child.string, '[[', ']]');
+  return !!parseRoamDateString(headingDateString);
+};
+
+const isCardMetaBlock = (child) => child?.string === CARD_META_BLOCK_NAME;
+
+const getCardScopedFields = (children: any[] = []) => {
+  const cardScopedFields = {};
+  const cardMetaBlock = children.find(isCardMetaBlock) as { children?: any[] } | undefined;
+  const legacyCardMetadataBlocks = children.filter(
+    (child) => !isSessionHeadingBlock(child) && !isCardMetaBlock(child)
+  );
+  const cardMetadataBlocks = cardMetaBlock?.children || legacyCardMetadataBlocks;
+
+  if (cardMetadataBlocks.length) {
+    parseFieldValuesFromChildren(cardScopedFields, cardMetadataBlocks);
+  }
+
+  return cardScopedFields;
+};
+
 const mapPluginPageDataLatest = (queryResultsData): Records =>
   queryResultsData
     .map((arr) => arr[0])[0]
     .children?.reduce((acc, cur) => {
       const uid = getStringBetween(cur.string, '((', '))');
+      const sessionChildren = cur.children?.filter(isSessionHeadingBlock) || [];
+      const cardScopedFields = getCardScopedFields(cur.children);
+
+      if (!sessionChildren.length) {
+        acc[uid] = {
+          ...generateNewSession(),
+          ...cardScopedFields,
+        };
+        return acc;
+      }
+
+      const latestChild = sessionChildren.find((child) => child.order === 0);
       acc[uid] = {};
-
-      if (!cur.children) return acc;
-
-      const latestChild = cur.children.find((child) => child.order === 0);
       acc[uid].dateCreated = parseRoamDateString(getStringBetween(latestChild.string, '[[', ']]'));
 
       if (!latestChild.children) return acc;
-      parseFieldValues(acc[uid], latestChild);
+      parseFieldValuesFromChildren(acc[uid], latestChild.children, { ensureReviewMode: true });
+      Object.assign(acc[uid], cardScopedFields);
 
       return acc;
     }, {}) || {};
@@ -172,22 +216,32 @@ const mapPluginPageData = (queryResultsData): CompleteRecords =>
     .map((arr) => arr[0])[0]
     .children?.reduce((acc, cur) => {
       const uid = getStringBetween(cur.string, '((', '))');
+      const sessionChildren = cur.children?.filter(isSessionHeadingBlock) || [];
+      const cardScopedFields = getCardScopedFields(cur.children);
       acc[uid] = [];
 
-      if (!cur.children) return acc;
+      if (!sessionChildren.length) {
+        acc[uid].push({
+          ...generateNewSession(),
+          ...cardScopedFields,
+        });
+        return acc;
+      }
 
-      for (const child of cur.children) {
+      for (const child of sessionChildren) {
         const record = {
           refUid: uid,
           dateCreated: parseRoamDateString(getStringBetween(child.string, '[[', ']]')),
         };
 
         if (!child.children) {
+          Object.assign(record, cardScopedFields);
           acc[uid].push(record);
           continue;
         }
 
-        parseFieldValues(record, child);
+        parseFieldValuesFromChildren(record, child.children, { ensureReviewMode: true });
+        Object.assign(record, cardScopedFields);
         acc[uid].push(record);
       }
 

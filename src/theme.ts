@@ -42,4 +42,8 @@ export const colors = {
   // Card mode indicator colors (aligned with intent colors for visual consistency)
   modeSpaced: 'var(--roam-success-color, #56d364)',
   modeFixed: 'var(--roam-warning-color, #d29922)',
+
+  // Line-by-line review accents
+  lineByLineCurrentBorder: 'var(--roam-success-color, #56d364)',
+  lineByLineMasteredBorder: 'rgba(128, 128, 128, 0.15)',
 };

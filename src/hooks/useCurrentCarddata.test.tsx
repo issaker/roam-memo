@@ -9,6 +9,8 @@ describe('useCurrentCardData', () => {
   const originalLocation = window;
 
   afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
     Object.defineProperty(globalThis, 'window', {
       value: originalLocation,
     });
@@ -178,6 +180,35 @@ describe('useCurrentCardData', () => {
         reviewMode: ReviewModes.DefaultSpacedInterval,
         grade: 2,
         isNew: false,
+      });
+    });
+
+    it('Preserves line-by-line metadata when switching review modes', async () => {
+      const currentCardRefUid = 'id_lbl';
+
+      const mockBuilder = new testUtils.MockDataBuilder()
+        .withCard({ uid: currentCardRefUid })
+        .withSession(currentCardRefUid, {
+          reviewMode: ReviewModes.FixedInterval,
+          lineByLineReview: 'Y',
+          lineByLineProgress: '{"child-1":{"interval":1}}',
+        });
+
+      mockBuilder.mockQueryResults();
+      const { practiceData } = await mockBuilder.getPracticeData();
+
+      const { result } = renderHook(() =>
+        useCurrentCardData({ sessions: practiceData[currentCardRefUid], currentCardRefUid })
+      );
+
+      act(() => {
+        result.current.setReviewModeOverride(ReviewModes.DefaultSpacedInterval);
+      });
+
+      expect(result.current.currentCardData).toMatchObject({
+        reviewMode: ReviewModes.DefaultSpacedInterval,
+        lineByLineReview: 'Y',
+        lineByLineProgress: '{"child-1":{"interval":1}}',
       });
     });
 
@@ -523,5 +554,6 @@ describe('useCurrentCardData', () => {
         IntervalMultiplierType.Days
       );
     });
+
   });
 });

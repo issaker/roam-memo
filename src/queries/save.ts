@@ -9,6 +9,9 @@ import {
   getOrCreatePage,
 } from '~/queries/utils';
 
+const CARD_META_BLOCK_NAME = 'meta';
+const CARD_META_SESSION_KEYS = new Set(['lineByLineReview', 'lineByLineProgress']);
+
 const getEmojiFromGrade = (grade) => {
   switch (grade) {
     case 5:
@@ -24,6 +27,56 @@ const getEmojiFromGrade = (grade) => {
     default:
       return '🟢';
   }
+};
+
+const getLatestSessionUid = (cardDataBlockUid: string) => {
+  const sessionHeadingQuery = `
+    [:find ?childUid ?childOrder
+     :where
+     [?parent :block/uid "${cardDataBlockUid}"]
+     [?child :block/parents ?parent]
+     [?child :block/uid ?childUid]
+     [?child :block/order ?childOrder]
+     [?child :block/string ?childString]
+     [(clojure.string/starts-with? ?childString "[[")]
+    ]
+  `;
+  const sessionHeadings = window.roamAlphaAPI.q(sessionHeadingQuery);
+  if (!sessionHeadings?.length) return;
+
+  sessionHeadings.sort((a, b) => a[1] - b[1]);
+  return sessionHeadings[0][0];
+};
+
+const getOrCreateCardMetaBlock = async (cardDataBlockUid: string) =>
+  getOrCreateChildBlock(cardDataBlockUid, CARD_META_BLOCK_NAME, 0, {
+    open: false,
+  });
+
+const upsertCardMetaField = async ({
+  cardDataBlockUid,
+  key,
+  value,
+}: {
+  cardDataBlockUid: string;
+  key: string;
+  value: string;
+}) => {
+  const cardMetaBlockUid = await getOrCreateCardMetaBlock(cardDataBlockUid);
+  const existingFieldBlockUid = await getChildBlock(cardMetaBlockUid, `${key}::`, {
+    exactMatch: false,
+  });
+
+  if (existingFieldBlockUid) {
+    await window.roamAlphaAPI.updateBlock({
+      block: { uid: existingFieldBlockUid, string: `${key}:: ${value}` },
+    });
+    return;
+  }
+
+  await createChildBlock(cardMetaBlockUid, `${key}:: ${value}`, -1, {
+    open: false,
+  });
 };
 
 export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...data }) => {
@@ -54,6 +107,15 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
   const nextDueDate = data.nextDueDate || dateUtils.addDays(referenceDate, data.interval);
 
   for (const key of Object.keys(data)) {
+    if (CARD_META_SESSION_KEYS.has(key)) {
+      await upsertCardMetaField({
+        cardDataBlockUid,
+        key,
+        value: data[key],
+      });
+      continue;
+    }
+
     let value = data[key];
     if (key === 'nextDueDate') {
       value = `[[${stringUtils.dateToRoamDateString(nextDueDate)}]]`;
@@ -74,6 +136,25 @@ interface RoamBatchAction {
   block?: { uid?: string; string?: string; open?: boolean };
   location?: { 'parent-uid': string; order: number };
 }
+
+const getLatestCardMetaFromSessions = (sessions: CompleteRecords[string] = []) => {
+  const meta = {} as Record<string, string>;
+
+  for (let i = sessions.length - 1; i >= 0; i--) {
+    const session = sessions[i];
+    for (const key of Array.from(CARD_META_SESSION_KEYS)) {
+      if (!(key in meta) && session[key] !== undefined) {
+        meta[key] = session[key];
+      }
+    }
+
+    if (Object.keys(meta).length === CARD_META_SESSION_KEYS.size) {
+      break;
+    }
+  }
+
+  return meta;
+};
 
 export const bulkSavePracticeData = async ({
   token,
@@ -131,6 +212,38 @@ export const bulkSavePracticeData = async ({
 
     // Add sessions
     const sessions = records[refUid];
+    const cardMeta = getLatestCardMetaFromSessions(sessions);
+
+    if (Object.keys(cardMeta).length) {
+      const metaBlockUid = window.roamAlphaAPI.util.generateUID();
+      payload.data.actions.push({
+        action: 'create-block',
+        location: {
+          'parent-uid': entryUid,
+          order: 0,
+        },
+        block: {
+          string: CARD_META_BLOCK_NAME,
+          uid: metaBlockUid,
+          open: false,
+        },
+      });
+
+      for (const [key, value] of Object.entries(cardMeta)) {
+        payload.data.actions.push({
+          action: 'create-block',
+          location: {
+            'parent-uid': metaBlockUid,
+            order: -1,
+          },
+          block: {
+            string: `${key}:: ${value}`,
+            open: false,
+          },
+        });
+      }
+    }
+
     for (const session of sessions) {
       // Add Session Heading
       const dateCreatedRoamDateString = stringUtils.dateToRoamDateString(session.dateCreated);
@@ -151,6 +264,7 @@ export const bulkSavePracticeData = async ({
 
       // Add Session Data
       for (const key of Object.keys(session)) {
+        if (CARD_META_SESSION_KEYS.has(key)) continue;
         let value = session[key];
         if (key === 'dateCreated') continue; // no need to store this
         if (key === 'nextDueDate') {
@@ -205,44 +319,12 @@ export const updateLineByLineProgress = async ({
   const cardDataBlockUid = await getChildBlock(dataBlockUid, `((${refUid}))`);
   if (!cardDataBlockUid) return;
 
-  const sessionHeadingQuery = `
-    [:find ?childUid ?childOrder
-     :where
-     [?parent :block/uid "${cardDataBlockUid}"]
-     [?child :block/parents ?parent]
-     [?child :block/uid ?childUid]
-     [?child :block/order ?childOrder]
-    ]
-  `;
-  let sessionHeadings = window.roamAlphaAPI.q(sessionHeadingQuery);
-
-  if (!sessionHeadings || !sessionHeadings.length) {
-    const dateCreatedRoamDateString = stringUtils.dateToRoamDateString(new Date());
-    await createChildBlock(
-      cardDataBlockUid,
-      `[[${dateCreatedRoamDateString}]] ⚪`,
-      0,
-      { open: false }
-    );
-    sessionHeadings = window.roamAlphaAPI.q(sessionHeadingQuery);
-    if (!sessionHeadings || !sessionHeadings.length) return;
-  }
-
-  sessionHeadings.sort((a, b) => a[1] - b[1]);
-  const latestSessionUid = sessionHeadings[0][0];
-
   const progressString = JSON.stringify(progress);
-  const existingProgressBlockUid = await getChildBlock(latestSessionUid, 'lineByLineProgress::', {
-    exactMatch: false,
+  await upsertCardMetaField({
+    cardDataBlockUid,
+    key: 'lineByLineProgress',
+    value: progressString,
   });
-
-  if (existingProgressBlockUid) {
-    await window.roamAlphaAPI.updateBlock({
-      block: { uid: existingProgressBlockUid, string: `lineByLineProgress:: ${progressString}` },
-    });
-  } else {
-    await createChildBlock(latestSessionUid, `lineByLineProgress:: ${progressString}`, -1);
-  }
 
   const earliestDueDate = Object.values(progress).reduce((earliest, child) => {
     const d = new Date(child.nextDueDate);
@@ -251,14 +333,11 @@ export const updateLineByLineProgress = async ({
 
   if (earliestDueDate) {
     const dueDateString = `[[${stringUtils.dateToRoamDateString(earliestDueDate)}]]`;
-    const existingDueDateBlockUid = await getChildBlock(latestSessionUid, 'nextDueDate::', {
-      exactMatch: false,
+    await upsertCardMetaField({
+      cardDataBlockUid,
+      key: 'nextDueDate',
+      value: dueDateString,
     });
-    if (existingDueDateBlockUid) {
-      await window.roamAlphaAPI.updateBlock({
-        block: { uid: existingDueDateBlockUid, string: `nextDueDate:: ${dueDateString}` },
-      });
-    }
   }
 };
 
@@ -281,42 +360,21 @@ export const updateLineByLineFlag = async ({
     open: false,
   });
 
-  const sessionHeadingQuery = `
-    [:find ?childUid ?childOrder
-     :where
-     [?parent :block/uid "${cardDataBlockUid}"]
-     [?child :block/parents ?parent]
-     [?child :block/uid ?childUid]
-     [?child :block/order ?childOrder]
-    ]
-  `;
-  let sessionHeadings = window.roamAlphaAPI.q(sessionHeadingQuery);
-
-  if (!sessionHeadings || !sessionHeadings.length) {
-    const dateCreatedRoamDateString = stringUtils.dateToRoamDateString(new Date());
-    await createChildBlock(
-      cardDataBlockUid,
-      `[[${dateCreatedRoamDateString}]] ⚪`,
-      0,
-      { open: false }
-    );
-    sessionHeadings = window.roamAlphaAPI.q(sessionHeadingQuery);
-    if (!sessionHeadings || !sessionHeadings.length) return;
-  }
-
-  sessionHeadings.sort((a, b) => a[1] - b[1]);
-  const latestSessionUid = sessionHeadings[0][0];
-
   const flagValue = enabled ? 'Y' : 'N';
-  const existingFlagBlockUid = await getChildBlock(latestSessionUid, 'lineByLineReview::', {
-    exactMatch: false,
+
+  // Card metadata now lives in a dedicated meta block so card-scoped state
+  // is structurally separated from historical review sessions.
+  await upsertCardMetaField({
+    cardDataBlockUid,
+    key: 'lineByLineReview',
+    value: flagValue,
   });
 
-  if (existingFlagBlockUid) {
-    await window.roamAlphaAPI.updateBlock({
-      block: { uid: existingFlagBlockUid, string: `lineByLineReview:: ${flagValue}` },
+  if (enabled && !getLatestSessionUid(cardDataBlockUid)) {
+    await upsertCardMetaField({
+      cardDataBlockUid,
+      key: 'lineByLineProgress',
+      value: JSON.stringify({}),
     });
-  } else {
-    await createChildBlock(latestSessionUid, `lineByLineReview:: ${flagValue}`, -1);
   }
 };

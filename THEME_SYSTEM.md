@@ -36,6 +36,10 @@ export const colors = {
   // 卡片模式指示颜色（与 intent 颜色对齐，用于 ModeBadge 和 Dialog 边框）
   modeSpaced: 'var(--roam-success-color, #56d364)',  // Spaced 模式 = 绿色 = 与 "New" 标签一致
   modeFixed: 'var(--roam-warning-color, #d29922)',    // Fixed 模式 = 橙色 = 与 "Past Due" 标签一致
+
+  // 逐行复习边框颜色
+  lineByLineCurrentBorder: 'var(--roam-success-color, #56d364)',
+  lineByLineMasteredBorder: 'rgba(128, 128, 128, 0.15)',
 };
 
 // Intent 颜色映射（使用 Roam CSS 变量）
@@ -66,7 +70,7 @@ Dialog 边框 (modeSpaced / modeFixed)
 
 ```
 src/
-├── theme.ts              # 唯一的颜色定义文件（含 modeSpaced/modeFixed 模式颜色）
+├── theme.ts              # 唯一的颜色定义文件（含 modeSpaced/modeFixed 与逐行复习边框变量）
 ├── app.tsx               # 主应用（无主题相关逻辑）
 └── components/overlay/
     ├── PracticeOverlay.tsx  # Dialog 继承背景色 + 动态边框颜色（基于 reviewMode）
@@ -87,6 +91,14 @@ src/
 - 零 JS 主题逻辑
 - 只在必要时使用 `!important`（移动端全屏、Blueprint 覆盖）
 - 单一数据源：`theme.ts`
+
+## 2026-04-14 更新摘要
+
+- 逐行复习的当前行高亮和已掌握行边框改为统一复用 `theme.ts` 中的样式变量
+- 新增 `lineByLineCurrentBorder` 与 `lineByLineMasteredBorder` 两个样式变量，分别用于当前行和已掌握行的左侧边框
+- 这次修复没有引入新的主题机制，仍然遵守“能继承就继承，只把功能色放进主题文件”的原则
+- 新增 `Show Review Mode Borders` 设置项，允许关闭模式边框显示；关闭后仍回退到统一的 subtle border，不改变主题继承模型
+- 逐行复习只在 `Spaced Interval Mode` 下激活，因此 `Fixed Interval Mode` 仍保持整卡展开的阅读体验，不新增额外主题分支
 
 ## 常见问题
 
@@ -136,5 +148,5 @@ export const colors = {
 
 ---
 
-**最后更新**: 2026-04-12
+**最后更新**: 2026-04-14
 **简化目标**: 移除过度工程化，保持简单直接

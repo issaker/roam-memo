@@ -111,6 +111,21 @@ export const generateMockRoamAlphaAPI = ({
         result: [[`${dataPageUid}`]],
         shouldReturnPromise: false,
       },
+      {
+        query: `
+    [:find ?block_uid
+    :in $ ?parent_uid ?block_string
+    :where
+      [?parent :block/uid ?parent_uid]
+      [?block :block/parents ?parent]
+      [?block :block/string ?block_string]
+      [?block :block/uid ?block_uid]
+    ]
+  `,
+        args: [`${dataPageUid}`, 'settings'],
+        result: [],
+        shouldReturnPromise: false,
+      },
     ];
 
     const mocks = queryMocks.concat(defaultMocks);
@@ -403,14 +418,39 @@ export const actions = {
   },
   clickControlButton: async (buttonText: string) => {
     const footerActionsElm = screen.getByTestId('footer-actions-wrapper');
-    const showAnswerButton = within(footerActionsElm).getByText(buttonText);
-    const buttonElm = showAnswerButton.closest<HTMLButtonElement>('button');
+    let targetButton = within(footerActionsElm).queryByText(buttonText);
+    if (!targetButton && buttonText !== 'Show Answer') {
+      const showAnswerButton = within(footerActionsElm).queryByText('Show Answer');
+      const showAnswerElm = showAnswerButton?.closest<HTMLButtonElement>('button');
+      showAnswerElm?.click();
+      await new Promise(resolve => setTimeout(resolve, 200));
+      targetButton = within(screen.getByTestId('footer-actions-wrapper')).queryByText(buttonText);
+    }
+
+    if (!targetButton) {
+      throw new Error(`Control button not found: ${buttonText}`);
+    }
+    const buttonElm = targetButton.closest<HTMLButtonElement>('button');
     buttonElm?.click();
     await new Promise(resolve => setTimeout(resolve, 200));
   },
   clickSwitchReviewModeButton: async () => {
-    const footerActionsElm = screen.getByTestId('footer-actions-wrapper');
-    const reviewModeToggleButton = within(footerActionsElm).getByTestId('review-mode-button');
+    let footerActionsElm = screen.getByTestId('footer-actions-wrapper');
+    let reviewModeToggleButton = within(footerActionsElm).queryByTestId('review-mode-button');
+
+    if (!reviewModeToggleButton) {
+      const showAnswerButton = within(footerActionsElm).queryByText('Show Answer');
+      const showAnswerElm = showAnswerButton?.closest<HTMLButtonElement>('button');
+      showAnswerElm?.click();
+      await new Promise(resolve => setTimeout(resolve, 200));
+      footerActionsElm = screen.getByTestId('footer-actions-wrapper');
+      reviewModeToggleButton = within(footerActionsElm).queryByTestId('review-mode-button');
+    }
+
+    if (!reviewModeToggleButton) {
+      throw new Error('Review mode toggle button not found');
+    }
+
     const buttonElm = reviewModeToggleButton.closest<HTMLButtonElement>('button');
     buttonElm?.click();
     await new Promise(resolve => setTimeout(resolve, 200));
