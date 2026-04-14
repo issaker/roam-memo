@@ -1,5 +1,6 @@
 import * as asyncUtils from '~/utils/async';
 import RoamSrImportPanel from '~/components/RoamSrImportPanel';
+import MigrateLegacyDataPanel from '~/components/MigrateLegacyDataPanel';
 import { defaultSettings } from './hooks/useSettings';
 
 const settingsPanelConfig = ({ settings, setSettings }) => {
@@ -36,6 +37,16 @@ const settingsPanelConfig = ({ settings, setSettings }) => {
         action: {
           type: 'reactComponent',
           component: () => <RoamSrImportPanel dataPageTitle={settings.dataPageTitle} />,
+        },
+      },
+      {
+        id: 'migrate-legacy-data',
+        name: 'Migrate Legacy Data (Add cardType)',
+        description:
+          'Add cardType metadata to cards created before v2.1. This ensures proper review mode detection when card history is deleted. Run once after upgrading.',
+        action: {
+          type: 'reactComponent',
+          component: () => <MigrateLegacyDataPanel dataPageTitle={settings.dataPageTitle} />,
         },
       },
       {

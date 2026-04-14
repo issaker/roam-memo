@@ -1,6 +1,6 @@
 import * as stringUtils from '~/utils/string';
 import * as dateUtils from '~/utils/date';
-import { CompleteRecords, LineByLineProgressMap } from '~/models/session';
+import { CardType, CompleteRecords, LineByLineProgressMap } from '~/models/session';
 import {
   createChildBlock,
   getChildBlock,
@@ -9,8 +9,7 @@ import {
   getOrCreatePage,
 } from '~/queries/utils';
 
-const CARD_META_BLOCK_NAME = 'meta';
-const CARD_META_SESSION_KEYS = new Set(['lineByLineReview', 'lineByLineProgress']);
+import { CARD_META_BLOCK_NAME, CARD_META_SESSION_KEYS } from '~/constants';
 
 const getEmojiFromGrade = (grade) => {
   switch (grade) {
@@ -21,6 +20,8 @@ const getEmojiFromGrade = (grade) => {
     case 3:
       return '🟠';
     case 2:
+      return '🟠';
+    case 1:
       return '🟠';
     case 0:
       return '🔴';
@@ -186,7 +187,7 @@ export const bulkSavePracticeData = async ({
   for (const refUid of selectedUids) {
     // Check if entry already exists, if it does, delete it first so we don't
     // have duplicates
-    const existingEntryUid = getChildBlock(dataBlockUid, `((${refUid}))`);
+    const existingEntryUid = await getChildBlock(dataBlockUid, `((${refUid}))`);
     if (existingEntryUid) {
       payload.data.actions.push({
         action: 'delete-block',
@@ -375,6 +376,38 @@ export const updateLineByLineFlag = async ({
       cardDataBlockUid,
       key: 'lineByLineProgress',
       value: JSON.stringify({}),
+    });
+  }
+};
+
+export const updateCardType = async ({
+  refUid,
+  dataPageTitle,
+  cardType,
+  lineByLineReview,
+}: {
+  refUid: string;
+  dataPageTitle: string;
+  cardType: CardType;
+  lineByLineReview?: 'Y' | 'N';
+}) => {
+  await getOrCreatePage(dataPageTitle);
+  const dataBlockUid = await getOrCreateBlockOnPage(dataPageTitle, 'data', -1, {
+    open: false,
+    heading: 3,
+  });
+
+  const cardDataBlockUid = await getOrCreateChildBlock(dataBlockUid, `((${refUid}))`, 0, {
+    open: false,
+  });
+
+  await upsertCardMetaField({ cardDataBlockUid, key: 'cardType', value: cardType });
+
+  if (lineByLineReview !== undefined) {
+    await upsertCardMetaField({
+      cardDataBlockUid,
+      key: 'lineByLineReview',
+      value: lineByLineReview,
     });
   }
 };

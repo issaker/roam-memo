@@ -10,6 +10,15 @@ import { CompleteRecords, RecordUid, Session } from '~/models/session';
 import { CompletionStatus, RenderMode, Today, TodayInitial } from '~/models/practice';
 import { generateNewSession } from '~/queries/utils';
 
+const fisherYatesShuffle = <T>(array: T[]): T[] => {
+  const result = [...array];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+};
+
 export const initializeToday = ({ tagsList, cachedData }) => {
   const today: Today = JSON.parse(JSON.stringify(TodayInitial));
 
@@ -61,7 +70,7 @@ export const calculateTodayStatus = ({ today, tagsList }) => {
   }
 };
 
-export const calculateCompletedTodayCounts = async ({ today, tagsList, sessionData }) => {
+export const calculateCompletedTodayCounts = ({ today, tagsList, sessionData }) => {
   for (const tag of tagsList) {
     let count = 0;
     const completedUids: RecordUid[] = [];
@@ -152,7 +161,7 @@ export const addNewCards = ({
 }) => {
   for (const currentTag of tagsList) {
     const allSelectedTagCardsUids = cardUids[currentTag];
-    const newCardsUids: RecordUid[] = [];
+    let newCardsUids: RecordUid[] = [];
 
     allSelectedTagCardsUids.forEach((referenceId) => {
       const latestSession = pluginPageData[referenceId]?.[
@@ -171,7 +180,7 @@ export const addNewCards = ({
     });
 
     if (shuffleCards) {
-      newCardsUids.sort(() => Math.random() - 0.5);
+      newCardsUids = fisherYatesShuffle(newCardsUids);
     } else {
       newCardsUids.reverse();
     }
@@ -238,10 +247,10 @@ export const getDueCardUids = (currentTagSessionData: CompleteRecords, isCrammin
 export const addDueCards = ({ today, tagsList, sessionData, isCramming, shuffleCards }) => {
   for (const currentTag of tagsList) {
     const currentTagSessionData = sessionData[currentTag];
-    const dueCardsUids = getDueCardUids(currentTagSessionData, isCramming);
+    let dueCardsUids = getDueCardUids(currentTagSessionData, isCramming);
 
     if (shuffleCards) {
-      dueCardsUids.sort(() => Math.random() - 0.5);
+      dueCardsUids = fisherYatesShuffle(dueCardsUids);
     }
 
     today.tags[currentTag] = {

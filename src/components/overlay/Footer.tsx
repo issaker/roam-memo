@@ -1,11 +1,13 @@
 import * as React from 'react';
 import * as Blueprint from '@blueprintjs/core';
+import type { IconName } from '@blueprintjs/core';
+import * as BlueprintSelect from '@blueprintjs/select';
 import styled from '@emotion/styled';
 import * as asyncUtils from '~/utils/async';
 import { generatePracticeData } from '~/practice';
 import Tooltip from '~/components/Tooltip';
 import ButtonTags from '~/components/ButtonTags';
-import { IntervalMultiplierType, ReviewModes } from '~/models/session';
+import { CardType, IntervalMultiplierType, ReviewModes, cardTypeToReviewMode, reviewModeToCardType } from '~/models/session';
 import { MainContext } from '~/components/overlay/PracticeOverlay';
 import { getIntentColor, colors } from '~/theme';
 
@@ -288,25 +290,7 @@ const GradingControlsWrapper = ({
   toggleIntervalEditorOpen,
   onPrevClick,
 }) => {
-  const { reviewMode, setReviewModeOverride } = React.useContext(MainContext);
-
-  const toggleReviewMode = () => {
-    if (setReviewModeOverride === undefined) return;
-
-    setReviewModeOverride((prev: ReviewModes | undefined) => {
-      const isOverrideSet = prev !== undefined;
-
-      if (isOverrideSet) {
-        // If set we clear it
-        return undefined;
-      }
-
-      // Toggle Review Mode
-      return reviewMode === ReviewModes.DefaultSpacedInterval
-        ? ReviewModes.FixedInterval
-        : ReviewModes.DefaultSpacedInterval;
-    });
-  };
+  const { reviewMode, onToggleReviewMode, onSelectCardType, cardMeta, intervalMultiplierType } = React.useContext(MainContext);
 
   const isFixedIntervalMode = reviewMode === ReviewModes.FixedInterval;
   return (
@@ -369,18 +353,11 @@ const GradingControlsWrapper = ({
         />
       )}
       {/* @ts-ignore */}
-      <ControlButton
-        icon={isFixedIntervalMode ? 'calendar' : 'history'}
-        className="text-base font-medium py-1"
-        intent="none"
-        tooltipText={isFixedIntervalMode ? 'Spaced Interval Mode' : 'Fixed Interval Mode'}
-        onClick={() => {
-          activateButtonFn('space-button', toggleReviewMode);
-        }}
-        data-testid="review-mode-button"
-        active={activeButtonKey === 'space-button'}
-        outlined
-      ></ControlButton>
+      <CardTypeSelector
+        cardMeta={cardMeta}
+        intervalMultiplierType={intervalMultiplierType}
+        onSelectCardType={onSelectCardType}
+      />
     </div>
   );
 };
@@ -671,6 +648,139 @@ const ControlButton = ({ tooltipText, wrapperClassName = '', ...props }) => {
     <Tooltip content={tooltipText} placement="top" wrapperClassName={wrapperClassName}>
       <ControlButtonWrapper {...props} />
     </Tooltip>
+  );
+};
+
+interface CardTypeOption {
+  cardType: CardType;
+  intervalMultiplierType?: IntervalMultiplierType;
+  label: string;
+  icon: IconName;
+  group: string;
+}
+
+const CARD_TYPE_OPTIONS: CardTypeOption[] = [
+  { cardType: CardType.SpacedInterval, label: 'Spaced Interval', icon: 'history', group: 'Spaced' },
+  { cardType: CardType.SpacedIntervalLineByLine, label: 'LBL Spaced', icon: 'list', group: 'Spaced' },
+  { cardType: CardType.FixedInterval, intervalMultiplierType: IntervalMultiplierType.Progressive, label: 'Progressive', icon: 'trending-up', group: 'Fixed' },
+  { cardType: CardType.FixedInterval, intervalMultiplierType: IntervalMultiplierType.Days, label: 'Days', icon: 'calendar', group: 'Fixed' },
+  { cardType: CardType.FixedInterval, intervalMultiplierType: IntervalMultiplierType.Weeks, label: 'Weeks', icon: 'calendar', group: 'Fixed' },
+  { cardType: CardType.FixedInterval, intervalMultiplierType: IntervalMultiplierType.Months, label: 'Months', icon: 'calendar', group: 'Fixed' },
+  { cardType: CardType.FixedInterval, intervalMultiplierType: IntervalMultiplierType.Years, label: 'Years', icon: 'calendar', group: 'Fixed' },
+];
+
+const getActiveOption = (cardMeta: import('~/models/session').CardMeta | undefined, intervalMultiplierType: IntervalMultiplierType): CardTypeOption => {
+  const ct = cardMeta?.cardType;
+  if (ct === CardType.SpacedIntervalLineByLine) {
+    return CARD_TYPE_OPTIONS[1];
+  }
+  if (ct === CardType.FixedInterval || ct === undefined) {
+    const imt = intervalMultiplierType || IntervalMultiplierType.Progressive;
+    return CARD_TYPE_OPTIONS.find(o => o.cardType === CardType.FixedInterval && o.intervalMultiplierType === imt) || CARD_TYPE_OPTIONS[2];
+  }
+  return CARD_TYPE_OPTIONS[0];
+};
+
+const CardTypeSelectorItemWrapper = styled.div<{ active: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  position: relative;
+  user-select: none;
+  cursor: pointer;
+  border-radius: 2px;
+  font-size: 13px;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: currentColor;
+    opacity: ${({ active }) => (active ? 0.08 : 0)};
+    border-radius: 2px;
+    pointer-events: none;
+  }
+
+  &:hover::before {
+    opacity: ${({ active }) => (active ? 0.12 : 0.06)};
+  }
+`;
+
+const GroupLabel = styled.div`
+  font-size: 11px;
+  font-weight: 600;
+  color: ${colors.textMuted};
+  padding: 6px 8px 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+`;
+
+const CardTypeSelector = ({
+  cardMeta,
+  intervalMultiplierType,
+  onSelectCardType,
+}: {
+  cardMeta: import('~/models/session').CardMeta | undefined;
+  intervalMultiplierType: IntervalMultiplierType;
+  onSelectCardType: (cardType: CardType, intervalMultiplierType?: IntervalMultiplierType) => void;
+}) => {
+  const activeOption = getActiveOption(cardMeta, intervalMultiplierType);
+
+  const groupedOptions = React.useMemo(() => {
+    const groups: { label: string; options: CardTypeOption[] }[] = [];
+    let currentGroup = '';
+    for (const option of CARD_TYPE_OPTIONS) {
+      if (option.group !== currentGroup) {
+        currentGroup = option.group;
+        groups.push({ label: currentGroup, options: [] });
+      }
+      groups[groups.length - 1].options.push(option);
+    }
+    return groups;
+  }, []);
+
+  return (
+    // @ts-ignore
+    <BlueprintSelect.Select
+      items={CARD_TYPE_OPTIONS}
+      activeItem={activeOption}
+      filterable={false}
+      itemRenderer={(option: CardTypeOption, { handleClick, modifiers }) => {
+        const isActive = option.cardType === activeOption.cardType
+          && option.intervalMultiplierType === activeOption.intervalMultiplierType;
+        return (
+          <CardTypeSelectorItemWrapper
+            active={modifiers.active}
+            key={`${option.cardType}-${option.intervalMultiplierType || 'none'}`}
+            onClick={handleClick}
+            data-testid={`card-type-option-${option.label.toLowerCase().replace(/\s+/g, '-')}`}
+          >
+            <Blueprint.Icon icon={option.icon} iconSize={14} style={{ opacity: isActive ? 1 : 0.6 }} />
+            <span style={{ fontWeight: isActive ? 600 : 400 }}>{option.label}</span>
+            {isActive && <Blueprint.Icon icon="tick" iconSize={12} style={{ marginLeft: 'auto', color: '#0d8050' }} />}
+          </CardTypeSelectorItemWrapper>
+        );
+      }}
+      onItemSelect={(option: CardTypeOption) => {
+        onSelectCardType(option.cardType, option.intervalMultiplierType);
+      }}
+      popoverProps={{ minimal: true }}
+      itemPredicate={(_, option: CardTypeOption) => true}
+    >
+      <Blueprint.Button
+        icon={activeOption.icon}
+        rightIcon="caret-down"
+        minimal
+        data-testid="review-mode-button"
+        style={{ fontSize: '12px' }}
+      >
+        {activeOption.label}
+      </Blueprint.Button>
+    </BlueprintSelect.Select>
   );
 };
 

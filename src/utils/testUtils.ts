@@ -434,25 +434,38 @@ export const actions = {
     buttonElm?.click();
     await new Promise(resolve => setTimeout(resolve, 200));
   },
-  clickSwitchReviewModeButton: async () => {
-    let footerActionsElm = screen.getByTestId('footer-actions-wrapper');
-    let reviewModeToggleButton = within(footerActionsElm).queryByTestId('review-mode-button');
+  clickSwitchReviewModeButton: async (targetLabel?: string) => {
+    const footerActionsElm = screen.getByTestId('footer-actions-wrapper');
+    const reviewModeMenuButton = within(footerActionsElm).queryByTestId('review-mode-button');
 
-    if (!reviewModeToggleButton) {
+    if (!reviewModeMenuButton) {
       const showAnswerButton = within(footerActionsElm).queryByText('Show Answer');
       const showAnswerElm = showAnswerButton?.closest<HTMLButtonElement>('button');
       showAnswerElm?.click();
       await new Promise(resolve => setTimeout(resolve, 200));
-      footerActionsElm = screen.getByTestId('footer-actions-wrapper');
-      reviewModeToggleButton = within(footerActionsElm).queryByTestId('review-mode-button');
     }
 
-    if (!reviewModeToggleButton) {
-      throw new Error('Review mode toggle button not found');
+    const button = screen.getByTestId('review-mode-button');
+    const buttonElm = button.closest<HTMLButtonElement>('button');
+
+    if (buttonElm) {
+      buttonElm.click();
+      await new Promise(resolve => setTimeout(resolve, 50));
     }
 
-    const buttonElm = reviewModeToggleButton.closest<HTMLButtonElement>('button');
-    buttonElm?.click();
+    const targetText = targetLabel || 'Spaced Interval';
+    const popoverElm = document.querySelector('.bp3-popover .bp3-popover-content');
+    if (popoverElm) {
+      const items = Array.from(popoverElm.querySelectorAll('[data-testid^="card-type-option-"]'));
+      for (const item of items) {
+        if (item.textContent?.includes(targetText)) {
+          (item as HTMLElement).click();
+          await new Promise(resolve => setTimeout(resolve, 200));
+          return;
+        }
+      }
+    }
+
     await new Promise(resolve => setTimeout(resolve, 200));
   },
 };

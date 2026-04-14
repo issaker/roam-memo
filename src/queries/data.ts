@@ -29,7 +29,7 @@
  */
 import { getStringBetween, parseConfigString, parseRoamDateString } from '~/utils/string';
 import * as stringUtils from '~/utils/string';
-import { CompleteRecords, Records, RecordUid, ReviewModes } from '~/models/session';
+import { CardType, CompleteRecords, Records, RecordUid, ReviewModes } from '~/models/session';
 import { Today } from '~/models/practice';
 import {
   addDueCards,
@@ -42,7 +42,7 @@ import {
 } from '~/queries/today';
 import { generateNewSession, getChildBlocksOnPage } from './utils';
 
-const CARD_META_BLOCK_NAME = 'meta';
+import { CARD_META_BLOCK_NAME } from '~/constants';
 
 export const getPracticeData = async ({
   tagsList,
@@ -72,7 +72,7 @@ export const getPracticeData = async ({
     cardUids[tag] = currentCardUids;
   }
 
-  await calculateCompletedTodayCounts({ today, tagsList, sessionData });
+  calculateCompletedTodayCounts({ today, tagsList, sessionData });
 
   addNewCards({ today, tagsList, cardUids, pluginPageData, shuffleCards });
   addDueCards({ today, tagsList, sessionData, isCramming, shuffleCards });
@@ -131,14 +131,16 @@ const FIXED_MODE_KEYS = [
   'progressiveRepetitions',
 ] as const;
 
-const inferReviewModeFromFields = (fields: Partial<{ reviewMode: ReviewModes } & Record<string, any>>) => {
+const inferReviewModeFromFields = (fields: Partial<{ reviewMode: ReviewModes; cardType: CardType } & Record<string, any>>) => {
   if (fields.reviewMode) {
     return fields.reviewMode;
   }
 
-  // Legacy or partially-corrupted records may miss reviewMode:: entirely.
-  // Prefer Spaced when SM2 fields exist; otherwise fall back to Fixed only
-  // when the data is empty or clearly uses Fixed-interval fields.
+  if (fields.cardType) {
+    if (fields.cardType === CardType.FixedInterval) return ReviewModes.FixedInterval;
+    return ReviewModes.DefaultSpacedInterval;
+  }
+
   if (SPACED_MODE_KEYS.some((key) => fields[key] !== undefined)) {
     return ReviewModes.DefaultSpacedInterval;
   }

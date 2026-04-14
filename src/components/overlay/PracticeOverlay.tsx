@@ -15,9 +15,10 @@ import { saveSettingsToPage, loadSettingsFromPage } from '~/queries/settings';
 import CardBlock from '~/components/overlay/CardBlock';
 import Footer from '~/components/overlay/Footer';
 import ButtonTags from '~/components/ButtonTags';
-import { CompleteRecords, IntervalMultiplierType, ReviewModes, LineByLineProgressMap } from '~/models/session';
-import useCurrentCardData, { resolveModeSpecificData } from '~/hooks/useCurrentCardData';
-import { generateNewSession, updateLineByLineProgress, updateLineByLineFlag } from '~/queries';
+import { CardType, CompleteRecords, IntervalMultiplierType, ReviewModes, LineByLineProgressMap, reviewModeToCardType } from '~/models/session';
+import useCurrentCardData from '~/hooks/useCurrentCardData';
+import { generateNewSession, updateLineByLineProgress, updateCardType } from '~/queries';
+import MigrateLegacyDataPanel from '~/components/MigrateLegacyDataPanel';
 import { supermemo } from '~/practice';
 import { CompletionStatus, Today, RenderMode } from '~/models/practice';
 import { handlePracticeProps } from '~/app';
@@ -26,7 +27,8 @@ import { colors } from '~/theme';
 
 interface MainContextProps {
   reviewMode: ReviewModes | undefined;
-  setReviewModeOverride: React.Dispatch<React.SetStateAction<ReviewModes | undefined>>;
+  onToggleReviewMode: () => void;
+  onSelectCardType: (cardType: CardType, intervalMultiplierType?: IntervalMultiplierType) => void;
   intervalMultiplier: number;
   setIntervalMultiplier: (multiplier: number) => void;
   intervalMultiplierType: IntervalMultiplierType;
@@ -40,6 +42,7 @@ interface MainContextProps {
   isLineByLine: boolean;
   lineByLineCurrentIndex: number;
   lineByLineTotal: number;
+  cardMeta: import('~/models/session').CardMeta | undefined;
 }
 
 export const MainContext = React.createContext<MainContextProps>({} as MainContextProps);
@@ -100,7 +103,7 @@ const PracticeOverlay = ({
     if (!sessions) return [];
     return sessions;
   }, [currentCardRefUid, practiceData]);
-  const { currentCardData, reviewMode, setReviewModeOverride, latestSession } = useCurrentCardData({
+  const { currentCardData, cardMeta, reviewMode, latestSession, applyOptimisticCardMeta } = useCurrentCardData({
     currentCardRefUid,
     sessions,
     dataPageTitle,
@@ -127,10 +130,7 @@ const PracticeOverlay = ({
   // switching intervalMultiplierType (e.g. Days → Progressive) recovers
   // the correct progressiveRepetitions from earlier sessions instead of
   // treating undefined as 0 and producing wrong intervals.
-  const resolvedCardData = React.useMemo(() => {
-    if (!currentCardData) return currentCardData;
-    return resolveModeSpecificData(currentCardData, sessions, intervalMultiplierType);
-  }, [currentCardData, sessions, intervalMultiplierType]);
+  const resolvedCardData = currentCardData;
 
   const isDone = todaySelectedTag?.status === CompletionStatus.Finished || !currentCardData;
 
@@ -196,10 +196,8 @@ const PracticeOverlay = ({
   const lineByLineChecked =
     lineByLineLocalOverride !== undefined
       ? lineByLineLocalOverride === 'Y'
-      : currentCardData?.lineByLineReview === 'Y';
+      : cardMeta?.lineByLineReview === 'Y';
 
-  // LBL remains a card-level flag, but the actual line-by-line interaction
-  // only runs in Spaced mode. Fixed mode stays a fully expanded reading card.
   const isLineByLine =
     lineByLineChecked &&
     reviewMode === ReviewModes.DefaultSpacedInterval &&
@@ -314,13 +312,18 @@ const PracticeOverlay = ({
     async (enabled: boolean) => {
       if (!currentCardRefUid) return;
       setLineByLineLocalOverride(enabled ? 'Y' : 'N');
-      await updateLineByLineFlag({
+
+      const currentReviewMode = reviewMode || ReviewModes.FixedInterval;
+      const newCardType = reviewModeToCardType(currentReviewMode, enabled);
+
+      await updateCardType({
         refUid: currentCardRefUid,
         dataPageTitle,
-        enabled,
+        cardType: newCardType,
+        lineByLineReview: enabled ? 'Y' : 'N',
       });
     },
-    [currentCardRefUid, dataPageTitle]
+    [currentCardRefUid, dataPageTitle, reviewMode]
   );
 
   // Local settings state for roam/js mode
@@ -383,12 +386,6 @@ const PracticeOverlay = ({
     }
   };
 
-  // When sessions are updated, reset current index
-  React.useEffect(() => {
-    setCurrentIndex(0);
-  }, [practiceData]);
-
-  // When selected tag changes, reset cardQueue and currentIndex
   React.useEffect(() => {
     setCardQueue(initialCardUids);
     setCurrentIndex(0);
@@ -438,12 +435,11 @@ const PracticeOverlay = ({
         });
       }
 
-      setCurrentIndex(currentIndex + 1);
+      setCurrentIndex((prev) => prev + 1);
     },
     [
       handlePracticeClick,
       isDone,
-      currentIndex,
       resolvedCardData,
       intervalMultiplier,
       intervalMultiplierType,
@@ -559,6 +555,50 @@ const PracticeOverlay = ({
     };
   }, [isOpen]);
 
+  const onToggleReviewMode = React.useCallback(async () => {
+    if (!currentCardRefUid) return;
+
+    const newReviewMode = reviewMode === ReviewModes.FixedInterval
+      ? ReviewModes.DefaultSpacedInterval
+      : ReviewModes.FixedInterval;
+    const newCardType = reviewModeToCardType(newReviewMode, lineByLineChecked);
+
+    applyOptimisticCardMeta({
+      ...cardMeta,
+      cardType: newCardType,
+      lineByLineReview: lineByLineChecked ? 'Y' : cardMeta?.lineByLineReview,
+    });
+
+    await updateCardType({
+      refUid: currentCardRefUid,
+      dataPageTitle,
+      cardType: newCardType,
+      lineByLineReview: lineByLineChecked ? 'Y' : undefined,
+    });
+  }, [currentCardRefUid, dataPageTitle, reviewMode, cardMeta, lineByLineChecked, applyOptimisticCardMeta]);
+
+  const onSelectCardType = React.useCallback(async (newCardType: CardType, newIntervalMultiplierType?: IntervalMultiplierType) => {
+    if (!currentCardRefUid) return;
+
+    const isLbl = newCardType === CardType.SpacedIntervalLineByLine;
+    applyOptimisticCardMeta({
+      ...cardMeta,
+      cardType: newCardType,
+      lineByLineReview: isLbl ? 'Y' : cardMeta?.lineByLineReview,
+    });
+
+    if (newIntervalMultiplierType) {
+      setIntervalMultiplierType(newIntervalMultiplierType);
+    }
+
+    await updateCardType({
+      refUid: currentCardRefUid,
+      dataPageTitle,
+      cardType: newCardType,
+      lineByLineReview: isLbl ? 'Y' : undefined,
+    });
+  }, [currentCardRefUid, dataPageTitle, cardMeta, applyOptimisticCardMeta, setIntervalMultiplierType]);
+
   if (!todaySelectedTag) {
     return null;
   }
@@ -567,7 +607,8 @@ const PracticeOverlay = ({
     <MainContext.Provider
       value={{
         reviewMode,
-        setReviewModeOverride,
+        onToggleReviewMode,
+        onSelectCardType,
         intervalMultiplier,
         setIntervalMultiplier,
         intervalMultiplierType,
@@ -581,6 +622,7 @@ const PracticeOverlay = ({
         isLineByLine,
         lineByLineCurrentIndex: isLineByLine ? lineByLineCurrentChildIndex + 1 : 0,
         lineByLineTotal: isLineByLine ? childUidsList.length : 0,
+        cardMeta,
       }}
     >
       <style>{mobileOverlayStyles(isEditing)}</style>
@@ -849,6 +891,14 @@ const PracticeOverlay = ({
             <p style={{ fontSize: '12px', color: colors.textMuted, margin: '5px 0 0 0' }}>
               Show the green/orange dialog border that marks the current card&apos;s review mode.
             </p>
+          </div>
+
+          <div style={{ marginBottom: '20px', borderTop: '1px solid #394b59', paddingTop: '15px' }}>
+            <span style={{ fontSize: '14px', fontWeight: 600 }}>Data Migration</span>
+            <p style={{ fontSize: '12px', color: colors.textMuted, margin: '5px 0 10px 0' }}>
+              Add cardType metadata to cards created before v2.1. Run once after upgrading.
+            </p>
+            <MigrateLegacyDataPanel dataPageTitle={dataPageTitle} />
           </div>
         </div>
 
