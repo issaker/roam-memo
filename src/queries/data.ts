@@ -222,7 +222,9 @@ const mapPluginPageDataLatest = (queryResultsData): Records =>
         return acc;
       }
 
-      const latestChild = sessionChildren.find((child) => child?.order === 0);
+      const latestChild = sessionChildren.reduce((min, cur) =>
+        cur && cur.order < min.order ? cur : min
+      );
       acc[uid] = {};
       acc[uid].dateCreated = latestChild?.string
         ? parseRoamDateString(getStringBetween(latestChild.string, '[[', ']]'))
