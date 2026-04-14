@@ -1,40 +1,51 @@
-/**
- * Session Data Model
- *
- * Represents a single review session for a card.
- * Each card can have multiple sessions (review history).
- *
- * Card-level properties (stored in meta block, not per-session):
- *   - cardType: CardType (FIXED_INTERVAL, SPACED_INTERVAL, SPACED_INTERVAL_LBL)
- *   - lineByLineReview: 'Y' | 'N'
- *   - lineByLineProgress: JSON string
- *
- * Session-level properties (stored per review event):
- *   - SPACED_INTERVAL: grade, repetitions, interval, eFactor
- *   - FIXED_INTERVAL: intervalMultiplier, intervalMultiplierType, progressiveRepetitions
- */
 export enum ReviewModes {
-  FixedInterval = 'FIXED_INTERVAL',
-  DefaultSpacedInterval = 'SPACED_INTERVAL',
-}
-
-export enum CardType {
-  FixedInterval = 'FIXED_INTERVAL',
   SpacedInterval = 'SPACED_INTERVAL',
-  SpacedIntervalLineByLine = 'SPACED_INTERVAL_LBL',
+  SpacedIntervalLBL = 'SPACED_INTERVAL_LBL',
+  FixedProgressive = 'FIXED_PROGRESSIVE',
+  FixedDays = 'FIXED_DAYS',
+  FixedWeeks = 'FIXED_WEEKS',
+  FixedMonths = 'FIXED_MONTHS',
+  FixedYears = 'FIXED_YEARS',
 }
 
-export const cardTypeToReviewMode = (cardType: CardType): ReviewModes => {
-  if (cardType === CardType.FixedInterval) return ReviewModes.FixedInterval;
-  return ReviewModes.DefaultSpacedInterval;
+export const isFixedMode = (mode: ReviewModes | undefined): boolean =>
+  mode === ReviewModes.FixedProgressive ||
+  mode === ReviewModes.FixedDays ||
+  mode === ReviewModes.FixedWeeks ||
+  mode === ReviewModes.FixedMonths ||
+  mode === ReviewModes.FixedYears;
+
+export const isSpacedMode = (mode: ReviewModes | undefined): boolean =>
+  mode === ReviewModes.SpacedInterval || mode === ReviewModes.SpacedIntervalLBL;
+
+export const isLineByLineMode = (mode: ReviewModes | undefined): boolean =>
+  mode === ReviewModes.SpacedIntervalLBL;
+
+export const DEFAULT_REVIEW_MODE = ReviewModes.FixedProgressive;
+
+export const LEGACY_REVIEW_MODE_MAP: Record<string, ReviewModes> = {
+  FIXED_INTERVAL: ReviewModes.FixedProgressive,
+  SPACED_INTERVAL: ReviewModes.SpacedInterval,
 };
 
-export const reviewModeToCardType = (
-  reviewMode: ReviewModes,
-  isLineByLine: boolean
-): CardType => {
-  if (reviewMode === ReviewModes.FixedInterval) return CardType.FixedInterval;
-  return isLineByLine ? CardType.SpacedIntervalLineByLine : CardType.SpacedInterval;
+export const resolveReviewMode = (rawMode: string | undefined, intervalMultiplierType?: string): ReviewModes => {
+  if (!rawMode) return DEFAULT_REVIEW_MODE;
+  if (rawMode in ReviewModes) return rawMode as ReviewModes;
+  if (rawMode in LEGACY_REVIEW_MODE_MAP) {
+    const resolved = LEGACY_REVIEW_MODE_MAP[rawMode];
+    if (resolved === ReviewModes.FixedProgressive && intervalMultiplierType) {
+      const subModeMap: Record<string, ReviewModes> = {
+        Days: ReviewModes.FixedDays,
+        Weeks: ReviewModes.FixedWeeks,
+        Months: ReviewModes.FixedMonths,
+        Years: ReviewModes.FixedYears,
+        Progressive: ReviewModes.FixedProgressive,
+      };
+      return subModeMap[intervalMultiplierType] || resolved;
+    }
+    return resolved;
+  }
+  return DEFAULT_REVIEW_MODE;
 };
 
 interface SessionCommon {
@@ -50,14 +61,13 @@ export type Session = {
   eFactor?: number;
   grade?: number;
   intervalMultiplier?: number;
-  intervalMultiplierType?: IntervalMultiplierType;
   progressiveRepetitions?: number;
   lineByLineReview?: string;
   lineByLineProgress?: string;
 } & SessionCommon;
 
 export interface CardMeta {
-  cardType?: CardType;
+  reviewMode?: ReviewModes;
   lineByLineReview?: 'Y' | 'N';
   lineByLineProgress?: string;
   nextDueDate?: Date;
@@ -79,14 +89,6 @@ export interface NewRecords {
 
 export interface CompleteRecords {
   [key: RecordUid]: Session[];
-}
-
-export enum IntervalMultiplierType {
-  Days = 'Days',
-  Weeks = 'Weeks',
-  Months = 'Months',
-  Years = 'Years',
-  Progressive = 'Progressive',
 }
 
 export interface LineByLineChildData {

@@ -1,4 +1,4 @@
-import { CompleteRecords, IntervalMultiplierType, ReviewModes } from '~/models/session';
+import { CompleteRecords, ReviewModes } from '~/models/session';
 import { generateNewSession } from '~/queries/utils';
 import { getStringBetween, parseRoamDateString } from '~/utils/string';
 
@@ -139,7 +139,6 @@ export const generateRecordsFromRoamSrData = async (
         interval?: number;
         reviewMode?: ReviewModes;
         intervalMultiplier?: number;
-        intervalMultiplierType?: IntervalMultiplierType;
         progressiveRepetitions?: number;
       } = {
         refUid,

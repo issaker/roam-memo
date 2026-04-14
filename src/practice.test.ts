@@ -114,7 +114,7 @@ describe('supermemo: simulate practice', () => {
     test('generatePracticeData preserves card-scoped line-by-line fields', () => {
       const result = practice.generatePracticeData({
         dateCreated: new Date('2026-04-14T00:00:00.000Z'),
-        reviewMode: ReviewModes.DefaultSpacedInterval,
+        reviewMode: ReviewModes.SpacedInterval,
         grade: 5,
         interval: 0,
         repetitions: 0,

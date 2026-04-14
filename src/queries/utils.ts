@@ -10,7 +10,7 @@
  * - createChildBlock: Creates a child block under a parent
  * - generateNewSession: Creates default session data for new cards
  */
-import { NewSession, ReviewModes, IntervalMultiplierType } from '~/models/session';
+import { NewSession, ReviewModes, isSpacedMode, DEFAULT_REVIEW_MODE } from '~/models/session';
 
 export const parentChainInfoQuery = `[
   :find (pull ?parentIds [
@@ -217,11 +217,11 @@ export const getOrCreateChildBlock = async (parent_uid, block, order, blockProps
 };
 
 export const generateNewSession = ({
-  reviewMode = ReviewModes.FixedInterval,
+  reviewMode = DEFAULT_REVIEW_MODE,
   dateCreated = undefined,
   isNew = true,
 } = {}): NewSession => {
-  if (reviewMode === ReviewModes.DefaultSpacedInterval) {
+  if (isSpacedMode(reviewMode)) {
     return {
       dateCreated: dateCreated || new Date(),
       eFactor: 2.5,
@@ -235,7 +235,6 @@ export const generateNewSession = ({
   return {
     dateCreated: dateCreated || new Date(),
     intervalMultiplier: 2,
-    intervalMultiplierType: IntervalMultiplierType.Progressive,
     repetitions: 0,
     progressiveRepetitions: 0,
     isNew,

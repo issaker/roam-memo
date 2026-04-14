@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { ReviewModes, reviewModeToCardType } from '~/models/session';
+import { ReviewModes, resolveReviewMode } from '~/models/session';
 import { getPluginPageData, updateCardType } from '~/queries';
 
 const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) => {
@@ -29,20 +29,24 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
           ? cardData[cardData.length - 1]
           : cardData;
 
-        if ((latestSession as any)?.cardType) {
+        if ((latestSession as any)?.reviewMode && (latestSession as any).reviewMode in ReviewModes) {
           skipped++;
           setProgress({ total, migrated, skipped });
           continue;
         }
 
-        const reviewMode = latestSession?.reviewMode || ReviewModes.FixedInterval;
+        const rawMode = latestSession?.reviewMode;
+        const resolvedMode = resolveReviewMode(rawMode);
         const isLineByLine = latestSession?.lineByLineReview === 'Y';
-        const cardType = reviewModeToCardType(reviewMode, isLineByLine);
+
+        const finalMode = isLineByLine && resolvedMode === ReviewModes.SpacedInterval
+          ? ReviewModes.SpacedIntervalLBL
+          : resolvedMode;
 
         await updateCardType({
           refUid: cardUid,
           dataPageTitle,
-          cardType,
+          reviewMode: finalMode,
           lineByLineReview: isLineByLine ? 'Y' : undefined,
         });
 

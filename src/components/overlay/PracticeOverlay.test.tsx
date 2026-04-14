@@ -128,7 +128,7 @@ describe('PracticeOverlay', () => {
 
     const result = await testUtils.grade('Good', mockBuilder);
     expect(result.updatedRecord).toMatchObject({
-      reviewMode: ReviewModes.DefaultSpacedInterval,
+      reviewMode: ReviewModes.SpacedInterval,
       dataPageTitle: testUtils.dataPageTitle,
       refUid: 'id_due_1',
     });
@@ -145,7 +145,7 @@ describe('PracticeOverlay', () => {
 
     const dueCard1 = 'id_due_1';
     mockBuilder.withCard({ uid: dueCard1 }).withSession(dueCard1, {
-      reviewMode: ReviewModes.FixedInterval,
+      reviewMode: ReviewModes.FixedProgressive,
       grade: 1,
       dateCreated: dateUtils.subtractDays(new Date(), 1),
       nextDueDate: new Date(),
@@ -162,7 +162,7 @@ describe('PracticeOverlay', () => {
 
     const result = await testUtils.grade('Next', mockBuilder);
     expect(result.updatedRecord).toMatchObject({
-      reviewMode: ReviewModes.FixedInterval,
+      reviewMode: ReviewModes.FixedProgressive,
       dataPageTitle: testUtils.dataPageTitle,
       refUid: 'id_due_1',
     });
@@ -173,7 +173,7 @@ describe('PracticeOverlay', () => {
     const dueCard1 = 'id_due_fixed_1';
 
     mockBuilder.withCard({ uid: dueCard1 }).withSession(dueCard1, {
-      reviewMode: ReviewModes.FixedInterval,
+      reviewMode: ReviewModes.FixedProgressive,
       grade: 1,
       dateCreated: dateUtils.subtractDays(new Date(), 1),
       nextDueDate: new Date(),
@@ -197,7 +197,7 @@ describe('PracticeOverlay', () => {
     const dueCard1 = 'id_due_fixed_lbl';
 
     mockBuilder.withCard({ uid: dueCard1 }).withSession(dueCard1, {
-      reviewMode: ReviewModes.FixedInterval,
+      reviewMode: ReviewModes.FixedProgressive,
       lineByLineReview: 'Y',
       lineByLineProgress: JSON.stringify({}),
       grade: 1,

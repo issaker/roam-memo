@@ -167,7 +167,7 @@ describe('getPluginPageData', () => {
     });
 
     expect(result['card-fixed']).toMatchObject({
-      reviewMode: 'FIXED_INTERVAL',
+      reviewMode: 'FIXED_PROGRESSIVE',
     });
   });
 });

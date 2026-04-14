@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react-hooks';
 import useCurrentCardData from './useCurrentCardData';
 import { generateNewSession } from '~/queries';
-import { CardType, ReviewModes } from '~/models/session';
+import { ReviewModes } from '~/models/session';
 import * as testUtils from '~/utils/testUtils';
 import React from 'react';
 
@@ -83,7 +83,7 @@ describe('useCurrentCardData', () => {
   it('polling infers SPACED_INTERVAL from live SM2 fields when reviewMode is missing', async () => {
     const currentCardRefUid = 'card-live-spaced';
     const staleQueueSession = generateNewSession({
-      reviewMode: ReviewModes.FixedInterval,
+      reviewMode: ReviewModes.FixedProgressive,
       isNew: false,
     });
 
@@ -134,22 +134,22 @@ describe('useCurrentCardData', () => {
       })
     );
 
-    expect(result.current.reviewMode).toEqual(ReviewModes.FixedInterval);
+    expect(result.current.reviewMode).toEqual(ReviewModes.FixedProgressive);
 
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 1500));
     });
 
     expect(result.current.currentCardData).toMatchObject({
-      reviewMode: ReviewModes.DefaultSpacedInterval,
+      reviewMode: ReviewModes.SpacedInterval,
       repetitions: 2,
       interval: 6,
       eFactor: 2.3,
     });
   });
 
-  it('reviewMode is derived from cardMeta.cardType', async () => {
-    const currentCardRefUid = 'id_cardtype';
+  it('reviewMode is derived from cardMeta.reviewMode', async () => {
+    const currentCardRefUid = 'id_reviewmode';
 
     Object.defineProperty(window, 'roamAlphaAPI', {
       value: {
@@ -164,7 +164,7 @@ describe('useCurrentCardData', () => {
                       string: 'meta',
                       order: 0,
                       children: [
-                        { string: 'cardType:: SPACED_INTERVAL' },
+                        { string: 'reviewMode:: SPACED_INTERVAL' },
                       ],
                     },
                     {
@@ -202,8 +202,8 @@ describe('useCurrentCardData', () => {
       await new Promise((resolve) => setTimeout(resolve, 1500));
     });
 
-    expect(result.current.reviewMode).toEqual(ReviewModes.DefaultSpacedInterval);
-    expect(result.current.cardMeta?.cardType).toEqual(CardType.SpacedInterval);
+    expect(result.current.reviewMode).toEqual(ReviewModes.SpacedInterval);
+    expect(result.current.cardMeta?.reviewMode).toEqual(ReviewModes.SpacedInterval);
   });
 
   describe('Card navigation', () => {
@@ -213,12 +213,12 @@ describe('useCurrentCardData', () => {
       const mockBuilder = new testUtils.MockDataBuilder()
         .withCard({ uid: currentCardRefUid_0 })
         .withSession(currentCardRefUid_0, {
-          reviewMode: ReviewModes.DefaultSpacedInterval,
+          reviewMode: ReviewModes.SpacedInterval,
         })
         .withCard({ uid: currentCardRefUid_1 })
         .withSession(currentCardRefUid_1, {
           grade: 2,
-          reviewMode: ReviewModes.FixedInterval,
+          reviewMode: ReviewModes.FixedProgressive,
         });
 
       mockBuilder.mockQueryResults();
@@ -245,7 +245,7 @@ describe('useCurrentCardData', () => {
 
       expect(result.current.currentCardData).toMatchObject({
         refUid: currentCardRefUid_1,
-        reviewMode: ReviewModes.FixedInterval,
+        reviewMode: ReviewModes.FixedProgressive,
         grade: 2,
       });
     });
@@ -256,11 +256,11 @@ describe('useCurrentCardData', () => {
         .withCard({ uid: currentCardRefUid })
         .withSession(currentCardRefUid, {
           grade: 1,
-          reviewMode: ReviewModes.DefaultSpacedInterval,
+          reviewMode: ReviewModes.SpacedInterval,
         })
         .withSession(currentCardRefUid, {
           grade: 2,
-          reviewMode: ReviewModes.FixedInterval,
+          reviewMode: ReviewModes.FixedProgressive,
         });
 
       mockBuilder.mockQueryResults();
@@ -271,7 +271,7 @@ describe('useCurrentCardData', () => {
       );
 
       expect(result.current.latestSession).toBeDefined();
-      expect(result.current.latestSession!.reviewMode).toEqual(ReviewModes.FixedInterval);
+      expect(result.current.latestSession!.reviewMode).toEqual(ReviewModes.FixedProgressive);
     });
   });
 
@@ -292,7 +292,7 @@ describe('useCurrentCardData', () => {
                         string: 'meta',
                         order: 0,
                         children: [
-                          { string: 'cardType:: SPACED_INTERVAL_LBL' },
+                          { string: 'reviewMode:: SPACED_INTERVAL_LBL' },
                           { string: 'lineByLineReview:: Y' },
                         ],
                       },
@@ -332,8 +332,8 @@ describe('useCurrentCardData', () => {
       });
 
       expect(result.current.cardMeta?.lineByLineReview).toEqual('Y');
-      expect(result.current.cardMeta?.cardType).toEqual(CardType.SpacedIntervalLineByLine);
-      expect(result.current.reviewMode).toEqual(ReviewModes.DefaultSpacedInterval);
+      expect(result.current.cardMeta?.reviewMode).toEqual(ReviewModes.SpacedIntervalLBL);
+      expect(result.current.reviewMode).toEqual(ReviewModes.SpacedIntervalLBL);
     });
   });
 });

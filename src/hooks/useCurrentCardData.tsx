@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { CardType, CardMeta, NewSession, ReviewModes, Session, cardTypeToReviewMode } from '~/models/session';
+import { CardMeta, NewSession, ReviewModes, Session, DEFAULT_REVIEW_MODE, resolveReviewMode } from '~/models/session';
 import { generateNewSession, getPluginPageData } from '~/queries';
 
 const CARD_DATA_POLL_INTERVAL = 1000;
@@ -20,7 +20,6 @@ const isSessionDataChanged = (prev: Session | undefined, next: Session | undefin
     !isSameDate(prev.nextDueDate, next.nextDueDate) ||
     !isSameDate(prev.dateCreated, next.dateCreated) ||
     prev.intervalMultiplier !== next.intervalMultiplier ||
-    prev.intervalMultiplierType !== next.intervalMultiplierType ||
     prev.progressiveRepetitions !== next.progressiveRepetitions ||
     prev.lineByLineReview !== next.lineByLineReview ||
     prev.lineByLineProgress !== next.lineByLineProgress
@@ -31,7 +30,7 @@ const isCardMetaChanged = (prev: CardMeta | undefined, next: CardMeta | undefine
   if (prev === next) return false;
   if (!prev || !next) return true;
   return (
-    prev.cardType !== next.cardType ||
+    prev.reviewMode !== next.reviewMode ||
     prev.lineByLineReview !== next.lineByLineReview ||
     prev.lineByLineProgress !== next.lineByLineProgress
   );
@@ -44,36 +43,16 @@ const extractCardMetaFromPluginData = (
   const cardData = pluginData[cardUid];
   if (!cardData) return undefined;
 
-  if (Array.isArray(cardData)) {
-    const latestSession = cardData[cardData.length - 1] as Session & { cardType?: CardType };
-    return {
-      cardType: latestSession.cardType as CardType | undefined,
-      lineByLineReview: latestSession.lineByLineReview as 'Y' | 'N' | undefined,
-      lineByLineProgress: latestSession.lineByLineProgress as string | undefined,
-      nextDueDate: latestSession.nextDueDate,
-    };
-  }
+  const latestSession = Array.isArray(cardData)
+    ? cardData[cardData.length - 1] as Session
+    : cardData as Session;
 
-  const session = cardData as Session & { cardType?: CardType };
   return {
-    cardType: session.cardType as CardType | undefined,
-    lineByLineReview: session.lineByLineReview as 'Y' | 'N' | undefined,
-    lineByLineProgress: session.lineByLineProgress as string | undefined,
-    nextDueDate: session.nextDueDate,
+    reviewMode: latestSession.reviewMode,
+    lineByLineReview: latestSession.lineByLineReview as 'Y' | 'N' | undefined,
+    lineByLineProgress: latestSession.lineByLineProgress as string | undefined,
+    nextDueDate: latestSession.nextDueDate,
   };
-};
-
-const resolveReviewModeFromMeta = (cardMeta: CardMeta | undefined, sessionReviewMode?: ReviewModes): ReviewModes => {
-  if (cardMeta?.cardType) {
-    return cardTypeToReviewMode(cardMeta.cardType);
-  }
-  if (cardMeta === undefined && !sessionReviewMode) {
-    return ReviewModes.FixedInterval;
-  }
-  if (sessionReviewMode) {
-    return sessionReviewMode;
-  }
-  return ReviewModes.FixedInterval;
 };
 
 export default function useCurrentCardData({
@@ -89,10 +68,12 @@ export default function useCurrentCardData({
   const [currentCardData, setCurrentCardData] = React.useState<Session | undefined>(latestSession);
   const [cardMeta, setCardMeta] = React.useState<CardMeta | undefined>(undefined);
 
-  const reviewMode = React.useMemo(
-    () => resolveReviewModeFromMeta(cardMeta, latestSession?.reviewMode),
-    [cardMeta, latestSession?.reviewMode]
-  );
+  const reviewMode = React.useMemo(() => {
+    if (cardMeta?.reviewMode) return cardMeta.reviewMode;
+    if (cardMeta === undefined) return DEFAULT_REVIEW_MODE;
+    if (latestSession?.reviewMode) return latestSession.reviewMode;
+    return DEFAULT_REVIEW_MODE;
+  }, [cardMeta, latestSession?.reviewMode]);
 
   const prevCardDataRef = React.useRef<Session | undefined>();
   const prevCardMetaRef = React.useRef<CardMeta | undefined>();
@@ -142,7 +123,7 @@ export default function useCurrentCardData({
         if (!liveSession || !('reviewMode' in liveSession)) {
           const resolvedMeta = extractCardMetaFromPluginData(latestPluginData, currentCardRefUid);
           const newSession = generateNewSession({
-            reviewMode: resolveReviewModeFromMeta(resolvedMeta),
+            reviewMode: resolvedMeta?.reviewMode || DEFAULT_REVIEW_MODE,
           });
           if (isSessionDataChanged(prevCardDataRef.current, newSession)) {
             setCurrentCardData(newSession);
@@ -189,4 +170,4 @@ export default function useCurrentCardData({
   };
 }
 
-export { resolveReviewModeFromMeta, extractCardMetaFromPluginData };
+export { extractCardMetaFromPluginData };

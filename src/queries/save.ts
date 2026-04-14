@@ -1,6 +1,6 @@
 import * as stringUtils from '~/utils/string';
 import * as dateUtils from '~/utils/date';
-import { CardType, CompleteRecords, LineByLineProgressMap } from '~/models/session';
+import { CompleteRecords, LineByLineProgressMap, ReviewModes } from '~/models/session';
 import {
   createChildBlock,
   getChildBlock,
@@ -326,12 +326,12 @@ export const updateLineByLineProgress = async ({
 export const updateCardType = async ({
   refUid,
   dataPageTitle,
-  cardType,
+  reviewMode,
   lineByLineReview,
 }: {
   refUid: string;
   dataPageTitle: string;
-  cardType: CardType;
+  reviewMode: ReviewModes;
   lineByLineReview?: 'Y' | 'N';
 }) => {
   await getOrCreatePage(dataPageTitle);
@@ -344,7 +344,7 @@ export const updateCardType = async ({
     open: false,
   });
 
-  await upsertCardMetaField({ cardDataBlockUid, key: 'cardType', value: cardType });
+  await upsertCardMetaField({ cardDataBlockUid, key: 'reviewMode', value: reviewMode });
 
   if (lineByLineReview !== undefined) {
     await upsertCardMetaField({

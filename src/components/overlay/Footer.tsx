@@ -7,7 +7,7 @@ import * as asyncUtils from '~/utils/async';
 import { generatePracticeData } from '~/practice';
 import Tooltip from '~/components/Tooltip';
 import ButtonTags from '~/components/ButtonTags';
-import { CardType, IntervalMultiplierType, ReviewModes } from '~/models/session';
+import { ReviewModes, isFixedMode } from '~/models/session';
 import { MainContext } from '~/components/overlay/PracticeOverlay';
 import { getIntentColor, colors } from '~/theme';
 
@@ -40,12 +40,11 @@ const Footer = ({
   currentCardData,
   onStartCrammingClick,
 }) => {
-  const { reviewMode, intervalMultiplier, intervalMultiplierType } = React.useContext(MainContext);
+  const { reviewMode, intervalMultiplier } = React.useContext(MainContext);
 
   const [isIntervalEditorOpen, setIsIntervalEditorOpen] = React.useState(false);
 
   const toggleIntervalEditorOpen = () => setIsIntervalEditorOpen((prev) => !prev);
-  // So we can flash the activated button when using keyboard shortcuts before transitioning
   const [activeButtonKey, setActiveButtonKey] = React.useState(null);
   const activateButtonFn = async (key, callbackFn) => {
     setActiveButtonKey(key);
@@ -108,7 +107,7 @@ const Footer = ({
           if (!showAnswers) {
             activateButtonFn('space-button', showAnswerFn);
           } else {
-            if (reviewMode === ReviewModes.FixedInterval) {
+            if (isFixedMode(reviewMode)) {
               intervalPractice();
             } else {
               gradeFn(5);
@@ -139,28 +138,28 @@ const Footer = ({
         global: true,
         label: 'Grade 0',
         onKeyDown: () => gradeFn(0),
-        disabled: reviewMode === ReviewModes.FixedInterval,
+        disabled: isFixedMode(reviewMode),
       },
       {
         combo: 'H',
         global: true,
         label: 'Grade 2',
         onKeyDown: () => gradeFn(2),
-        disabled: reviewMode === ReviewModes.FixedInterval,
+        disabled: isFixedMode(reviewMode),
       },
       {
         combo: 'G',
         global: true,
         label: 'Grade 4',
         onKeyDown: () => gradeFn(4),
-        disabled: reviewMode !== ReviewModes.DefaultSpacedInterval,
+        disabled: !isFixedMode(reviewMode),
       },
       {
         combo: 'E',
         global: true,
         label: 'Edit Interval',
         onKeyDown: toggleIntervalEditorOpen,
-        disabled: reviewMode !== ReviewModes.FixedInterval,
+        disabled: !isFixedMode(reviewMode),
       },
     ],
     [skipFn, onPrevClick, reviewMode, showAnswers, showAnswerFn, intervalPractice, gradeFn]
@@ -178,7 +177,7 @@ const Footer = ({
     const { interval, repetitions, eFactor, progressiveRepetitions } = currentCardData;
     const estimates = {};
 
-    const iterateCount = reviewMode === ReviewModes.FixedInterval ? 1 : grades.length;
+    const iterateCount = isFixedMode(reviewMode) ? 1 : grades.length;
     for (let i = 0; i < iterateCount; i++) {
       const grade = grades[i];
       const practiceResultData = generatePracticeData({
@@ -189,13 +188,12 @@ const Footer = ({
         dateCreated: new Date(),
         reviewMode,
         intervalMultiplier,
-        intervalMultiplierType,
         progressiveRepetitions,
       });
       estimates[grade] = practiceResultData;
     }
     return estimates;
-  }, [currentCardData, intervalMultiplier, intervalMultiplierType, reviewMode]);
+  }, [currentCardData, intervalMultiplier, reviewMode]);
 
   return (
     <FooterWrapper
@@ -288,9 +286,9 @@ const GradingControlsWrapper = ({
   toggleIntervalEditorOpen,
   onPrevClick,
 }) => {
-  const { reviewMode, onSelectCardType, cardMeta, intervalMultiplierType } = React.useContext(MainContext);
+  const { reviewMode, onSelectReviewMode, cardMeta } = React.useContext(MainContext);
 
-  const isFixedIntervalMode = reviewMode === ReviewModes.FixedInterval;
+  const isFixedModeActive = isFixedMode(reviewMode);
   return (
     <div className="flex items-center flex-wrap justify-evenly gap-3 w-full">
       <button
@@ -335,7 +333,7 @@ const GradingControlsWrapper = ({
       >
         ▶
       </button>
-      {isFixedIntervalMode ? (
+      {isFixedModeActive ? (
         <FixedIntervalModeControls
           activeButtonKey={activeButtonKey}
           intervalPractice={intervalPractice}
@@ -351,10 +349,9 @@ const GradingControlsWrapper = ({
         />
       )}
       {/* @ts-ignore */}
-      <CardTypeSelector
+      <ReviewModeSelector
         cardMeta={cardMeta}
-        intervalMultiplierType={intervalMultiplierType}
-        onSelectCardType={onSelectCardType}
+        onSelectReviewMode={onSelectReviewMode}
       />
     </div>
   );
@@ -363,68 +360,34 @@ const GradingControlsWrapper = ({
 const FixedIntervalEditor = () => {
   const {
     intervalMultiplier,
-    intervalMultiplierType,
     setIntervalMultiplier,
-    setIntervalMultiplierType,
   } = React.useContext(MainContext);
   const handleInputValueChange = (numericValue) => {
     if (isNaN(numericValue)) return;
     setIntervalMultiplier(numericValue);
   };
 
-  const intervalMultiplierTypes = [
-    { value: IntervalMultiplierType.Progressive, label: 'Progressive' },
-    { value: IntervalMultiplierType.Days, label: 'Days' },
-    { value: IntervalMultiplierType.Weeks, label: 'Weeks' },
-    { value: IntervalMultiplierType.Months, label: 'Months' },
-    { value: IntervalMultiplierType.Years, label: 'Years' },
-  ];
-
-  const isProgressiveMode = intervalMultiplierType === IntervalMultiplierType.Progressive;
-
   return (
-    <div className={`flex p-2 items-center ${isProgressiveMode ? 'w-auto' : 'w-80'} justify-evenly`}>
-      {!isProgressiveMode && <div className="">Every</div>}
-      {!isProgressiveMode && (
-        <div className="w-24">
-          <Blueprint.NumericInput
-            min={1}
-            max={365}
-            stepSize={1}
-            majorStepSize={30}
-            minorStepSize={1}
-            value={intervalMultiplier}
-            onValueChange={handleInputValueChange}
-            fill
-          />
-        </div>
-      )}
-      <div className="bp3-html-select">
-        <select
-          value={intervalMultiplierType}
-          onChange={(e) =>
-            setIntervalMultiplierType(e.currentTarget.value as IntervalMultiplierType)
-          }
-        >
-          {intervalMultiplierTypes.map((option) => (
-            <option
-              key={option.value}
-              value={option.value}
-              selected={option.value === intervalMultiplierType}
-            >
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <span className="bp3-icon bp3-icon-double-caret-vertical"></span>
+    <div className="flex p-2 items-center w-80 justify-evenly">
+      <div className="">Every</div>
+      <div className="w-24">
+        <Blueprint.NumericInput
+          min={1}
+          max={365}
+          stepSize={1}
+          majorStepSize={30}
+          minorStepSize={1}
+          value={intervalMultiplier}
+          onValueChange={handleInputValueChange}
+          fill
+        />
       </div>
     </div>
   );
 };
 
-const IntervalString = ({ intervalMultiplier, intervalMultiplierType, nextDueDateFromNow }) => {
-  // Progressive mode: show when the next review is due
-  if (intervalMultiplierType === IntervalMultiplierType.Progressive) {
+const IntervalString = ({ reviewMode, intervalMultiplier, nextDueDateFromNow }) => {
+  if (reviewMode === ReviewModes.FixedProgressive) {
     const displayText = nextDueDateFromNow || 'Progressive';
     return (
       <>
@@ -435,14 +398,14 @@ const IntervalString = ({ intervalMultiplier, intervalMultiplierType, nextDueDat
 
   let singularString = '';
   if (intervalMultiplier === 1) {
-    switch (intervalMultiplierType) {
-      case IntervalMultiplierType.Weeks:
+    switch (reviewMode) {
+      case ReviewModes.FixedWeeks:
         singularString += 'Weekly';
         break;
-      case IntervalMultiplierType.Months:
+      case ReviewModes.FixedMonths:
         singularString += 'Monthly';
         break;
-      case IntervalMultiplierType.Years:
+      case ReviewModes.FixedYears:
         singularString += 'Yearly';
         break;
       default:
@@ -450,6 +413,15 @@ const IntervalString = ({ intervalMultiplier, intervalMultiplierType, nextDueDat
         break;
     }
   }
+
+  const unitLabel = (() => {
+    switch (reviewMode) {
+      case ReviewModes.FixedWeeks: return 'Weeks';
+      case ReviewModes.FixedMonths: return 'Months';
+      case ReviewModes.FixedYears: return 'Years';
+      default: return 'Days';
+    }
+  })();
 
   return (
     <>
@@ -459,7 +431,7 @@ const IntervalString = ({ intervalMultiplier, intervalMultiplierType, nextDueDat
           singularString
         ) : (
           <>
-            Every {intervalMultiplier} {intervalMultiplierType}
+            Every {intervalMultiplier} {unitLabel}
           </>
         )}
       </span>
@@ -480,7 +452,7 @@ const FixedIntervalModeControls = ({
   toggleIntervalEditorOpen: () => void;
   intervalEstimates: IntervalEstimates;
 }): JSX.Element => {
-  const { intervalMultiplier, intervalMultiplierType } = React.useContext(MainContext);
+  const { intervalMultiplier, reviewMode } = React.useContext(MainContext);
   const onInteractionhandler = (nextState) => {
     if (!nextState && isIntervalEditorOpen) toggleIntervalEditorOpen();
   };
@@ -503,8 +475,8 @@ const FixedIntervalModeControls = ({
         >
           <span className="ml-2">
             <IntervalString
+              reviewMode={reviewMode}
               intervalMultiplier={intervalMultiplier}
-              intervalMultiplierType={intervalMultiplierType}
               nextDueDateFromNow={intervalEstimates[0]?.nextDueDateFromNow}
             />
             <ButtonTags>E</ButtonTags>
@@ -609,7 +581,6 @@ const FooterWrapper = styled.div`
     align-items: center;
   }
 
-  /* 内部组件不定义背景色，继承 Dialog 容器的背景 */
   background-color: transparent;
 `;
 
@@ -649,37 +620,32 @@ const ControlButton = ({ tooltipText, wrapperClassName = '', ...props }) => {
   );
 };
 
-interface CardTypeOption {
-  cardType: CardType;
-  intervalMultiplierType?: IntervalMultiplierType;
+interface ReviewModeOption {
+  reviewMode: ReviewModes;
   label: string;
   icon: IconName;
   group: string;
 }
 
-const CARD_TYPE_OPTIONS: CardTypeOption[] = [
-  { cardType: CardType.SpacedInterval, label: 'Spaced Interval', icon: 'history', group: 'Spaced' },
-  { cardType: CardType.SpacedIntervalLineByLine, label: 'LBL Spaced', icon: 'list', group: 'Spaced' },
-  { cardType: CardType.FixedInterval, intervalMultiplierType: IntervalMultiplierType.Progressive, label: 'Progressive', icon: 'trending-up', group: 'Fixed' },
-  { cardType: CardType.FixedInterval, intervalMultiplierType: IntervalMultiplierType.Days, label: 'Days', icon: 'calendar', group: 'Fixed' },
-  { cardType: CardType.FixedInterval, intervalMultiplierType: IntervalMultiplierType.Weeks, label: 'Weeks', icon: 'calendar', group: 'Fixed' },
-  { cardType: CardType.FixedInterval, intervalMultiplierType: IntervalMultiplierType.Months, label: 'Months', icon: 'calendar', group: 'Fixed' },
-  { cardType: CardType.FixedInterval, intervalMultiplierType: IntervalMultiplierType.Years, label: 'Years', icon: 'calendar', group: 'Fixed' },
+const REVIEW_MODE_OPTIONS: ReviewModeOption[] = [
+  { reviewMode: ReviewModes.SpacedInterval, label: 'Spaced Interval', icon: 'history', group: 'Spaced' },
+  { reviewMode: ReviewModes.SpacedIntervalLBL, label: 'LBL Spaced', icon: 'list', group: 'Spaced' },
+  { reviewMode: ReviewModes.FixedProgressive, label: 'Progressive', icon: 'trending-up', group: 'Fixed' },
+  { reviewMode: ReviewModes.FixedDays, label: 'Days', icon: 'calendar', group: 'Fixed' },
+  { reviewMode: ReviewModes.FixedWeeks, label: 'Weeks', icon: 'calendar', group: 'Fixed' },
+  { reviewMode: ReviewModes.FixedMonths, label: 'Months', icon: 'calendar', group: 'Fixed' },
+  { reviewMode: ReviewModes.FixedYears, label: 'Years', icon: 'calendar', group: 'Fixed' },
 ];
 
-const getActiveOption = (cardMeta: import('~/models/session').CardMeta | undefined, intervalMultiplierType: IntervalMultiplierType): CardTypeOption => {
-  const ct = cardMeta?.cardType;
-  if (ct === CardType.SpacedIntervalLineByLine) {
-    return CARD_TYPE_OPTIONS[1];
+const getActiveOption = (cardMeta: import('~/models/session').CardMeta | undefined): ReviewModeOption => {
+  const rm = cardMeta?.reviewMode;
+  if (rm) {
+    return REVIEW_MODE_OPTIONS.find(o => o.reviewMode === rm) || REVIEW_MODE_OPTIONS[2];
   }
-  if (ct === CardType.FixedInterval || ct === undefined) {
-    const imt = intervalMultiplierType || IntervalMultiplierType.Progressive;
-    return CARD_TYPE_OPTIONS.find(o => o.cardType === CardType.FixedInterval && o.intervalMultiplierType === imt) || CARD_TYPE_OPTIONS[2];
-  }
-  return CARD_TYPE_OPTIONS[0];
+  return REVIEW_MODE_OPTIONS[2];
 };
 
-const CardTypeSelectorItemWrapper = styled.div<{ active: boolean }>`
+const ReviewModeSelectorItemWrapper = styled.div<{ active: boolean }>`
   display: flex;
   align-items: center;
   gap: 8px;
@@ -708,44 +674,41 @@ const CardTypeSelectorItemWrapper = styled.div<{ active: boolean }>`
   }
 `;
 
-const CardTypeSelector = ({
+const ReviewModeSelector = ({
   cardMeta,
-  intervalMultiplierType,
-  onSelectCardType,
+  onSelectReviewMode,
 }: {
   cardMeta: import('~/models/session').CardMeta | undefined;
-  intervalMultiplierType: IntervalMultiplierType;
-  onSelectCardType: (cardType: CardType, intervalMultiplierType?: IntervalMultiplierType) => void;
+  onSelectReviewMode: (reviewMode: ReviewModes) => void;
 }) => {
-  const activeOption = getActiveOption(cardMeta, intervalMultiplierType);
+  const activeOption = getActiveOption(cardMeta);
 
   return (
     // @ts-ignore
     <BlueprintSelect.Select
-      items={CARD_TYPE_OPTIONS}
+      items={REVIEW_MODE_OPTIONS}
       activeItem={activeOption}
       filterable={false}
-      itemRenderer={(option: CardTypeOption, { handleClick, modifiers }) => {
-        const isActive = option.cardType === activeOption.cardType
-          && option.intervalMultiplierType === activeOption.intervalMultiplierType;
+      itemRenderer={(option: ReviewModeOption, { handleClick, modifiers }) => {
+        const isActive = option.reviewMode === activeOption.reviewMode;
         return (
-          <CardTypeSelectorItemWrapper
+          <ReviewModeSelectorItemWrapper
             active={modifiers.active}
-            key={`${option.cardType}-${option.intervalMultiplierType || 'none'}`}
+            key={option.reviewMode}
             onClick={handleClick}
             data-testid={`card-type-option-${option.label.toLowerCase().replace(/\s+/g, '-')}`}
           >
             <Blueprint.Icon icon={option.icon} iconSize={14} style={{ opacity: isActive ? 1 : 0.6 }} />
             <span style={{ fontWeight: isActive ? 600 : 400 }}>{option.label}</span>
             {isActive && <Blueprint.Icon icon="tick" iconSize={12} style={{ marginLeft: 'auto', color: '#0d8050' }} />}
-          </CardTypeSelectorItemWrapper>
+          </ReviewModeSelectorItemWrapper>
         );
       }}
-      onItemSelect={(option: CardTypeOption) => {
-        onSelectCardType(option.cardType, option.intervalMultiplierType);
+      onItemSelect={(option: ReviewModeOption) => {
+        onSelectReviewMode(option.reviewMode);
       }}
       popoverProps={{ minimal: true }}
-      itemPredicate={(_, _option: CardTypeOption) => true}
+      itemPredicate={(_, _option: ReviewModeOption) => true}
     >
       <Blueprint.Button
         icon={activeOption.icon}

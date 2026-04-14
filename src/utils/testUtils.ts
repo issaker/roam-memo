@@ -265,7 +265,7 @@ export class MockDataBuilder {
 
     this.sessions[uid].push({
       ...generateNewSession({
-        reviewMode: ReviewModes.DefaultSpacedInterval,
+        reviewMode: ReviewModes.SpacedInterval,
         isNew: false,
       }),
       ...overrides,

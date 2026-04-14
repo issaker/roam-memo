@@ -15,7 +15,7 @@ import { saveSettingsToPage, loadSettingsFromPage } from '~/queries/settings';
 import CardBlock from '~/components/overlay/CardBlock';
 import Footer from '~/components/overlay/Footer';
 import ButtonTags from '~/components/ButtonTags';
-import { CardType, CompleteRecords, IntervalMultiplierType, ReviewModes, LineByLineProgressMap } from '~/models/session';
+import { CompleteRecords, ReviewModes, isFixedMode, isLineByLineMode, DEFAULT_REVIEW_MODE, LineByLineProgressMap } from '~/models/session';
 import useCurrentCardData from '~/hooks/useCurrentCardData';
 import { generateNewSession, updateLineByLineProgress, updateCardType } from '~/queries';
 import MigrateLegacyDataPanel from '~/components/MigrateLegacyDataPanel';
@@ -27,11 +27,9 @@ import { colors } from '~/theme';
 
 interface MainContextProps {
   reviewMode: ReviewModes | undefined;
-  onSelectCardType: (cardType: CardType, intervalMultiplierType?: IntervalMultiplierType) => void;
+  onSelectReviewMode: (reviewMode: ReviewModes) => void;
   intervalMultiplier: number;
   setIntervalMultiplier: (multiplier: number) => void;
-  intervalMultiplierType: IntervalMultiplierType;
-  setIntervalMultiplierType: (type: IntervalMultiplierType) => void;
   onPracticeClick: (props: handlePracticeProps) => void;
   today: Today;
   selectedTag: string;
@@ -112,21 +110,16 @@ const PracticeOverlay = ({
   const hasCards = totalCardsCount > 0;
 
   const newFixedSessionDefaults = React.useMemo(
-    () => generateNewSession({ reviewMode: ReviewModes.FixedInterval }),
+    () => generateNewSession({ reviewMode: DEFAULT_REVIEW_MODE }),
     []
   );
 
   const [intervalMultiplier, setIntervalMultiplier] = React.useState<number>(
     currentCardData?.intervalMultiplier || (newFixedSessionDefaults.intervalMultiplier as number)
   );
-  const [intervalMultiplierType, setIntervalMultiplierType] =
-    React.useState<IntervalMultiplierType>(
-      currentCardData?.intervalMultiplierType ||
-        (newFixedSessionDefaults.intervalMultiplierType as IntervalMultiplierType)
-    );
 
   // Resolve mode-specific data fields via historical lookback so that
-  // switching intervalMultiplierType (e.g. Days → Progressive) recovers
+  // switching reviewMode (e.g. FixedDays → FixedProgressive) recovers
   // the correct progressiveRepetitions from earlier sessions instead of
   // treating undefined as 0 and producing wrong intervals.
   const resolvedCardData = currentCardData;
@@ -135,8 +128,8 @@ const PracticeOverlay = ({
 
   // Track previous card UID so the interval state is only initialised
   // when the card changes — not on every polling update that touches
-  // currentCardData.  This prevents the 200 ms poll from overwriting a
-  // user's manual intervalMultiplierType selection.
+  // currentCardData.  This prevents the 1s poll from overwriting a
+  // user's manual intervalMultiplier selection.
   const prevCardRefUidRef = React.useRef<string | undefined>();
 
   // Reset interval state when navigating to a different card.
@@ -144,7 +137,7 @@ const PracticeOverlay = ({
   // of currentCardData, because currentCardData is updated asynchronously by
   // useCurrentCardData's Effect 1 and is stale during the first render after
   // a card change. Using stale currentCardData would copy the PREVIOUS card's
-  // intervalMultiplierType into the new card, and the cardChanged guard would
+  // intervalMultiplier into the new card, and the cardChanged guard would
   // prevent correction on the subsequent render.
   React.useEffect(() => {
     const cardChanged = prevCardRefUidRef.current !== currentCardRefUid;
@@ -154,14 +147,10 @@ const PracticeOverlay = ({
 
     if (!cardChanged) return;
 
-    if (latestSession.reviewMode === ReviewModes.FixedInterval) {
+    if (isFixedMode(latestSession.reviewMode)) {
       setIntervalMultiplier(latestSession.intervalMultiplier as number);
-      setIntervalMultiplierType(latestSession.intervalMultiplierType as IntervalMultiplierType);
     } else {
       setIntervalMultiplier(newFixedSessionDefaults.intervalMultiplier as number);
-      setIntervalMultiplierType(
-        newFixedSessionDefaults.intervalMultiplierType as IntervalMultiplierType
-      );
     }
   }, [latestSession, currentCardRefUid, newFixedSessionDefaults]);
 
@@ -185,8 +174,7 @@ const PracticeOverlay = ({
     renderMode === RenderMode.AnswerFirst && hasBlockChildrenUids && !showAnswers;
 
   const isLineByLine =
-    cardMeta?.cardType === CardType.SpacedIntervalLineByLine &&
-    reviewMode === ReviewModes.DefaultSpacedInterval &&
+    isLineByLineMode(reviewMode) &&
     hasBlockChildrenUids;
 
   const parseLineByLineProgress = (progressStr?: string): LineByLineProgressMap => {
@@ -325,8 +313,7 @@ const PracticeOverlay = ({
 
   // Reset showAnswers state
   React.useEffect(() => {
-    if (isLineByLine || reviewMode === ReviewModes.FixedInterval) {
-      // Fixed Interval is a reading mode, so cards should open expanded by default.
+    if (isLineByLine || isFixedMode(reviewMode)) {
       setShowAnswers(true);
     } else if (hasBlockChildren || hasCloze) {
       setShowAnswers(false);
@@ -384,7 +371,6 @@ const PracticeOverlay = ({
         ...resolvedCardData,
         ...gradeData,
         intervalMultiplier,
-        intervalMultiplierType,
       };
 
       handlePracticeClick(practiceProps);
@@ -409,7 +395,6 @@ const PracticeOverlay = ({
       isDone,
       resolvedCardData,
       intervalMultiplier,
-      intervalMultiplierType,
       currentCardRefUid,
       forgotReinsertOffset,
       isLineByLine,
@@ -522,27 +507,23 @@ const PracticeOverlay = ({
     };
   }, [isOpen]);
 
-  const onSelectCardType = React.useCallback(async (newCardType: CardType, newIntervalMultiplierType?: IntervalMultiplierType) => {
+  const onSelectReviewMode = React.useCallback(async (newReviewMode: ReviewModes) => {
     if (!currentCardRefUid) return;
 
-    const isLbl = newCardType === CardType.SpacedIntervalLineByLine;
+    const isLbl = isLineByLineMode(newReviewMode);
     applyOptimisticCardMeta({
       ...cardMeta,
-      cardType: newCardType,
+      reviewMode: newReviewMode,
       lineByLineReview: isLbl ? 'Y' : cardMeta?.lineByLineReview,
     });
-
-    if (newIntervalMultiplierType) {
-      setIntervalMultiplierType(newIntervalMultiplierType);
-    }
 
     await updateCardType({
       refUid: currentCardRefUid,
       dataPageTitle,
-      cardType: newCardType,
+      reviewMode: newReviewMode,
       lineByLineReview: isLbl ? 'Y' : undefined,
     });
-  }, [currentCardRefUid, dataPageTitle, cardMeta, applyOptimisticCardMeta, setIntervalMultiplierType]);
+  }, [currentCardRefUid, dataPageTitle, cardMeta, applyOptimisticCardMeta]);
 
   if (!todaySelectedTag) {
     return null;
@@ -552,11 +533,9 @@ const PracticeOverlay = ({
     <MainContext.Provider
       value={{
         reviewMode,
-        onSelectCardType,
+        onSelectReviewMode,
         intervalMultiplier,
         setIntervalMultiplier,
-        intervalMultiplierType,
-        setIntervalMultiplierType,
         onPracticeClick,
         today,
         selectedTag,
@@ -888,17 +867,25 @@ const Dialog = styled(Blueprint.Dialog)<{
 
   /* Dynamic border color based on card review mode */
   border: 2px solid ${({ $reviewMode }) =>
-    $reviewMode === ReviewModes.DefaultSpacedInterval
+    ($reviewMode === ReviewModes.SpacedInterval || $reviewMode === ReviewModes.SpacedIntervalLBL)
       ? colors.modeSpaced
-      : $reviewMode === ReviewModes.FixedInterval
+      : $reviewMode === ReviewModes.FixedProgressive ||
+        $reviewMode === ReviewModes.FixedDays ||
+        $reviewMode === ReviewModes.FixedWeeks ||
+        $reviewMode === ReviewModes.FixedMonths ||
+        $reviewMode === ReviewModes.FixedYears
         ? colors.modeFixed
         : colors.borderSubtle};
   border-color: ${({ $showModeBorders, $reviewMode }) =>
     $showModeBorders === false
       ? colors.borderSubtle
-      : $reviewMode === ReviewModes.DefaultSpacedInterval
+      : ($reviewMode === ReviewModes.SpacedInterval || $reviewMode === ReviewModes.SpacedIntervalLBL)
         ? colors.modeSpaced
-        : $reviewMode === ReviewModes.FixedInterval
+        : $reviewMode === ReviewModes.FixedProgressive ||
+          $reviewMode === ReviewModes.FixedDays ||
+          $reviewMode === ReviewModes.FixedWeeks ||
+          $reviewMode === ReviewModes.FixedMonths ||
+          $reviewMode === ReviewModes.FixedYears
           ? colors.modeFixed
           : colors.borderSubtle};
 
@@ -1216,14 +1203,14 @@ const StatusBadge = ({ status, nextDueDate, isCramming }) => {
 
 const ModeBadge = ({ reviewMode }) => {
   if (!reviewMode) return null;
-  if (reviewMode === ReviewModes.DefaultSpacedInterval) {
+  if (reviewMode === ReviewModes.SpacedInterval || reviewMode === ReviewModes.SpacedIntervalLBL) {
     return (
       <Blueprint.Tag intent="success" minimal>
         Spaced
       </Blueprint.Tag>
     );
   }
-  if (reviewMode === ReviewModes.FixedInterval) {
+  if (isFixedMode(reviewMode)) {
     return (
       <Blueprint.Tag intent="warning" minimal>
         Fixed

@@ -29,7 +29,7 @@
  */
 import { getStringBetween, parseConfigString, parseRoamDateString } from '~/utils/string';
 import * as stringUtils from '~/utils/string';
-import { CardType, CompleteRecords, Records, RecordUid, ReviewModes } from '~/models/session';
+import { CompleteRecords, Records, RecordUid, ReviewModes, resolveReviewMode } from '~/models/session';
 import { Today } from '~/models/practice';
 import {
   addDueCards,
@@ -131,25 +131,20 @@ const FIXED_MODE_KEYS = [
   'progressiveRepetitions',
 ] as const;
 
-const inferReviewModeFromFields = (fields: Partial<{ reviewMode: ReviewModes; cardType: CardType } & Record<string, any>>) => {
+const inferReviewModeFromFields = (fields: Partial<{ reviewMode: string; intervalMultiplierType: string } & Record<string, any>>) => {
   if (fields.reviewMode) {
-    return fields.reviewMode;
-  }
-
-  if (fields.cardType) {
-    if (fields.cardType === CardType.FixedInterval) return ReviewModes.FixedInterval;
-    return ReviewModes.DefaultSpacedInterval;
+    return resolveReviewMode(fields.reviewMode, fields.intervalMultiplierType);
   }
 
   if (SPACED_MODE_KEYS.some((key) => fields[key] !== undefined)) {
-    return ReviewModes.DefaultSpacedInterval;
+    return ReviewModes.SpacedInterval;
   }
 
   if (FIXED_MODE_KEYS.some((key) => fields[key] !== undefined)) {
-    return ReviewModes.FixedInterval;
+    return ReviewModes.FixedProgressive;
   }
 
-  return ReviewModes.FixedInterval;
+  return ReviewModes.FixedProgressive;
 };
 
 const parseFieldValuesFromChildren = (
@@ -196,11 +191,6 @@ const getCardScopedFields = (children: any[] = []) => {
   if (cardMetadataBlocks.length) {
     parseFieldValuesFromChildren(cardScopedFields, cardMetadataBlocks);
   }
-
-  // reviewMode is session-scoped, not card-scoped.
-  // Prevent meta block or legacy metadata from overriding the reviewMode
-  // that was inferred from each session's own fields.
-  delete cardScopedFields.reviewMode;
 
   return cardScopedFields;
 };
@@ -277,7 +267,11 @@ const mapPluginPageData = (queryResultsData): CompleteRecords =>
         }
 
         parseFieldValuesFromChildren(record, child.children, { inferReviewMode: true });
+        const sessionReviewMode = (record as any).reviewMode;
         Object.assign(record, cardScopedFields);
+        if (sessionReviewMode) {
+          (record as any).reviewMode = sessionReviewMode;
+        }
         acc[uid].push(record);
       }
 
