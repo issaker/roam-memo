@@ -86,4 +86,88 @@ describe('getPluginPageData', () => {
     const cardData = result['card-1'] as any;
     expect(cardData.nextDueDate).toEqual(new Date('2026-04-20T00:00:00.000Z'));
   });
+
+  it('infers SPACED_INTERVAL when reviewMode is missing but SM2 fields exist', async () => {
+    Object.defineProperty(window, 'roamAlphaAPI', {
+      value: {
+        q: jest.fn(() => [
+          [
+            {
+              children: [
+                {
+                  string: '((card-spaced))',
+                  children: [
+                    {
+                      string: '[[April 14th, 2026]] 🟢',
+                      order: 0,
+                      children: [
+                        { string: 'repetitions:: 3' },
+                        { string: 'interval:: 12' },
+                        { string: 'eFactor:: 2.4' },
+                        { string: 'nextDueDate:: [[April 20th, 2026]]' },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        ]),
+        util: {
+          pageTitleToDate: jest.fn((value: string) => parseMockRoamDate(value)),
+        },
+      },
+      writable: true,
+    });
+
+    const result = await getPluginPageData({
+      dataPageTitle: 'roam/memo',
+      limitToLatest: true,
+    });
+
+    expect(result['card-spaced']).toMatchObject({
+      reviewMode: 'SPACED_INTERVAL',
+      repetitions: 3,
+      interval: 12,
+      eFactor: 2.4,
+    });
+  });
+
+  it('falls back to FIXED_INTERVAL when reviewMode is missing and no SM2 fields exist', async () => {
+    Object.defineProperty(window, 'roamAlphaAPI', {
+      value: {
+        q: jest.fn(() => [
+          [
+            {
+              children: [
+                {
+                  string: '((card-fixed))',
+                  children: [
+                    {
+                      string: '[[April 14th, 2026]] 🟢',
+                      order: 0,
+                      children: [{ string: 'nextDueDate:: [[April 20th, 2026]]' }],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        ]),
+        util: {
+          pageTitleToDate: jest.fn((value: string) => parseMockRoamDate(value)),
+        },
+      },
+      writable: true,
+    });
+
+    const result = await getPluginPageData({
+      dataPageTitle: 'roam/memo',
+      limitToLatest: true,
+    });
+
+    expect(result['card-fixed']).toMatchObject({
+      reviewMode: 'FIXED_INTERVAL',
+    });
+  });
 });

@@ -485,10 +485,19 @@ const PracticeOverlay = ({
   };
 
   const [showBreadcrumbs, setShowBreadcrumbs] = React.useState(false);
+  const [liveShowModeBorders, setLiveShowModeBorders] = React.useState(showModeBorders);
 
   React.useEffect(() => {
     setShowBreadcrumbs(localSettings.showBreadcrumbs);
   }, [localSettings.showBreadcrumbs]);
+
+  React.useEffect(() => {
+    setLiveShowModeBorders(localSettings.showModeBorders);
+  }, [localSettings.showModeBorders]);
+
+  React.useEffect(() => {
+    setLiveShowModeBorders(showModeBorders);
+  }, [showModeBorders]);
 
   const toggleBreadcrumbs = React.useCallback(async () => {
     const newState = !showBreadcrumbs;
@@ -579,7 +588,7 @@ const PracticeOverlay = ({
       <Dialog
         $isEditing={isEditing}
         $reviewMode={reviewMode}
-        $showModeBorders={showModeBorders}
+        $showModeBorders={liveShowModeBorders}
         isOpen={isOpen}
         onClose={onCloseCallback}
         className="pb-0"

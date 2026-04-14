@@ -7,6 +7,27 @@ import React from 'react';
 
 describe('useCurrentCardData', () => {
   const originalLocation = window;
+  const parseMockRoamDate = (value: string) => {
+    if (!value || value.split(' ').length < 3) return undefined;
+    const months = {
+      January: 0,
+      February: 1,
+      March: 2,
+      April: 3,
+      May: 4,
+      June: 5,
+      July: 6,
+      August: 7,
+      September: 8,
+      October: 9,
+      November: 10,
+      December: 11,
+    };
+    const [month, dayWithSuffix, year] = value.replace(',', '').split(' ');
+    if (!(month in months) || !dayWithSuffix || !year) return undefined;
+    const day = Number(dayWithSuffix.replace(/(st|nd|rd|th)$/, ''));
+    return new Date(Date.UTC(Number(year), months[month as keyof typeof months], day));
+  };
 
   afterEach(() => {
     jest.useRealTimers();
@@ -67,6 +88,77 @@ describe('useCurrentCardData', () => {
     });
 
     expect(result.current.currentCardData).toEqual(undefined);
+  });
+
+  it('polling infers SPACED_INTERVAL from live SM2 fields when reviewMode is missing', async () => {
+    const currentCardRefUid = 'card-live-spaced';
+    const staleQueueSession = generateNewSession({
+      reviewMode: ReviewModes.FixedInterval,
+      isNew: false,
+    });
+
+    // Stable reference: prevents Effect 1 from re-running on every render
+    // (a new array literal in renderHook would change the `sessions` dep
+    // and cause Effect 1 to reset currentCardData / reviewMode / prevCardDataRef).
+    const sessions = [staleQueueSession];
+
+    Object.defineProperty(window, 'roamAlphaAPI', {
+      value: {
+        q: jest.fn(() => [
+          [
+            {
+              children: [
+                {
+                  string: `((${currentCardRefUid}))`,
+                  children: [
+                    {
+                      string: '[[April 14th, 2026]] 🟢',
+                      order: 0,
+                      children: [
+                        { string: 'repetitions:: 2' },
+                        { string: 'interval:: 6' },
+                        { string: 'eFactor:: 2.3' },
+                        { string: 'nextDueDate:: [[April 20th, 2026]]' },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        ]),
+        util: {
+          pageTitleToDate: jest.fn((value: string) => parseMockRoamDate(value)),
+        },
+      },
+      writable: true,
+    });
+
+    const { result } = renderHook(() =>
+      useCurrentCardData({
+        sessions,
+        currentCardRefUid,
+        dataPageTitle: 'roam/memo',
+      })
+    );
+
+    expect(result.current.reviewMode).toEqual(ReviewModes.FixedInterval);
+
+    // Wait for the polling cycle (200ms interval) to fire and the async
+    // fetchLiveData chain to resolve. Using real timers with a delay that
+    // exceeds the polling interval avoids the fragile microtask-flushing
+    // pattern required with jest.useFakeTimers().
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    });
+
+    expect(result.current.reviewMode).toEqual(ReviewModes.DefaultSpacedInterval);
+    expect(result.current.currentCardData).toMatchObject({
+      reviewMode: ReviewModes.DefaultSpacedInterval,
+      repetitions: 2,
+      interval: 6,
+      eFactor: 2.3,
+    });
   });
 
   describe('When review mode changed', () => {

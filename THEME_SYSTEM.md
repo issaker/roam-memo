@@ -99,6 +99,10 @@ src/
 - 这次修复没有引入新的主题机制，仍然遵守“能继承就继承，只把功能色放进主题文件”的原则
 - 新增 `Show Review Mode Borders` 设置项，允许关闭模式边框显示；关闭后仍回退到统一的 subtle border，不改变主题继承模型
 - 逐行复习只在 `Spaced Interval Mode` 下激活，因此 `Fixed Interval Mode` 仍保持整卡展开的阅读体验，不新增额外主题分支
+- 新增“复习模式字段推断”修复后，模式徽标与边框继续复用既有的 `modeSpaced` / `modeFixed` 颜色变量，无需新增样式变量
+- 当实时轮询读到缺失 `reviewMode::` 但仍包含 SM2 字段的卡片时，UI 现在会自动显示为 `Spaced Interval Mode`，从而让模式颜色与实际数据保持一致
+- 本次与主题系统相关的结论是：未新增任何新的样式变量，仍然优先使用现有颜色令牌和继承机制
+- 补充修复：`getCardScopedFields()` 现在会删除 `reviewMode` 字段，防止 meta 块覆盖会话级别的模式推断；`mapPluginPageData()` 现在按 `:block/order` 排序会话，确保 `sessions[sessions.length - 1]` 始终是最新的会话记录
 
 ## 常见问题
 

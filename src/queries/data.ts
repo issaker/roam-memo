@@ -124,29 +124,38 @@ export const getSelectedTagPageBlocksIds = async (selectedTag): Promise<string[]
   return filteredChildren.map((arr) => arr.uid);
 };
 
-const ensureReviewModeField = (record) => {
-  const hasReviewModeField = record.children.some((child) => child.string.includes('reviewMode'));
-  const children = hasReviewModeField
-    ? record.children
-    : [
-        ...record.children,
-        {
-          order: record.children.length,
-          string: `reviewMode:: ${ReviewModes.DefaultSpacedInterval}`,
-        },
-      ];
+const SPACED_MODE_KEYS = ['grade', 'repetitions', 'interval', 'eFactor'] as const;
+const FIXED_MODE_KEYS = [
+  'intervalMultiplier',
+  'intervalMultiplierType',
+  'progressiveRepetitions',
+] as const;
 
-  return { ...record, children };
+const inferReviewModeFromFields = (fields: Partial<{ reviewMode: ReviewModes } & Record<string, any>>) => {
+  if (fields.reviewMode) {
+    return fields.reviewMode;
+  }
+
+  // Legacy or partially-corrupted records may miss reviewMode:: entirely.
+  // Prefer Spaced when SM2 fields exist; otherwise fall back to Fixed only
+  // when the data is empty or clearly uses Fixed-interval fields.
+  if (SPACED_MODE_KEYS.some((key) => fields[key] !== undefined)) {
+    return ReviewModes.DefaultSpacedInterval;
+  }
+
+  if (FIXED_MODE_KEYS.some((key) => fields[key] !== undefined)) {
+    return ReviewModes.FixedInterval;
+  }
+
+  return ReviewModes.FixedInterval;
 };
 
 const parseFieldValuesFromChildren = (
   object,
   children,
-  { ensureReviewMode = false }: { ensureReviewMode?: boolean } = {}
+  { inferReviewMode = false }: { inferReviewMode?: boolean } = {}
 ) => {
-  const fieldSource = ensureReviewMode ? ensureReviewModeField({ children }).children : children;
-
-  for (const field of fieldSource) {
+  for (const field of children) {
     const [key, value] = parseConfigString(field.string);
 
     if (key === 'nextDueDate') {
@@ -159,6 +168,10 @@ const parseFieldValuesFromChildren = (
       object[key] = value;
     }
   }
+
+  if (inferReviewMode) {
+    object.reviewMode = inferReviewModeFromFields(object);
+  }
 };
 
 const isSessionHeadingBlock = (child) => {
@@ -170,7 +183,7 @@ const isSessionHeadingBlock = (child) => {
 const isCardMetaBlock = (child) => child?.string === CARD_META_BLOCK_NAME;
 
 const getCardScopedFields = (children: any[] = []) => {
-  const cardScopedFields = {};
+  const cardScopedFields: Record<string, any> = {};
   const cardMetaBlock = children.find(isCardMetaBlock) as { children?: any[] } | undefined;
   const legacyCardMetadataBlocks = children.filter(
     (child) => !isSessionHeadingBlock(child) && !isCardMetaBlock(child)
@@ -180,6 +193,11 @@ const getCardScopedFields = (children: any[] = []) => {
   if (cardMetadataBlocks.length) {
     parseFieldValuesFromChildren(cardScopedFields, cardMetadataBlocks);
   }
+
+  // reviewMode is session-scoped, not card-scoped.
+  // Prevent meta block or legacy metadata from overriding the reviewMode
+  // that was inferred from each session's own fields.
+  delete cardScopedFields.reviewMode;
 
   return cardScopedFields;
 };
@@ -205,7 +223,7 @@ const mapPluginPageDataLatest = (queryResultsData): Records =>
       acc[uid].dateCreated = parseRoamDateString(getStringBetween(latestChild.string, '[[', ']]'));
 
       if (!latestChild.children) return acc;
-      parseFieldValuesFromChildren(acc[uid], latestChild.children, { ensureReviewMode: true });
+      parseFieldValuesFromChildren(acc[uid], latestChild.children, { inferReviewMode: true });
       Object.assign(acc[uid], cardScopedFields);
 
       return acc;
@@ -228,7 +246,15 @@ const mapPluginPageData = (queryResultsData): CompleteRecords =>
         return acc;
       }
 
-      for (const child of sessionChildren) {
+      // Sort sessions by block order descending (highest order = oldest first,
+      // order 0 = newest last) so that sessions[sessions.length - 1] is the
+      // latest session — consistent with mapPluginPageDataLatest and downstream
+      // consumers (useCurrentCardData, today.ts, etc.).
+      const sortedSessionChildren = [...sessionChildren].sort(
+        (a, b) => b.order - a.order
+      );
+
+      for (const child of sortedSessionChildren) {
         const record = {
           refUid: uid,
           dateCreated: parseRoamDateString(getStringBetween(child.string, '[[', ']]')),
@@ -240,7 +266,7 @@ const mapPluginPageData = (queryResultsData): CompleteRecords =>
           continue;
         }
 
-        parseFieldValuesFromChildren(record, child.children, { ensureReviewMode: true });
+        parseFieldValuesFromChildren(record, child.children, { inferReviewMode: true });
         Object.assign(record, cardScopedFields);
         acc[uid].push(record);
       }

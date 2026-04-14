@@ -119,6 +119,12 @@ A relaxed approach for content you want to revisit regularly. Includes **Progres
 
 Each card's `reviewMode` is read from the Data Page in real-time on every card navigation. Changes to `reviewMode::` on the Data Page take effect immediately — no session restart required.
 
+For legacy or partially corrupted records, the reader now infers the effective review mode from the latest session fields:
+
+- If SM2 / Spaced fields such as `repetitions`, `interval`, or `eFactor` exist, the card is treated as `Spaced Interval Mode`
+- Only cards with empty review data, or cards that explicitly use Fixed Interval fields, fall back to `Fixed Interval Mode`
+- This inference is applied to the real-time polling path as well, so the mode badge and footer controls stay aligned with the actual stored data
+
 ### Urgency-Based Due Card Sorting
 
 Due cards are sorted by **memory urgency** using a three-level priority system, ensuring the most at-risk cards are always reviewed first:
@@ -270,6 +276,27 @@ Session Queue (one-time read)     Data Page (real-time polling, 200ms)
 - Review history consistency with actual review mode
 - `reviewModeOverride` cleared on card navigation to prevent mode inheritance
 - `latestSession` correctly derived from sessions
+
+### Review Mode Field Inference Fix
+
+**Problem:** Some live or legacy session records could lose their explicit `reviewMode::` field even though they still contained valid Spaced Interval data (`repetitions`, `interval`, `eFactor`). In that state, polling could misidentify the current card as `Fixed Interval Mode`, causing the badge, controls, and review behavior to drift away from the stored session data.
+
+**Root causes (additional, 2026-04-14):**
+1. **`cardScopedFields` overriding inferred reviewMode (data.ts):** `getCardScopedFields()` collected all fields from the `meta` block or legacy metadata, including `reviewMode` if present. When `Object.assign(record, cardScopedFields)` ran after `parseFieldValuesFromChildren({ inferReviewMode: true })`, the card-scoped `reviewMode` (often stale or from a different session) overwrote the correctly inferred per-session reviewMode. Fix: `delete cardScopedFields.reviewMode` before returning, since `reviewMode` is session-scoped, not card-scoped.
+2. **Unsorted session array in `mapPluginPageData` (data.ts):** The Datalog query returns child blocks in unspecified order, but `mapPluginPageData` iterated them as-is. Downstream consumers (useCurrentCardData, today.ts) use `sessions[sessions.length - 1]` as the latest session, which could return a stale session instead of the one with `order === 0`. Fix: sort `sessionChildren` by `b.order - a.order` so the newest session (order 0) is always last in the array.
+
+**Fix:**
+- `src/queries/data.ts` now infers the effective review mode from the latest session fields instead of blindly defaulting missing `reviewMode::` values
+- Spaced Interval fields take priority, so any session with SM2 data is resolved as `SPACED_INTERVAL`
+- `FIXED_INTERVAL` is only used when the record is empty or when the latest session clearly contains Fixed Interval fields
+- The polling flow in `useCurrentCardData` benefits automatically because it already reads through `getPluginPageData({ limitToLatest: true })`
+- `getCardScopedFields()` now strips `reviewMode` before returning, preventing meta-block data from overriding per-session inference
+- `mapPluginPageData()` now sorts sessions by `:block/order` so `sessions[sessions.length - 1]` is always the latest session
+
+**Test coverage (3 new tests):**
+- Missing `reviewMode::` + SM2 fields resolves to `SPACED_INTERVAL`
+- Missing `reviewMode::` + no SM2 fields resolves to `FIXED_INTERVAL`
+- Live polling updates a stale Fixed UI back to `SPACED_INTERVAL` when the Data Page contains Spaced fields
 
 ## Development
 
