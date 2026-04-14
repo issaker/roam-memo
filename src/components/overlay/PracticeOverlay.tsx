@@ -183,7 +183,15 @@ const PracticeOverlay = ({
   const shouldShowAnswerFirst =
     renderMode === RenderMode.AnswerFirst && hasBlockChildrenUids && !showAnswers;
 
-  const isLineByLine = currentCardData?.lineByLineReview === 'Y' && hasBlockChildrenUids;
+  const [lineByLineLocalOverride, setLineByLineLocalOverride] = React.useState<string | undefined>(undefined);
+
+  React.useEffect(() => {
+    setLineByLineLocalOverride(undefined);
+  }, [currentCardRefUid]);
+
+  const isLineByLine = (lineByLineLocalOverride !== undefined
+    ? lineByLineLocalOverride === 'Y'
+    : currentCardData?.lineByLineReview === 'Y') && hasBlockChildrenUids;
 
   const parseLineByLineProgress = (progressStr?: string): LineByLineProgressMap => {
     if (!progressStr) return {};
@@ -273,6 +281,8 @@ const PracticeOverlay = ({
   const onToggleLineByLine = React.useCallback(
     async (enabled: boolean) => {
       if (!currentCardRefUid) return;
+      const flagValue = enabled ? 'Y' : 'N';
+      setLineByLineLocalOverride(flagValue);
       await updateLineByLineFlag({
         refUid: currentCardRefUid,
         dataPageTitle,
@@ -556,7 +566,7 @@ const PracticeOverlay = ({
           reviewMode={reviewMode}
           isLineByLine={isLineByLine}
           hasBlockChildren={hasBlockChildren}
-          lineByLineChecked={currentCardData?.lineByLineReview === 'Y'}
+          lineByLineChecked={lineByLineLocalOverride !== undefined ? lineByLineLocalOverride === 'Y' : currentCardData?.lineByLineReview === 'Y'}
           onToggleLineByLine={onToggleLineByLine}
           lineByLineCurrentIndex={isLineByLine ? lineByLineCurrentChildIndex + 1 : 0}
           lineByLineTotal={childUidsList.length}

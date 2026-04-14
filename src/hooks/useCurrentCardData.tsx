@@ -149,6 +149,15 @@ export const resolveModeSpecificData = (
     }
   }
 
+  if (resolved.lineByLineReview === undefined) {
+    for (let i = sessions.length - 1; i >= 0; i--) {
+      if (sessions[i].lineByLineReview !== undefined) {
+        resolved.lineByLineReview = sessions[i].lineByLineReview;
+        break;
+      }
+    }
+  }
+
   if (resolved.lineByLineReview === 'Y' && resolved.lineByLineProgress === undefined) {
     for (let i = sessions.length - 1; i >= 0; i--) {
       if (sessions[i].lineByLineProgress !== undefined) {

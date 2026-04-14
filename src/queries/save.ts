@@ -214,8 +214,19 @@ export const updateLineByLineProgress = async ({
      [?child :block/order ?childOrder]
     ]
   `;
-  const sessionHeadings = window.roamAlphaAPI.q(sessionHeadingQuery);
-  if (!sessionHeadings || !sessionHeadings.length) return;
+  let sessionHeadings = window.roamAlphaAPI.q(sessionHeadingQuery);
+
+  if (!sessionHeadings || !sessionHeadings.length) {
+    const dateCreatedRoamDateString = stringUtils.dateToRoamDateString(new Date());
+    await createChildBlock(
+      cardDataBlockUid,
+      `[[${dateCreatedRoamDateString}]] ⚪`,
+      0,
+      { open: false }
+    );
+    sessionHeadings = window.roamAlphaAPI.q(sessionHeadingQuery);
+    if (!sessionHeadings || !sessionHeadings.length) return;
+  }
 
   sessionHeadings.sort((a, b) => a[1] - b[1]);
   const latestSessionUid = sessionHeadings[0][0];
@@ -279,8 +290,19 @@ export const updateLineByLineFlag = async ({
      [?child :block/order ?childOrder]
     ]
   `;
-  const sessionHeadings = window.roamAlphaAPI.q(sessionHeadingQuery);
-  if (!sessionHeadings || !sessionHeadings.length) return;
+  let sessionHeadings = window.roamAlphaAPI.q(sessionHeadingQuery);
+
+  if (!sessionHeadings || !sessionHeadings.length) {
+    const dateCreatedRoamDateString = stringUtils.dateToRoamDateString(new Date());
+    await createChildBlock(
+      cardDataBlockUid,
+      `[[${dateCreatedRoamDateString}]] ⚪`,
+      0,
+      { open: false }
+    );
+    sessionHeadings = window.roamAlphaAPI.q(sessionHeadingQuery);
+    if (!sessionHeadings || !sessionHeadings.length) return;
+  }
 
   sessionHeadings.sort((a, b) => a[1] - b[1]);
   const latestSessionUid = sessionHeadings[0][0];
