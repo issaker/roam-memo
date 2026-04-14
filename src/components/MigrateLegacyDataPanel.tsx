@@ -43,8 +43,65 @@ const hasLegacyCardType = (cardChildren: any[] = []): boolean => {
   return hasCardType && !hasReviewMode;
 };
 
-const findSessionReviewModeBlocks = (cardChildren: any[] = []): { uid: string; string: string }[] => {
-  const results: { uid: string; string: string }[] = [];
+const hasDuplicateReviewMode = (cardChildren: any[] = []): boolean => {
+  const metaBlock = cardChildren.find((child) => child?.string === CARD_META_BLOCK_NAME);
+  const metaChildren = metaBlock?.children || [];
+  let reviewModeCount = 0;
+  let hasCardType = false;
+
+  for (const block of metaChildren) {
+    if (!block?.string) continue;
+    const [key] = parseConfigString(block.string);
+    if (key === 'reviewMode') reviewModeCount++;
+    if (key === 'cardType') hasCardType = true;
+  }
+
+  return reviewModeCount > 1 || (reviewModeCount >= 1 && hasCardType);
+};
+
+const findMetaCardTypeBlock = (cardChildren: any[] = []): { uid: string; value: string } | null => {
+  const metaBlock = cardChildren.find((child) => child?.string === CARD_META_BLOCK_NAME);
+  const metaChildren = metaBlock?.children || [];
+
+  for (const block of metaChildren) {
+    if (!block?.string) continue;
+    const [key, value] = parseConfigString(block.string);
+    if (key === 'cardType' && block.uid) {
+      return { uid: block.uid, value };
+    }
+  }
+
+  return null;
+};
+
+const findDuplicateMetaBlocks = (cardChildren: any[] = []): { uid: string; key: string }[] => {
+  const metaBlock = cardChildren.find((child) => child?.string === CARD_META_BLOCK_NAME);
+  const metaChildren = metaBlock?.children || [];
+  const keyCount: Record<string, number> = {};
+  const duplicates: { uid: string; key: string }[] = [];
+
+  for (const block of metaChildren) {
+    if (!block?.string || !block.uid) continue;
+    const [key] = parseConfigString(block.string);
+    keyCount[key] = (keyCount[key] || 0) + 1;
+    if (keyCount[key] > 1) {
+      duplicates.push({ uid: block.uid, key });
+    }
+  }
+
+  for (const block of metaChildren) {
+    if (!block?.string || !block.uid) continue;
+    const [key] = parseConfigString(block.string);
+    if (key === 'cardType' && keyCount['reviewMode'] >= 1) {
+      duplicates.push({ uid: block.uid, key });
+    }
+  }
+
+  return duplicates;
+};
+
+const findSessionReviewModeBlocks = (cardChildren: any[] = []): { uid: string }[] => {
+  const results: { uid: string }[] = [];
 
   for (const child of cardChildren) {
     if (!child?.string) continue;
@@ -56,7 +113,7 @@ const findSessionReviewModeBlocks = (cardChildren: any[] = []): { uid: string; s
         if (!field?.string) continue;
         const [key] = parseConfigString(field.string);
         if (key === 'reviewMode' && field.uid) {
-          results.push({ uid: field.uid, string: field.string });
+          results.push({ uid: field.uid });
         }
       }
     }
@@ -68,10 +125,11 @@ const findSessionReviewModeBlocks = (cardChildren: any[] = []): { uid: string; s
 interface MigrationTask {
   cardUid: string;
   needsCardTypeRename: boolean;
+  cardTypeBlockUid?: string;
+  cardTypeBlockValue?: string;
   needsReviewModeWrite: boolean;
-  needsSessionCleanup: boolean;
-  cardTypeFieldUid?: string;
-  cardTypeFieldValue?: string;
+  needsDuplicateCleanup: boolean;
+  duplicateBlockUids: string[];
   sessionReviewModeUids: string[];
   resolvedMode: ReviewModes;
   lineByLineReview?: 'Y';
@@ -80,10 +138,12 @@ interface MigrationTask {
 const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) => {
   const [status, setStatus] = React.useState<'idle' | 'running' | 'done' | 'error'>('idle');
   const [progress, setProgress] = React.useState({ total: 0, migrated: 0, skipped: 0, phase: '' });
+  const [errorDetail, setErrorDetail] = React.useState('');
 
   const runMigration = async () => {
     setStatus('running');
     setProgress({ total: 0, migrated: 0, skipped: 0, phase: 'Scanning...' });
+    setErrorDetail('');
 
     try {
       const query = `[
@@ -123,11 +183,15 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
 
         const needsCardTypeRename = hasLegacyCardType(rawCardChildren);
         const needsReviewModeWrite = !hasMetaReviewMode(rawCardChildren);
-        const sessionReviewModeBlocks = findSessionReviewModeBlocks(rawCardChildren);
-        const sessionReviewModeUids = sessionReviewModeBlocks.map((b) => b.uid);
-        const needsSessionCleanup = sessionReviewModeUids.length > 0;
+        const needsDuplicateCleanup = hasDuplicateReviewMode(rawCardChildren);
+        const duplicateBlockUids = needsDuplicateCleanup
+          ? findDuplicateMetaBlocks(rawCardChildren).map((b) => b.uid)
+          : [];
+        const sessionReviewModeUids = findSessionReviewModeBlocks(rawCardChildren).map((b) => b.uid);
 
-        if (!needsCardTypeRename && !needsReviewModeWrite && !needsSessionCleanup) {
+        const hasWork = needsCardTypeRename || needsReviewModeWrite || needsDuplicateCleanup || sessionReviewModeUids.length > 0;
+
+        if (!hasWork) {
           skipped++;
           continue;
         }
@@ -141,59 +205,67 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
           ? ReviewModes.SpacedIntervalLBL
           : resolvedMode;
 
-        let cardTypeFieldUid: string | undefined;
-        let cardTypeFieldValue: string | undefined;
+        let cardTypeBlockUid: string | undefined;
+        let cardTypeBlockValue: string | undefined;
         if (needsCardTypeRename) {
-          const metaBlock = rawCardChildren.find((child) => child?.string === CARD_META_BLOCK_NAME);
-          if (metaBlock?.children) {
-            for (const field of metaBlock.children) {
-              if (!field?.string) continue;
-              const [key, value] = parseConfigString(field.string);
-              if (key === 'cardType' && field.uid) {
-                cardTypeFieldUid = field.uid;
-                cardTypeFieldValue = value;
-                break;
-              }
-            }
+          const cardTypeBlock = findMetaCardTypeBlock(rawCardChildren);
+          if (cardTypeBlock) {
+            cardTypeBlockUid = cardTypeBlock.uid;
+            cardTypeBlockValue = cardTypeBlock.value;
           }
         }
 
         tasks.push({
           cardUid,
           needsCardTypeRename,
+          cardTypeBlockUid,
+          cardTypeBlockValue,
           needsReviewModeWrite,
-          needsSessionCleanup,
-          cardTypeFieldUid,
-          cardTypeFieldValue,
+          needsDuplicateCleanup,
+          duplicateBlockUids,
           sessionReviewModeUids,
           resolvedMode: finalMode,
           lineByLineReview: isLineByLine ? 'Y' : undefined,
         });
       }
 
-      setProgress({ total, migrated: 0, skipped, phase: `Phase 1: Writing reviewMode to meta (${tasks.length} cards)` });
+      setProgress({ total, migrated: 0, skipped, phase: `Phase 1: Renaming cardType → reviewMode` });
 
       let migrated = 0;
+      let errors = 0;
+
       for (let i = 0; i < tasks.length; i++) {
         const task = tasks[i];
 
-        if (task.needsCardTypeRename || task.needsReviewModeWrite) {
-          await updateCardType({
-            refUid: task.cardUid,
-            dataPageTitle,
-            reviewMode: task.resolvedMode,
-            lineByLineReview: task.lineByLineReview,
-          });
-
-          if (task.needsCardTypeRename && task.cardTypeFieldUid && task.cardTypeFieldValue) {
+        try {
+          if (task.needsCardTypeRename && task.cardTypeBlockUid && task.cardTypeBlockValue) {
             await window.roamAlphaAPI.updateBlock({
-              block: { uid: task.cardTypeFieldUid, string: `reviewMode:: ${task.cardTypeFieldValue}` },
+              block: { uid: task.cardTypeBlockUid, string: `reviewMode:: ${task.cardTypeBlockValue}` },
             });
           }
+
+          if (task.needsReviewModeWrite || task.needsCardTypeRename) {
+            await updateCardType({
+              refUid: task.cardUid,
+              dataPageTitle,
+              reviewMode: task.resolvedMode,
+              lineByLineReview: task.lineByLineReview,
+            });
+          }
+
+          if (task.needsDuplicateCleanup && task.duplicateBlockUids.length > 0) {
+            for (const uid of task.duplicateBlockUids) {
+              await window.roamAlphaAPI.deleteBlock({ block: { uid } });
+            }
+          }
+
+          migrated++;
+        } catch (err) {
+          console.error(`[Memo] Migration error on card ${task.cardUid}:`, err);
+          errors++;
         }
 
-        migrated++;
-        setProgress({ total, migrated, skipped, phase: `Phase 1: Writing reviewMode (${migrated}/${tasks.length})` });
+        setProgress({ total, migrated, skipped, phase: `Phase 1: Writing reviewMode (${migrated + errors}/${tasks.length})` });
 
         if ((i + 1) % BATCH_SIZE === 0) {
           await sleep(BATCH_DELAY_MS);
@@ -208,11 +280,13 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
 
         let deleted = 0;
         for (let i = 0; i < allSessionUids.length; i++) {
-          await window.roamAlphaAPI.deleteBlock({
-            block: { uid: allSessionUids[i] },
-          });
+          try {
+            await window.roamAlphaAPI.deleteBlock({ block: { uid: allSessionUids[i] } });
+            deleted++;
+          } catch (err) {
+            console.error(`[Memo] Session cleanup error:`, err);
+          }
 
-          deleted++;
           if (deleted % BATCH_SIZE === 0) {
             setProgress({ total, migrated, skipped, phase: `Phase 2: Cleaning session records (${deleted}/${allSessionUids.length})` });
             await sleep(BATCH_DELAY_MS);
@@ -221,6 +295,9 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
       }
 
       setProgress({ total, migrated, skipped, phase: 'Done' });
+      if (errors > 0) {
+        setErrorDetail(`${errors} cards had errors — check console for details.`);
+      }
       setStatus('done');
     } catch (error) {
       console.error('[Memo] Migration error:', error);
@@ -249,9 +326,14 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
         </div>
       )}
       {status === 'done' && (
-        <div style={{ fontSize: '12px', color: '#0d8050' }}>
-          Migration complete! {progress.migrated} cards migrated, {progress.skipped} already
-          up-to-date.
+        <div>
+          <div style={{ fontSize: '12px', color: '#0d8050' }}>
+            Migration complete! {progress.migrated} cards migrated, {progress.skipped} already
+            up-to-date.
+          </div>
+          {errorDetail && (
+            <div style={{ fontSize: '12px', color: '#d29922', marginTop: '4px' }}>{errorDetail}</div>
+          )}
         </div>
       )}
       {status === 'error' && (
