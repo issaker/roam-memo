@@ -1,10 +1,10 @@
-import { act, render, screen, fireEvent } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 
 import * as testUtils from '~/utils/testUtils';
 import * as dateUtils from '~/utils/date';
 
 import App from '~/app';
-import { CardType, IntervalMultiplierType, ReviewModes } from '~/models/session';
+import { ReviewModes } from '~/models/session';
 import * as saveQueries from '~/queries/save';
 
 /** Check that a Date value is within toleranceMs of the expected Date (default 1s) */

@@ -158,6 +158,7 @@ const parseFieldValuesFromChildren = (
   { inferReviewMode = false }: { inferReviewMode?: boolean } = {}
 ) => {
   for (const field of children) {
+    if (!field?.string) continue;
     const [key, value] = parseConfigString(field.string);
 
     if (key === 'nextDueDate') {
@@ -190,7 +191,7 @@ const getCardScopedFields = (children: any[] = []) => {
   const legacyCardMetadataBlocks = children.filter(
     (child) => !isSessionHeadingBlock(child) && !isCardMetaBlock(child)
   );
-  const cardMetadataBlocks = cardMetaBlock?.children || legacyCardMetadataBlocks;
+  const cardMetadataBlocks = (cardMetaBlock?.children || legacyCardMetadataBlocks).filter(c => c?.string);
 
   if (cardMetadataBlocks.length) {
     parseFieldValuesFromChildren(cardScopedFields, cardMetadataBlocks);
@@ -208,6 +209,7 @@ const mapPluginPageDataLatest = (queryResultsData): Records =>
   queryResultsData
     .map((arr) => arr[0])[0]
     .children?.reduce((acc, cur) => {
+      if (!cur?.string) return acc;
       const uid = getStringBetween(cur.string, '((', '))');
       const sessionChildren = cur.children?.filter(isSessionHeadingBlock) || [];
       const cardScopedFields = getCardScopedFields(cur.children);
@@ -220,11 +222,13 @@ const mapPluginPageDataLatest = (queryResultsData): Records =>
         return acc;
       }
 
-      const latestChild = sessionChildren.find((child) => child.order === 0);
+      const latestChild = sessionChildren.find((child) => child?.order === 0);
       acc[uid] = {};
-      acc[uid].dateCreated = parseRoamDateString(getStringBetween(latestChild.string, '[[', ']]'));
+      acc[uid].dateCreated = latestChild?.string
+        ? parseRoamDateString(getStringBetween(latestChild.string, '[[', ']]'))
+        : undefined;
 
-      if (!latestChild.children) return acc;
+      if (!latestChild?.children) return acc;
       parseFieldValuesFromChildren(acc[uid], latestChild.children, { inferReviewMode: true });
       Object.assign(acc[uid], cardScopedFields);
 
@@ -235,6 +239,7 @@ const mapPluginPageData = (queryResultsData): CompleteRecords =>
   queryResultsData
     .map((arr) => arr[0])[0]
     .children?.reduce((acc, cur) => {
+      if (!cur?.string) return acc;
       const uid = getStringBetween(cur.string, '((', '))');
       const sessionChildren = cur.children?.filter(isSessionHeadingBlock) || [];
       const cardScopedFields = getCardScopedFields(cur.children);
@@ -257,6 +262,7 @@ const mapPluginPageData = (queryResultsData): CompleteRecords =>
       );
 
       for (const child of sortedSessionChildren) {
+        if (!child?.string) continue;
         const record = {
           refUid: uid,
           dateCreated: parseRoamDateString(getStringBetween(child.string, '[[', ']]')),
@@ -309,6 +315,7 @@ const mapPluginPageCachedData = (queryResultsData) => {
 
   return (
     data.reduce((acc, cur) => {
+      if (!cur?.string) return acc;
       const tag = getStringBetween(cur.string, '[[', ']]');
       acc[tag] =
         cur.children?.reduce((acc, cur) => {

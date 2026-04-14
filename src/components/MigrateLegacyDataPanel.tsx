@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { CardType, ReviewModes, reviewModeToCardType } from '~/models/session';
+import { ReviewModes, reviewModeToCardType } from '~/models/session';
 import { getPluginPageData, updateCardType } from '~/queries';
 
 const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) => {

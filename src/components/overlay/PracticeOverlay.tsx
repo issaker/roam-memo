@@ -15,7 +15,7 @@ import { saveSettingsToPage, loadSettingsFromPage } from '~/queries/settings';
 import CardBlock from '~/components/overlay/CardBlock';
 import Footer from '~/components/overlay/Footer';
 import ButtonTags from '~/components/ButtonTags';
-import { CardType, CompleteRecords, IntervalMultiplierType, ReviewModes, LineByLineProgressMap, reviewModeToCardType } from '~/models/session';
+import { CardType, CompleteRecords, IntervalMultiplierType, ReviewModes, LineByLineProgressMap } from '~/models/session';
 import useCurrentCardData from '~/hooks/useCurrentCardData';
 import { generateNewSession, updateLineByLineProgress, updateCardType } from '~/queries';
 import MigrateLegacyDataPanel from '~/components/MigrateLegacyDataPanel';
@@ -27,7 +27,6 @@ import { colors } from '~/theme';
 
 interface MainContextProps {
   reviewMode: ReviewModes | undefined;
-  onToggleReviewMode: () => void;
   onSelectCardType: (cardType: CardType, intervalMultiplierType?: IntervalMultiplierType) => void;
   intervalMultiplier: number;
   setIntervalMultiplier: (multiplier: number) => void;
@@ -185,21 +184,8 @@ const PracticeOverlay = ({
   const shouldShowAnswerFirst =
     renderMode === RenderMode.AnswerFirst && hasBlockChildrenUids && !showAnswers;
 
-  const [lineByLineLocalOverride, setLineByLineLocalOverride] = React.useState<string | undefined>(
-    undefined
-  );
-
-  React.useEffect(() => {
-    setLineByLineLocalOverride(undefined);
-  }, [currentCardRefUid]);
-
-  const lineByLineChecked =
-    lineByLineLocalOverride !== undefined
-      ? lineByLineLocalOverride === 'Y'
-      : cardMeta?.lineByLineReview === 'Y';
-
   const isLineByLine =
-    lineByLineChecked &&
+    cardMeta?.cardType === CardType.SpacedIntervalLineByLine &&
     reviewMode === ReviewModes.DefaultSpacedInterval &&
     hasBlockChildrenUids;
 
@@ -308,25 +294,6 @@ const PracticeOverlay = ({
     setShowAnswers(true);
   }, []);
 
-  const onToggleLineByLine = React.useCallback(
-    async (enabled: boolean) => {
-      if (!currentCardRefUid) return;
-      setLineByLineLocalOverride(enabled ? 'Y' : 'N');
-
-      const currentReviewMode = reviewMode || ReviewModes.FixedInterval;
-      const newCardType = reviewModeToCardType(currentReviewMode, enabled);
-
-      await updateCardType({
-        refUid: currentCardRefUid,
-        dataPageTitle,
-        cardType: newCardType,
-        lineByLineReview: enabled ? 'Y' : 'N',
-      });
-    },
-    [currentCardRefUid, dataPageTitle, reviewMode]
-  );
-
-  // Local settings state for roam/js mode
   const [localSettings, setLocalSettings] = React.useState({
     tagsListString: 'memo',
     dataPageTitle: 'roam/memo',
@@ -555,28 +522,6 @@ const PracticeOverlay = ({
     };
   }, [isOpen]);
 
-  const onToggleReviewMode = React.useCallback(async () => {
-    if (!currentCardRefUid) return;
-
-    const newReviewMode = reviewMode === ReviewModes.FixedInterval
-      ? ReviewModes.DefaultSpacedInterval
-      : ReviewModes.FixedInterval;
-    const newCardType = reviewModeToCardType(newReviewMode, lineByLineChecked);
-
-    applyOptimisticCardMeta({
-      ...cardMeta,
-      cardType: newCardType,
-      lineByLineReview: lineByLineChecked ? 'Y' : cardMeta?.lineByLineReview,
-    });
-
-    await updateCardType({
-      refUid: currentCardRefUid,
-      dataPageTitle,
-      cardType: newCardType,
-      lineByLineReview: lineByLineChecked ? 'Y' : undefined,
-    });
-  }, [currentCardRefUid, dataPageTitle, reviewMode, cardMeta, lineByLineChecked, applyOptimisticCardMeta]);
-
   const onSelectCardType = React.useCallback(async (newCardType: CardType, newIntervalMultiplierType?: IntervalMultiplierType) => {
     if (!currentCardRefUid) return;
 
@@ -607,7 +552,6 @@ const PracticeOverlay = ({
     <MainContext.Provider
       value={{
         reviewMode,
-        onToggleReviewMode,
         onSelectCardType,
         intervalMultiplier,
         setIntervalMultiplier,
@@ -650,9 +594,6 @@ const PracticeOverlay = ({
           onSettingsClick={() => setShowSettings(true)}
           reviewMode={reviewMode}
           isLineByLine={isLineByLine}
-          hasBlockChildren={hasBlockChildren}
-          lineByLineChecked={lineByLineChecked}
-          onToggleLineByLine={onToggleLineByLine}
           lineByLineCurrentIndex={isLineByLine ? lineByLineCurrentChildIndex + 1 : 0}
           lineByLineTotal={childUidsList.length}
         />
@@ -1323,9 +1264,6 @@ const Header = ({
   onSettingsClick,
   reviewMode,
   isLineByLine,
-  hasBlockChildren,
-  lineByLineChecked,
-  onToggleLineByLine,
   lineByLineCurrentIndex,
   lineByLineTotal,
 }) => {
@@ -1341,10 +1279,6 @@ const Header = ({
     onToggleBreadcrumbs();
   };
 
-  const handleLineByLineToggle = () => {
-    onToggleLineByLine(!lineByLineChecked);
-  };
-
   return (
     <HeaderWrapper className={className} tabIndex={0}>
       <div className="flex items-center">
@@ -1354,18 +1288,6 @@ const Header = ({
         </div>
       </div>
       <div className="flex items-center justify-end">
-        {!isDone && hasBlockChildren && (
-          <Tooltip content="Line-by-Line Review" placement="left">
-            <Blueprint.Checkbox
-              checked={lineByLineChecked}
-              onChange={handleLineByLineToggle}
-              className="mr-1 mb-0"
-              style={{ fontSize: '11px' }}
-            >
-              <span style={{ fontSize: '11px' }}>LBL</span>
-            </Blueprint.Checkbox>
-          </Tooltip>
-        )}
         {isLineByLine && !isDone && (
           <Blueprint.Tag intent="none" minimal style={{ fontSize: '10px', marginRight: '4px' }}>
             L{lineByLineCurrentIndex}/{lineByLineTotal}

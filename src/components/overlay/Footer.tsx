@@ -7,7 +7,7 @@ import * as asyncUtils from '~/utils/async';
 import { generatePracticeData } from '~/practice';
 import Tooltip from '~/components/Tooltip';
 import ButtonTags from '~/components/ButtonTags';
-import { CardType, IntervalMultiplierType, ReviewModes, cardTypeToReviewMode, reviewModeToCardType } from '~/models/session';
+import { CardType, IntervalMultiplierType, ReviewModes } from '~/models/session';
 import { MainContext } from '~/components/overlay/PracticeOverlay';
 import { getIntentColor, colors } from '~/theme';
 
@@ -220,7 +220,6 @@ const Footer = ({
           />
         ) : (
           <GradingControlsWrapper
-            activateButtonFn={activateButtonFn}
             activeButtonKey={activeButtonKey}
             skipFn={skipFn}
             gradeFn={gradeFn}
@@ -280,7 +279,6 @@ const FinishedControls = ({ onStartCrammingClick, onCloseCallback }) => {
 };
 
 const GradingControlsWrapper = ({
-  activateButtonFn,
   activeButtonKey,
   skipFn,
   gradeFn,
@@ -290,7 +288,7 @@ const GradingControlsWrapper = ({
   toggleIntervalEditorOpen,
   onPrevClick,
 }) => {
-  const { reviewMode, onToggleReviewMode, onSelectCardType, cardMeta, intervalMultiplierType } = React.useContext(MainContext);
+  const { reviewMode, onSelectCardType, cardMeta, intervalMultiplierType } = React.useContext(MainContext);
 
   const isFixedIntervalMode = reviewMode === ReviewModes.FixedInterval;
   return (
@@ -710,15 +708,6 @@ const CardTypeSelectorItemWrapper = styled.div<{ active: boolean }>`
   }
 `;
 
-const GroupLabel = styled.div`
-  font-size: 11px;
-  font-weight: 600;
-  color: ${colors.textMuted};
-  padding: 6px 8px 2px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-`;
-
 const CardTypeSelector = ({
   cardMeta,
   intervalMultiplierType,
@@ -729,19 +718,6 @@ const CardTypeSelector = ({
   onSelectCardType: (cardType: CardType, intervalMultiplierType?: IntervalMultiplierType) => void;
 }) => {
   const activeOption = getActiveOption(cardMeta, intervalMultiplierType);
-
-  const groupedOptions = React.useMemo(() => {
-    const groups: { label: string; options: CardTypeOption[] }[] = [];
-    let currentGroup = '';
-    for (const option of CARD_TYPE_OPTIONS) {
-      if (option.group !== currentGroup) {
-        currentGroup = option.group;
-        groups.push({ label: currentGroup, options: [] });
-      }
-      groups[groups.length - 1].options.push(option);
-    }
-    return groups;
-  }, []);
 
   return (
     // @ts-ignore
@@ -769,7 +745,7 @@ const CardTypeSelector = ({
         onSelectCardType(option.cardType, option.intervalMultiplierType);
       }}
       popoverProps={{ minimal: true }}
-      itemPredicate={(_, option: CardTypeOption) => true}
+      itemPredicate={(_, _option: CardTypeOption) => true}
     >
       <Blueprint.Button
         icon={activeOption.icon}

@@ -30,25 +30,6 @@ const getEmojiFromGrade = (grade) => {
   }
 };
 
-const getLatestSessionUid = (cardDataBlockUid: string) => {
-  const sessionHeadingQuery = `
-    [:find ?childUid ?childOrder
-     :where
-     [?parent :block/uid "${cardDataBlockUid}"]
-     [?child :block/parents ?parent]
-     [?child :block/uid ?childUid]
-     [?child :block/order ?childOrder]
-     [?child :block/string ?childString]
-     [(clojure.string/starts-with? ?childString "[[")]
-    ]
-  `;
-  const sessionHeadings = window.roamAlphaAPI.q(sessionHeadingQuery);
-  if (!sessionHeadings?.length) return;
-
-  sessionHeadings.sort((a, b) => a[1] - b[1]);
-  return sessionHeadings[0][0];
-};
-
 const getOrCreateCardMetaBlock = async (cardDataBlockUid: string) =>
   getOrCreateChildBlock(cardDataBlockUid, CARD_META_BLOCK_NAME, 0, {
     open: false,
@@ -338,44 +319,6 @@ export const updateLineByLineProgress = async ({
       cardDataBlockUid,
       key: 'nextDueDate',
       value: dueDateString,
-    });
-  }
-};
-
-export const updateLineByLineFlag = async ({
-  refUid,
-  dataPageTitle,
-  enabled,
-}: {
-  refUid: string;
-  dataPageTitle: string;
-  enabled: boolean;
-}) => {
-  await getOrCreatePage(dataPageTitle);
-  const dataBlockUid = await getOrCreateBlockOnPage(dataPageTitle, 'data', -1, {
-    open: false,
-    heading: 3,
-  });
-
-  const cardDataBlockUid = await getOrCreateChildBlock(dataBlockUid, `((${refUid}))`, 0, {
-    open: false,
-  });
-
-  const flagValue = enabled ? 'Y' : 'N';
-
-  // Card metadata now lives in a dedicated meta block so card-scoped state
-  // is structurally separated from historical review sessions.
-  await upsertCardMetaField({
-    cardDataBlockUid,
-    key: 'lineByLineReview',
-    value: flagValue,
-  });
-
-  if (enabled && !getLatestSessionUid(cardDataBlockUid)) {
-    await upsertCardMetaField({
-      cardDataBlockUid,
-      key: 'lineByLineProgress',
-      value: JSON.stringify({}),
     });
   }
 };
