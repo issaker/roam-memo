@@ -1,25 +1,3 @@
-/**
- * useCurrentCardData Hook
- *
- * Resolves the active card's session data with real-time Data Page synchronization.
- *
- * Architecture:
- *   1. Card queue: Determined at session start, modified locally (Forgot reinsertion)
- *   2. Card session data: Real-time polling from Data Page every 1000ms
- *   3. Card meta (cardType, LBL): Read from meta block via polling
- *
- * Key simplification from previous version:
- *   - Removed reviewModeOverride mechanism entirely
- *   - reviewMode is now derived from cardMeta.cardType (card-level property)
- *   - Mode switching writes directly to Data Page via updateCardType
- *   - Optimistic update: cardMeta is updated immediately on mode switch
- *   - Polling reconciles any drift between optimistic state and Data Page
- *
- * Polling handles:
- *   - External data changes (user deleting card history on Data Page)
- *   - Reconciliation after optimistic updates
- *   - LBL flag changes
- */
 import * as React from 'react';
 import { CardType, CardMeta, NewSession, ReviewModes, Session, cardTypeToReviewMode } from '~/models/session';
 import { generateNewSession, getPluginPageData } from '~/queries';
@@ -62,9 +40,9 @@ const isCardMetaChanged = (prev: CardMeta | undefined, next: CardMeta | undefine
 const extractCardMetaFromPluginData = (
   pluginData: Record<string, any>,
   cardUid: string
-): CardMeta => {
+): CardMeta | undefined => {
   const cardData = pluginData[cardUid];
-  if (!cardData) return {};
+  if (!cardData) return undefined;
 
   if (Array.isArray(cardData)) {
     const latestSession = cardData[cardData.length - 1] as Session & { cardType?: CardType };
@@ -88,6 +66,9 @@ const extractCardMetaFromPluginData = (
 const resolveReviewModeFromMeta = (cardMeta: CardMeta | undefined, sessionReviewMode?: ReviewModes): ReviewModes => {
   if (cardMeta?.cardType) {
     return cardTypeToReviewMode(cardMeta.cardType);
+  }
+  if (cardMeta === undefined && !sessionReviewMode) {
+    return ReviewModes.FixedInterval;
   }
   if (sessionReviewMode) {
     return sessionReviewMode;
@@ -135,9 +116,14 @@ export default function useCurrentCardData({
     const cardChanged = prevCardUidRef.current !== currentCardRefUid;
     prevCardUidRef.current = currentCardRefUid;
 
-    if (cardChanged && latestSession) {
-      setCurrentCardData(latestSession);
-      prevCardDataRef.current = latestSession;
+    if (cardChanged) {
+      setCardMeta(undefined);
+      prevCardMetaRef.current = undefined;
+
+      if (latestSession) {
+        setCurrentCardData(latestSession);
+        prevCardDataRef.current = latestSession;
+      }
     }
   }, [currentCardRefUid, latestSession]);
 
