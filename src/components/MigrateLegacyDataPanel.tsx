@@ -8,9 +8,12 @@ const getStringBetween = (string, from, to) =>
   string.substring(string.indexOf(from) + from.length, string.lastIndexOf(to));
 const parseConfigString = (configString) => configString.split('::').map((s) => s.trim());
 
-/**
- * Check whether a card's meta block has a reviewMode or legacy cardType field.
- */
+const BATCH_SIZE = 20;
+const BATCH_DELAY_MS = 2000;
+const CARD_DELAY_MS = 100;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const hasMetaReviewMode = (cardChildren: any[] = []): boolean => {
   const metaBlock = cardChildren.find((child) => child?.string === CARD_META_BLOCK_NAME);
   const metaChildren = metaBlock?.children || [];
@@ -24,9 +27,6 @@ const hasMetaReviewMode = (cardChildren: any[] = []): boolean => {
   return false;
 };
 
-/**
- * Check whether a card's meta block has the legacy cardType field (not reviewMode).
- */
 const hasLegacyCardType = (cardChildren: any[] = []): boolean => {
   const metaBlock = cardChildren.find((child) => child?.string === CARD_META_BLOCK_NAME);
   const metaChildren = metaBlock?.children || [];
@@ -43,9 +43,6 @@ const hasLegacyCardType = (cardChildren: any[] = []): boolean => {
   return hasCardType && !hasReviewMode;
 };
 
-/**
- * Find all session blocks that contain a reviewMode:: field.
- */
 const findSessionReviewModeBlocks = (cardChildren: any[] = []): { uid: string; string: string }[] => {
   const results: { uid: string; string: string }[] = [];
 
@@ -68,27 +65,25 @@ const findSessionReviewModeBlocks = (cardChildren: any[] = []): { uid: string; s
   return results;
 };
 
-/**
- * MigrateLegacyDataPanel
- *
- * Migrates card data to the current architecture where reviewMode is the
- * single source of truth stored in the meta block, and session records
- * contain only algorithm-specific parameters (no reviewMode).
- *
- * Three migration tasks:
- * 1. cardType → reviewMode: Rename legacy cardType:: to reviewMode:: in meta blocks
- * 2. Missing reviewMode: Infer and write reviewMode to meta for cards without one
- * 3. Session cleanup: Remove redundant reviewMode:: from session records
- *
- * Safe to run multiple times — already-migrated cards are skipped.
- */
+interface MigrationTask {
+  cardUid: string;
+  needsCardTypeRename: boolean;
+  needsReviewModeWrite: boolean;
+  needsSessionCleanup: boolean;
+  cardTypeFieldUid?: string;
+  cardTypeFieldValue?: string;
+  sessionReviewModeUids: string[];
+  resolvedMode: ReviewModes;
+  lineByLineReview?: 'Y';
+}
+
 const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) => {
   const [status, setStatus] = React.useState<'idle' | 'running' | 'done' | 'error'>('idle');
-  const [progress, setProgress] = React.useState({ total: 0, migrated: 0, skipped: 0 });
+  const [progress, setProgress] = React.useState({ total: 0, migrated: 0, skipped: 0, phase: '' });
 
   const runMigration = async () => {
     setStatus('running');
-    setProgress({ total: 0, migrated: 0, skipped: 0 });
+    setProgress({ total: 0, migrated: 0, skipped: 0, phase: 'Scanning...' });
 
     try {
       const query = `[
@@ -111,14 +106,14 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
       const pluginPageData = await getPluginPageData({ dataPageTitle, limitToLatest: false });
       const cardUids = Object.keys(pluginPageData);
       const total = cardUids.length;
-      let migrated = 0;
+
+      const tasks: MigrationTask[] = [];
       let skipped = 0;
 
       for (const cardUid of cardUids) {
         const cardData = pluginPageData[cardUid];
         if (!cardData) {
           skipped++;
-          setProgress({ total, migrated, skipped });
           continue;
         }
 
@@ -129,60 +124,103 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
         const needsCardTypeRename = hasLegacyCardType(rawCardChildren);
         const needsReviewModeWrite = !hasMetaReviewMode(rawCardChildren);
         const sessionReviewModeBlocks = findSessionReviewModeBlocks(rawCardChildren);
-        const needsSessionCleanup = sessionReviewModeBlocks.length > 0;
+        const sessionReviewModeUids = sessionReviewModeBlocks.map((b) => b.uid);
+        const needsSessionCleanup = sessionReviewModeUids.length > 0;
 
         if (!needsCardTypeRename && !needsReviewModeWrite && !needsSessionCleanup) {
           skipped++;
-          setProgress({ total, migrated, skipped });
           continue;
         }
 
         const sessions = Array.isArray(cardData) ? cardData : [cardData];
         const latestSession = sessions[sessions.length - 1];
 
-        if (needsCardTypeRename || needsReviewModeWrite) {
-          const resolvedMode = inferReviewModeFromFields(latestSession);
-          const isLineByLine = latestSession?.lineByLineReview === 'Y';
+        const resolvedMode = inferReviewModeFromFields(latestSession);
+        const isLineByLine = latestSession?.lineByLineReview === 'Y';
+        const finalMode = isLineByLine && resolvedMode === ReviewModes.SpacedInterval
+          ? ReviewModes.SpacedIntervalLBL
+          : resolvedMode;
 
-          const finalMode = isLineByLine && resolvedMode === ReviewModes.SpacedInterval
-            ? ReviewModes.SpacedIntervalLBL
-            : resolvedMode;
-
-          await updateCardType({
-            refUid: cardUid,
-            dataPageTitle,
-            reviewMode: finalMode,
-            lineByLineReview: isLineByLine ? 'Y' : undefined,
-          });
-
-          if (needsCardTypeRename) {
-            const metaBlock = rawCardChildren.find((child) => child?.string === CARD_META_BLOCK_NAME);
-            if (metaBlock?.children) {
-              for (const field of metaBlock.children) {
-                if (!field?.string) continue;
-                const [key, value] = parseConfigString(field.string);
-                if (key === 'cardType' && field.uid) {
-                  await window.roamAlphaAPI.updateBlock({
-                    block: { uid: field.uid, string: `reviewMode:: ${value}` },
-                  });
-                }
+        let cardTypeFieldUid: string | undefined;
+        let cardTypeFieldValue: string | undefined;
+        if (needsCardTypeRename) {
+          const metaBlock = rawCardChildren.find((child) => child?.string === CARD_META_BLOCK_NAME);
+          if (metaBlock?.children) {
+            for (const field of metaBlock.children) {
+              if (!field?.string) continue;
+              const [key, value] = parseConfigString(field.string);
+              if (key === 'cardType' && field.uid) {
+                cardTypeFieldUid = field.uid;
+                cardTypeFieldValue = value;
+                break;
               }
             }
           }
         }
 
-        if (needsSessionCleanup) {
-          for (const block of sessionReviewModeBlocks) {
-            await window.roamAlphaAPI.deleteBlock({
-              block: { uid: block.uid },
+        tasks.push({
+          cardUid,
+          needsCardTypeRename,
+          needsReviewModeWrite,
+          needsSessionCleanup,
+          cardTypeFieldUid,
+          cardTypeFieldValue,
+          sessionReviewModeUids,
+          resolvedMode: finalMode,
+          lineByLineReview: isLineByLine ? 'Y' : undefined,
+        });
+      }
+
+      setProgress({ total, migrated: 0, skipped, phase: `Phase 1: Writing reviewMode to meta (${tasks.length} cards)` });
+
+      let migrated = 0;
+      for (let i = 0; i < tasks.length; i++) {
+        const task = tasks[i];
+
+        if (task.needsCardTypeRename || task.needsReviewModeWrite) {
+          await updateCardType({
+            refUid: task.cardUid,
+            dataPageTitle,
+            reviewMode: task.resolvedMode,
+            lineByLineReview: task.lineByLineReview,
+          });
+
+          if (task.needsCardTypeRename && task.cardTypeFieldUid && task.cardTypeFieldValue) {
+            await window.roamAlphaAPI.updateBlock({
+              block: { uid: task.cardTypeFieldUid, string: `reviewMode:: ${task.cardTypeFieldValue}` },
             });
           }
         }
 
         migrated++;
-        setProgress({ total, migrated, skipped });
+        setProgress({ total, migrated, skipped, phase: `Phase 1: Writing reviewMode (${migrated}/${tasks.length})` });
+
+        if ((i + 1) % BATCH_SIZE === 0) {
+          await sleep(BATCH_DELAY_MS);
+        } else {
+          await sleep(CARD_DELAY_MS);
+        }
       }
 
+      const allSessionUids: string[] = tasks.flatMap((t) => t.sessionReviewModeUids);
+      if (allSessionUids.length > 0) {
+        setProgress({ total, migrated, skipped, phase: `Phase 2: Cleaning session records (${allSessionUids.length} blocks)` });
+
+        let deleted = 0;
+        for (let i = 0; i < allSessionUids.length; i++) {
+          await window.roamAlphaAPI.deleteBlock({
+            block: { uid: allSessionUids[i] },
+          });
+
+          deleted++;
+          if (deleted % BATCH_SIZE === 0) {
+            setProgress({ total, migrated, skipped, phase: `Phase 2: Cleaning session records (${deleted}/${allSessionUids.length})` });
+            await sleep(BATCH_DELAY_MS);
+          }
+        }
+      }
+
+      setProgress({ total, migrated, skipped, phase: 'Done' });
       setStatus('done');
     } catch (error) {
       console.error('[Memo] Migration error:', error);
@@ -203,8 +241,11 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
       )}
       {status === 'running' && (
         <div style={{ fontSize: '12px', color: '#888' }}>
-          Migrating... {progress.migrated + progress.skipped}/{progress.total} cards processed
-          ({progress.migrated} migrated, {progress.skipped} skipped)
+          <div>{progress.phase}</div>
+          <div>
+            {progress.migrated + progress.skipped}/{progress.total} cards
+            ({progress.migrated} migrated, {progress.skipped} skipped)
+          </div>
         </div>
       )}
       {status === 'done' && (
