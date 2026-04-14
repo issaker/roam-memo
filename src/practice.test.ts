@@ -111,7 +111,7 @@ describe('supermemo: simulate practice', () => {
   });
 
   describe('Line-by-line metadata', () => {
-    test('generatePracticeData preserves card-scoped line-by-line fields', () => {
+    test('generatePracticeData does not pass through line-by-line fields (managed separately)', () => {
       const result = practice.generatePracticeData({
         dateCreated: new Date('2026-04-14T00:00:00.000Z'),
         reviewMode: ReviewModes.SpacedInterval,
@@ -119,12 +119,11 @@ describe('supermemo: simulate practice', () => {
         interval: 0,
         repetitions: 0,
         eFactor: 2.5,
-        lineByLineReview: 'Y',
-        lineByLineProgress: '{"child-1":{"interval":1}}',
       });
 
-      expect(result.lineByLineReview).toBe('Y');
-      expect(result.lineByLineProgress).toBe('{"child-1":{"interval":1}}');
+      expect(result.lineByLineReview).toBeUndefined();
+      expect(result.lineByLineProgress).toBeUndefined();
+      expect(result.reviewMode).toBe(ReviewModes.SpacedInterval);
     });
   });
 });

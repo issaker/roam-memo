@@ -1,3 +1,20 @@
+/**
+ * PracticeOverlay Component
+ *
+ * Main review interface — displays cards one at a time and handles grading.
+ *
+ * Architecture:
+ * - Receives practice data, settings, and callbacks as props from App
+ * - Uses useCurrentCardData for real-time card data with polling
+ * - MainContext provides shared state (reviewMode, intervalMultiplier, etc.) to child components
+ * - Footer handles grading buttons and keyboard shortcuts
+ * - CardBlock renders the actual Roam block content
+ *
+ * Settings flow:
+ * - showBreadcrumbs, showModeBorders come from useSettings via App props (single source of truth)
+ * - localSettings is used ONLY for the settings dialog form state (roam/js mode)
+ * - Dialog saves sync to both page and extensionAPI, then dispatches roamMemoSettingsChanged event
+ */
 import * as React from 'react';
 import * as Blueprint from '@blueprintjs/core';
 import * as BlueprintSelect from '@blueprintjs/select';
@@ -15,7 +32,7 @@ import { saveSettingsToPage, loadSettingsFromPage } from '~/queries/settings';
 import CardBlock from '~/components/overlay/CardBlock';
 import Footer from '~/components/overlay/Footer';
 import ButtonTags from '~/components/ButtonTags';
-import { CompleteRecords, ReviewModes, isFixedMode, isLineByLineMode, DEFAULT_REVIEW_MODE, LineByLineProgressMap } from '~/models/session';
+import { CompleteRecords, ReviewModes, isFixedMode, isLineByLineMode, isReadingMode, DEFAULT_REVIEW_MODE, LineByLineProgressMap } from '~/models/session';
 import useCurrentCardData from '~/hooks/useCurrentCardData';
 import { generateNewSession, updateLineByLineProgress, updateCardType } from '~/queries';
 import MigrateLegacyDataPanel from '~/components/MigrateLegacyDataPanel';
@@ -60,6 +77,7 @@ interface Props {
   setRenderMode: (tag: string, mode: RenderMode) => void;
   forgotReinsertOffset: number;
   dataPageTitle: string;
+  showBreadcrumbs: boolean;
   showModeBorders: boolean;
 }
 
@@ -79,6 +97,7 @@ const PracticeOverlay = ({
   setRenderMode,
   forgotReinsertOffset,
   dataPageTitle,
+  showBreadcrumbs,
   showModeBorders,
 }: Props) => {
   const todaySelectedTag = today.tags[selectedTag];
@@ -117,12 +136,6 @@ const PracticeOverlay = ({
   const [intervalMultiplier, setIntervalMultiplier] = React.useState<number>(
     currentCardData?.intervalMultiplier || (newFixedSessionDefaults.intervalMultiplier as number)
   );
-
-  // Resolve mode-specific data fields via historical lookback so that
-  // switching reviewMode (e.g. FixedDays → FixedProgressive) recovers
-  // the correct progressiveRepetitions from earlier sessions instead of
-  // treating undefined as 0 and producing wrong intervals.
-  const resolvedCardData = currentCardData;
 
   const isDone = todaySelectedTag?.status === CompletionStatus.Finished || !currentCardData;
 
@@ -168,7 +181,6 @@ const PracticeOverlay = ({
   const [showAnswers, setShowAnswers] = React.useState(false);
   const [hasCloze, setHasCloze] = React.useState(true);
   const [showSettings, setShowSettings] = React.useState(false);
-  const [isRendered, setIsRendered] = React.useState(false);
 
   const shouldShowAnswerFirst =
     renderMode === RenderMode.AnswerFirst && hasBlockChildrenUids && !showAnswers;
@@ -176,6 +188,8 @@ const PracticeOverlay = ({
   const isLineByLine =
     isLineByLineMode(reviewMode) &&
     hasBlockChildrenUids;
+
+  const isReading = isReadingMode(reviewMode) && hasBlockChildrenUids;
 
   const parseLineByLineProgress = (progressStr?: string): LineByLineProgressMap => {
     if (!progressStr) return {};
@@ -202,6 +216,7 @@ const PracticeOverlay = ({
       setLineByLineCurrentChildIndex(0);
       return;
     }
+
     const now = new Date();
     let firstDueIndex = childUidsList.length;
     for (let i = 0; i < childUidsList.length; i++) {
@@ -221,6 +236,47 @@ const PracticeOverlay = ({
       if (!currentCardRefUid || lineByLineCurrentChildIndex >= childUidsList.length) return;
 
       const childUid = childUidsList[lineByLineCurrentChildIndex];
+
+      if (isReading) {
+        const existingData = lineByLineProgress[childUid];
+        const progReps = existingData?.progressiveRepetitions || 0;
+
+        let nextInterval: number;
+        if (progReps === 0) {
+          nextInterval = 2;
+        } else if (progReps === 1) {
+          nextInterval = 6;
+        } else {
+          nextInterval = Math.round(6 * Math.pow(2, progReps - 2));
+        }
+
+        const now = new Date();
+        const nextDueDate = dateUtils.addDays(now, nextInterval);
+
+        const updatedProgress: LineByLineProgressMap = {
+          ...lineByLineProgress,
+          [childUid]: {
+            nextDueDate: nextDueDate.toISOString(),
+            interval: nextInterval,
+            repetitions: (existingData?.repetitions || 0) + 1,
+            eFactor: existingData?.eFactor || 2.5,
+            progressiveRepetitions: progReps + 1,
+          },
+        };
+
+        await updateLineByLineProgress({
+          refUid: currentCardRefUid,
+          dataPageTitle,
+          progress: updatedProgress,
+        });
+
+        setCurrentIndex((prev) => prev + 1);
+        setLineByLineCurrentChildIndex(lineByLineCurrentChildIndex + 1);
+        setLineByLineRevealedCount(lineByLineCurrentChildIndex + 1);
+        setShowAnswers(true);
+        return;
+      }
+
       const existingData = lineByLineProgress[childUid];
 
       const sm2Input = {
@@ -253,9 +309,6 @@ const PracticeOverlay = ({
       const isCardFinished = nextIndex >= childUidsList.length;
 
       if (isCardFinished) {
-        // Line-by-line review is still a normal card in the session queue.
-        // After the final due child is graded, advance to the next card instead
-        // of leaving the user on a terminal "done" footer for the same card.
         setCurrentIndex((prev) => prev + 1);
         setLineByLineCurrentChildIndex(nextIndex);
         setLineByLineRevealedCount(nextIndex);
@@ -274,6 +327,8 @@ const PracticeOverlay = ({
       lineByLineProgress,
       dataPageTitle,
       setCurrentIndex,
+      isReading,
+      currentCardData?.lineByLineProgress,
     ]
   );
 
@@ -322,11 +377,6 @@ const PracticeOverlay = ({
     }
   }, [hasBlockChildren, hasCloze, isLineByLine, reviewMode, currentCardRefUid]);
 
-  // Reset render flag when card changes
-  React.useEffect(() => {
-    setIsRendered(false);
-  }, [currentCardRefUid]);
-
   const onTagChange = async (tag) => {
     setCurrentIndex(0);
     handleMemoTagChange(tag);
@@ -368,7 +418,7 @@ const PracticeOverlay = ({
       }
 
       const practiceProps = {
-        ...resolvedCardData,
+        ...currentCardData,
         ...gradeData,
         intervalMultiplier,
       };
@@ -393,7 +443,7 @@ const PracticeOverlay = ({
     [
       handlePracticeClick,
       isDone,
-      resolvedCardData,
+      currentCardData,
       intervalMultiplier,
       currentCardRefUid,
       forgotReinsertOffset,
@@ -432,31 +482,14 @@ const PracticeOverlay = ({
     maxHeight: '40vh',
   };
 
-  const [showBreadcrumbs, setShowBreadcrumbs] = React.useState(false);
-  const [liveShowModeBorders, setLiveShowModeBorders] = React.useState(showModeBorders);
-
-  React.useEffect(() => {
-    setShowBreadcrumbs(localSettings.showBreadcrumbs);
-  }, [localSettings.showBreadcrumbs]);
-
-  React.useEffect(() => {
-    setLiveShowModeBorders(localSettings.showModeBorders);
-  }, [localSettings.showModeBorders]);
-
-  React.useEffect(() => {
-    setLiveShowModeBorders(showModeBorders);
-  }, [showModeBorders]);
-
   const toggleBreadcrumbs = React.useCallback(async () => {
     const newState = !showBreadcrumbs;
-    setShowBreadcrumbs(newState);
-    const updatedSettings = { ...localSettings, showBreadcrumbs: newState };
-    setLocalSettings(updatedSettings);
-    await saveSettingsToPage(updatedSettings.dataPageTitle, updatedSettings);
     if (window.roamMemo?.extensionAPI?.settings) {
       window.roamMemo.extensionAPI.settings.set('showBreadcrumbs', newState);
+      window.dispatchEvent(new Event('roamMemoSettingsChanged'));
     }
-  }, [showBreadcrumbs, localSettings]);
+    await saveSettingsToPage(dataPageTitle, { ...localSettings, showBreadcrumbs: newState });
+  }, [showBreadcrumbs, dataPageTitle, localSettings]);
 
   const hotkeys = React.useMemo(
     () => [
@@ -553,7 +586,7 @@ const PracticeOverlay = ({
       <Dialog
         $isEditing={isEditing}
         $reviewMode={reviewMode}
-        $showModeBorders={liveShowModeBorders}
+        $showModeBorders={showModeBorders}
         isOpen={isOpen}
         onClose={onCloseCallback}
         className="pb-0"
@@ -591,7 +624,7 @@ const PracticeOverlay = ({
                     setHasCloze={setHasCloze}
                     breadcrumbs={blockInfo.breadcrumbs}
                     showBreadcrumbs={showBreadcrumbs}
-                    onRenderComplete={() => setIsRendered(true)}
+                    onRenderComplete={() => {}}
                     hideChildren={true}
                   />
                   <LineByLineSeparator>
@@ -609,7 +642,7 @@ const PracticeOverlay = ({
                           setHasCloze={setHasCloze}
                           breadcrumbs={[]}
                           showBreadcrumbs={false}
-                          onRenderComplete={() => setIsRendered(true)}
+                          onRenderComplete={() => {}}
                         />
                       </LineByLineItem>
                     );
@@ -624,7 +657,7 @@ const PracticeOverlay = ({
                     setHasCloze={setHasCloze}
                     breadcrumbs={blockInfo.breadcrumbs}
                     showBreadcrumbs={false}
-                    onRenderComplete={() => setIsRendered(true)}
+                    onRenderComplete={() => {}}
                   />
                 ))
               ) : (
@@ -634,7 +667,7 @@ const PracticeOverlay = ({
                   setHasCloze={setHasCloze}
                   breadcrumbs={blockInfo.breadcrumbs}
                   showBreadcrumbs={showBreadcrumbs}
-                  onRenderComplete={() => setIsRendered(true)}
+                  onRenderComplete={() => {}}
                 />
               )}
             </>
@@ -674,7 +707,7 @@ const PracticeOverlay = ({
           isDone={isDone || lineByLineIsCardComplete}
           hasCards={hasCards}
           onCloseCallback={onCloseCallback}
-          currentCardData={resolvedCardData}
+          currentCardData={currentCardData}
           onStartCrammingClick={onStartCrammingClick}
         />
       </Dialog>
@@ -816,7 +849,7 @@ const PracticeOverlay = ({
           <div style={{ marginBottom: '20px', borderTop: '1px solid #394b59', paddingTop: '15px' }}>
             <span style={{ fontSize: '14px', fontWeight: 600 }}>Data Migration</span>
             <p style={{ fontSize: '12px', color: colors.textMuted, margin: '5px 0 10px 0' }}>
-              Add cardType metadata to cards created before v2.1. Run once after upgrading.
+              Migrate card data to the current architecture: rename cardType→reviewMode in meta, add missing reviewMode, and remove redundant reviewMode from session records. Safe to run multiple times.
             </p>
             <MigrateLegacyDataPanel dataPageTitle={dataPageTitle} />
           </div>
@@ -869,18 +902,8 @@ const Dialog = styled(Blueprint.Dialog)<{
   border: 2px solid ${({ $reviewMode }) =>
     ($reviewMode === ReviewModes.SpacedInterval || $reviewMode === ReviewModes.SpacedIntervalLBL)
       ? colors.modeSpaced
-      : $reviewMode === ReviewModes.FixedProgressive ||
-        $reviewMode === ReviewModes.FixedDays ||
-        $reviewMode === ReviewModes.FixedWeeks ||
-        $reviewMode === ReviewModes.FixedMonths ||
-        $reviewMode === ReviewModes.FixedYears
-        ? colors.modeFixed
-        : colors.borderSubtle};
-  border-color: ${({ $showModeBorders, $reviewMode }) =>
-    $showModeBorders === false
-      ? colors.borderSubtle
-      : ($reviewMode === ReviewModes.SpacedInterval || $reviewMode === ReviewModes.SpacedIntervalLBL)
-        ? colors.modeSpaced
+      : $reviewMode === ReviewModes.FixedProgressiveLBL
+        ? colors.modeReading
         : $reviewMode === ReviewModes.FixedProgressive ||
           $reviewMode === ReviewModes.FixedDays ||
           $reviewMode === ReviewModes.FixedWeeks ||
@@ -888,6 +911,20 @@ const Dialog = styled(Blueprint.Dialog)<{
           $reviewMode === ReviewModes.FixedYears
           ? colors.modeFixed
           : colors.borderSubtle};
+  border-color: ${({ $showModeBorders, $reviewMode }) =>
+    $showModeBorders === false
+      ? colors.borderSubtle
+      : ($reviewMode === ReviewModes.SpacedInterval || $reviewMode === ReviewModes.SpacedIntervalLBL)
+        ? colors.modeSpaced
+        : $reviewMode === ReviewModes.FixedProgressiveLBL
+          ? colors.modeReading
+          : $reviewMode === ReviewModes.FixedProgressive ||
+            $reviewMode === ReviewModes.FixedDays ||
+            $reviewMode === ReviewModes.FixedWeeks ||
+            $reviewMode === ReviewModes.FixedMonths ||
+            $reviewMode === ReviewModes.FixedYears
+            ? colors.modeFixed
+            : colors.borderSubtle};
 
   ${mediaQueries.lg} {
     width: 80vw;
@@ -1207,6 +1244,13 @@ const ModeBadge = ({ reviewMode }) => {
     return (
       <Blueprint.Tag intent="success" minimal>
         Spaced
+      </Blueprint.Tag>
+    );
+  }
+  if (isReadingMode(reviewMode)) {
+    return (
+      <Blueprint.Tag intent="primary" minimal>
+        Read
       </Blueprint.Tag>
     );
   }

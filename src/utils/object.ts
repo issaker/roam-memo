@@ -1,9 +1,7 @@
 /**
  * Object Utilities
  *
- * deepClone: JSON-based deep clone for simple serializable objects.
- * Not suitable for objects with functions, Dates, or circular references.
+ * Shared object manipulation helpers.
+ * Note: For deep cloning serializable objects, use JSON.parse(JSON.stringify(obj)) directly
+ * rather than a utility function — it's more readable and explicit about limitations.
  */
-export const deepClone = (obj: object) => {
-  return JSON.parse(JSON.stringify(obj));
-};

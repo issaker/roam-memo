@@ -80,7 +80,7 @@ describe('useCurrentCardData', () => {
     expect(result.current.currentCardData).toEqual(undefined);
   });
 
-  it('polling infers SPACED_INTERVAL from live SM2 fields when reviewMode is missing', async () => {
+  it('polling reads reviewMode from meta block via live data', async () => {
     const currentCardRefUid = 'card-live-spaced';
     const staleQueueSession = generateNewSession({
       reviewMode: ReviewModes.FixedProgressive,
@@ -101,7 +101,9 @@ describe('useCurrentCardData', () => {
                     {
                       string: 'meta',
                       order: 0,
-                      children: [],
+                      children: [
+                        { string: 'reviewMode:: SPACED_INTERVAL' },
+                      ],
                     },
                     {
                       string: '[[April 14th, 2026]] 🟢',

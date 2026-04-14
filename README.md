@@ -71,8 +71,9 @@ The header bar displays a color-coded mode badge to the left of the status tags 
 |------------|-------------|-------|--------------|
 | **Spaced** | Spaced Interval Mode | Green | Same as "New" tag |
 | **Fixed** | Fixed Interval Mode | Orange | Same as "Past Due" tag |
+| **Read** | Incremental Read Mode | Blue | Same as primary intent |
 
-The dialog border color also dynamically matches the mode badge color, reinforcing the visual cue across the entire window.
+The dialog border color also dynamically matches the mode badge color, reinforcing the visual cue across the entire window. Can be toggled via the "Show Review Mode Borders" setting.
 
 ### Keyboard Shortcuts
 
@@ -82,7 +83,7 @@ The dialog border color also dynamically matches the mode badge color, reinforci
 | Skip            | `s` or `→` |
 | Previous card   | `←`        |
 | Breadcrumbs     | `b`        |
-| Perfect         | `space`    |
+| Perfect / Next  | `space`    |
 | Forgot          | `f`        |
 | Hard            | `h`        |
 | Good            | `g`        |
@@ -104,26 +105,47 @@ Uses a **modified SM2 algorithm** to optimize long-term memory retention with gr
 - **Reset Behavior**: Grade 0 → review again today (interval=0); Grades 1-2 → review tomorrow (interval=1)
 - **Grade Mapping**: Forgot(0), Hard(2), Good(4), Perfect(5) — grades 1 and 3 are skipped for simplicity
 
-### Fixed Interval Mode (Progressive Reading)
+### Fixed Interval Mode (Progressive Review)
 
 A relaxed approach for content you want to revisit regularly. Includes **Progressive Mode** with automatic interval growth:
 
 - Review schedule: 2 → 6 → 12 → 24 → 48 → 96 days...
-- Calculation: `nextInterval = (6 × 2^(progressiveRepetitions - 2)) × 2.0` for progReps ≥ 2; progReps 0 and 1 use hardcoded 2 and 6 days
+- Calculation: `nextInterval = 6 × 2^(progressiveRepetitions - 2)` for progReps ≥ 2; progReps 0 and 1 use hardcoded 2 and 6 days
 - Progressive mode maintains its own `progressiveRepetitions` counter, independent of SM2's `repetitions`, `interval`, and `eFactor`
 - Also supports manual intervals: Days, Weeks, Months, Years
 
 > **Tip:** New cards default to Progressive mode for a gentler learning experience. Switch to Spaced Interval mode anytime for more granular control.
 
+### Incremental Read Mode (Progressive Reading)
+
+A line-by-line reading mode designed for long-form content. Based on the **Incremental Reading** methodology, it breaks reading into digestible chunks with spaced intervals between sections.
+
+**How it differs from LBL Review:**
+
+| Aspect | LBL Review (SPACED_INTERVAL_LBL) | Incremental Read (FIXED_PROGRESSIVE_LBL) |
+|--------|-----------------------------------|------------------------------------------|
+| Purpose | Memory reinforcement | Reading comprehension |
+| Per session | Review all due children | Read one child, then next card |
+| Grading | SM2 buttons (Forgot/Hard/Good/Perfect) | "Next" button only |
+| Scheduling | SM2 per child | Progressive per child |
+| Next appearance | When any child is due | When next child is due |
+
+**Per-child Progressive intervals:**
+- Each child block gets its own independent Progressive interval counter
+- Schedule: 2 → 6 → 12 → 24 → 48 → 96 days per child
+- A 20-child article: all children start at 2-day intervals, not just the first few
+- The card's `nextDueDate` is set to the earliest child due date
+
+**Workflow:**
+1. Select "Incremental Read" from the mode selector (📖 icon)
+2. The first unread child block is revealed
+3. Click "Next" to mark it as read and advance to the next card
+4. Next time the card appears, the next unread child is shown
+5. After all children are read, the cycle restarts from the beginning
+
 ### Dynamic Review Mode Switching
 
-Each card's `reviewMode` is read from the Data Page in real-time on every card navigation. Changes to `reviewMode::` on the Data Page take effect immediately — no session restart required.
-
-For legacy or partially corrupted records, the reader now infers the effective review mode from the latest session fields:
-
-- If SM2 / Spaced fields such as `repetitions`, `interval`, or `eFactor` exist, the card is treated as `Spaced Interval Mode`
-- Only cards with empty review data, or cards that explicitly use Fixed Interval fields, fall back to `Fixed Interval Mode`
-- This inference is applied to the real-time polling path as well, so the mode badge and footer controls stay aligned with the actual stored data
+Each card's `reviewMode` is stored in the **meta block** on the Data Page as the single source of truth. Changes take effect immediately on card navigation — no session restart required.
 
 ### Urgency-Based Due Card Sorting
 
@@ -160,44 +182,87 @@ A specialized card-level review mode for cards with multiple child blocks (outli
 - The card's main `nextDueDate` is set to the earliest child due date, ensuring the card appears as "due" when any child needs review
 - `lineByLineReview`, `lineByLineProgress`, and the line-by-line parent `nextDueDate` are stored in a dedicated card-level `meta` block, so card metadata stays structurally separate from historical review sessions
 
-**Data Page fields:**
-- Card-level `meta > lineByLineReview:: Y` or `N` — marks the current card as line-by-line review type
-- Card-level `meta > lineByLineProgress::` — JSON object tracking per-child SM2 data: `{childUid: {nextDueDate, interval, repetitions, eFactor}}`
-- Card-level `meta > nextDueDate::` — earliest child due date for line-by-line scheduling
-
 **Visual indicators:**
 - **LBL checkbox** in the header toggles line-by-line mode for the current card
 - **L2/5** tag shows current line progress (current line / total lines)
 - Mastered lines display with reduced opacity and a subtle left border
 - The current active line has a green left border highlight
 
-### 2026-04-14 Line-by-Line Review Fix
+## Data Architecture
 
-- `Line-by-Line Review` now behaves as a card-scoped property, so toggling `LBL` on the current card survives review-mode switching
-- New or unreviewed cards can be converted to line-by-line immediately because the metadata is stored in a dedicated `meta` block under the card container on the Data Page
-- Child progress still uses independent SM2 records per block, while parent-card scheduling follows the earliest due child
-- Completing the final due child now advances directly to the next card instead of leaving the user on the same card
-- Added a `Show Review Mode Borders` setting so users can hide or show the green/orange mode border, with the default set to enabled
-- When a card's history is manually deleted during polling, the card now resets to the default `Fixed Interval` reading mode
-- `Fixed Interval` cards now open fully expanded without requiring `Show Answer`
-- `Line-by-Line Review` is now only activated in `Spaced Interval Mode`; in `Fixed Interval Mode` the card keeps normal expanded reading behavior
+All practice data is stored on a Roam page (default: `roam/memo`). Each card's data is split into two layers:
 
-## Data Storage
+### 1. CardMeta (persistent, card-level) — Single Source of Truth
 
-All practice data is stored on a Roam page (default: `roam/memo`) with this structure:
+Stored in the `meta` block. These fields define the card's identity and behavior:
+
+```
+((cardUid))
+├── meta                        ← Card-level persistent data
+│   ├── reviewMode:: SPACED_INTERVAL    ← Algorithm mode (SINGLE SOURCE OF TRUTH)
+│   ├── lineByLineReview:: Y            ← Line-by-line toggle
+│   ├── lineByLineProgress:: {...}      ← Per-child progress data
+│   └── nextDueDate:: [[Date]]          ← Earliest due date
+```
+
+### 2. Session Records (per-review, historical)
+
+Stored as date-headed blocks. These record algorithm-specific parameters at each review:
+
+```
+├── [[Date]] 🟢                ← Session heading (emoji = grade)
+│   ├── nextDueDate:: [[Date]]
+│   ├── grade:: 5
+│   ├── eFactor:: 2.5
+│   └── repetitions:: 3
+└── [[Date]] 🔴
+    └── ...
+```
+
+**Key principle:** `reviewMode` lives ONLY in the meta block. Session records contain algorithm-specific parameters (grade, interval, eFactor, etc.) but NOT reviewMode. This ensures a single source of truth and prevents mode conflicts.
+
+### lineByLineProgress Data Format
+
+The `lineByLineProgress` field in the meta block stores per-child scheduling data as JSON:
+
+```json
+{
+  "childUid1": {
+    "nextDueDate": "2026-04-16T00:00:00.000Z",
+    "interval": 2,
+    "repetitions": 1,
+    "eFactor": 2.5,
+    "progressiveRepetitions": 1
+  },
+  "childUid2": {
+    "nextDueDate": "2026-04-20T00:00:00.000Z",
+    "interval": 6,
+    "repetitions": 2,
+    "eFactor": 2.5,
+    "progressiveRepetitions": 2
+  }
+}
+```
+
+- **LBL Review mode** uses SM2 fields (`interval`, `repetitions`, `eFactor`) per child
+- **Incremental Read mode** uses `progressiveRepetitions` per child for Progressive scheduling
+- Both modes share the same data structure; `progressiveRepetitions` is optional and only used by Read mode
+
+### Full Data Page Structure
 
 ```
 roam/memo (page)
 ├── data (heading block)
 │   ├── ((cardUid1))
 │   │   ├── meta
+│   │   │   ├── reviewMode:: SPACED_INTERVAL
 │   │   │   ├── lineByLineReview:: Y
 │   │   │   ├── lineByLineProgress:: {"childUid": {...}}
 │   │   │   └── nextDueDate:: [[Date]]
-│   │   ├── [[Date]] 🟢        ← session heading (emoji = grade)
+│   │   ├── [[Date]] 🟢
 │   │   │   ├── nextDueDate:: [[Date]]
 │   │   │   ├── grade:: 5
-│   │   │   └── reviewMode:: SPACED_INTERVAL
+│   │   │   └── eFactor:: 2.5
 │   │   └── [[Date]] 🔴
 │   │       └── ...
 │   └── ((cardUid2))
@@ -211,18 +276,22 @@ roam/memo (page)
     └── ...
 ```
 
+## Data Migration
+
+The Data Migration tool (accessible via Settings → Data Migration) performs three tasks:
+
+1. **cardType → reviewMode**: Renames legacy `cardType::` to `reviewMode::` in meta blocks
+2. **Missing reviewMode**: Infers and writes `reviewMode` to meta for cards without one
+3. **Session cleanup**: Removes redundant `reviewMode::` from session records (reviewMode belongs only in meta)
+
+Safe to run multiple times — already-migrated cards are skipped.
+
 ## Real-Time Data Synchronization
-
-### Problem
-
-When a user modifies card history on the Data Page (e.g., deleting a session record) during an active review session, the UI displayed stale expected review times (e.g., "Review in 24 days") because the session data was only read once at session start.
-
-### Architecture
 
 The `useCurrentCardData` hook implements a **dual-layer data resolution** strategy:
 
 ```
-Session Queue (one-time read)     Data Page (real-time polling, 200ms)
+Session Queue (one-time read)     Data Page (real-time polling, 2s)
         │                                    │
         ▼                                    ▼
   Card queue + sessions[]           getPluginPageData()
@@ -235,68 +304,11 @@ Session Queue (one-time read)     Data Page (real-time polling, 200ms)
 
 **Layer 1 — Session Queue (one-time read):** The card queue and full session history are read once when the review session starts and remain fixed until the session closes. This ensures stable card ordering and prevents queue disruption.
 
-**Layer 2 — Data Page Polling (real-time):** Every 200ms, the hook reads the latest session data for the current card directly from the Data Page via `getPluginPageData({ limitToLatest: true })`. This detects external changes (history deletion, reviewMode edits) and updates the display immediately.
+**Layer 2 — Data Page Polling (real-time):** Every 2 seconds, the hook reads the latest session data for the current card directly from the Data Page via `getPluginPageData({ limitToLatest: true })`. This detects external changes (history deletion, reviewMode edits) and updates the display immediately.
 
-### Key Design Decisions
+**Optimistic updates:** When the user toggles reviewMode in the UI, `applyOptimisticCardMeta` provides instant feedback before the next poll confirms the change.
 
-- **Shallow comparison (`isSessionDataChanged`):** Polling compares only key session fields (interval, repetitions, eFactor, reviewMode, nextDueDate, dateCreated) to avoid unnecessary re-renders when data hasn't meaningfully changed.
-- **No immediate fetch on mount:** The first poll fires after 200ms, not immediately. Effect 1 already provides initial data from the sessions array, so the brief delay is imperceptible.
-- **Review mode override:** When the user toggles reviewMode in the UI, a temporary override takes precedence over live data. The override is automatically cleared once the Data Page reflects the persisted change.
-- **Refs for polling stability:** `reviewModeOverrideRef` and `reviewModeRef` allow the polling callback to access the latest state values without restarting the interval on every state change.
-
-### Mode-Specific Data Isolation (Bug Fix)
-
-**Problem:** When a card had Progressive mode data (`progressiveRepetitions: 1`) and the user switched to Days mode to set a manual interval, then switched back to Progressive mode, the system incorrectly calculated the next review date because `progressiveRepetitions` was `undefined` in the Days session — causing the Progressive counter to reset to 0.
-
-**Root causes:**
-1. `practice()` did not forward `progressiveRepetitions` to `generatePracticeData()`, so the field was always `undefined` regardless of history
-2. No historical lookback: when a mode-specific field was `undefined`, the system used `|| 0` instead of searching earlier sessions for the last valid value
-3. The 200ms polling effect in `PracticeOverlay` reset `intervalMultiplierType` from the latest session on every update, overriding the user's manual mode switch
-
-**Fix (3 files):**
-- **`practice.ts`:** `progressiveRepetitions` is now destructured and passed to `generatePracticeData()`, preserving the counter across sessions
-- **`useCurrentCardData.tsx`:** New `resolveModeSpecificData()` function searches backward through session history for the last valid value of a mode-specific field (e.g., `progressiveRepetitions` for Progressive, `intervalMultiplier` for Days/Weeks/Months/Years, `repetitions`/`interval`/`eFactor` for SM2)
-- **`PracticeOverlay.tsx`:** `resolvedCardData` applies `resolveModeSpecificData()` before passing data to the Footer and `onPracticeClick`; the interval state initialisation effect now only runs when the card changes (tracked via `prevCardRefUidRef`), not on every polling update
-
-### Review Mode Inheritance Bug Fix
-
-**Problem:** During a review session, when the previous card used Progressive mode and the user clicked "Next", the next card would incorrectly inherit the Progressive mode even though its most recent history record explicitly specified `reviewMode:: SPACED_INTERVAL`. This caused users to be unable to correctly identify the current card's review mode, impacting learning experience and review effectiveness.
-
-**Root causes:**
-1. **`reviewModeOverride` not cleared on card navigation (useCurrentCardData.tsx):** Effect 2 only cleared `reviewModeOverride` when `dataPageTitle` was unavailable. When Data Page access was available, the effect relied on the polling effect (Effect 3) to clear the override. However, the polling effect only checks whether the **current** card's data matches the override — after navigating to a new card, the new card's `reviewMode` typically doesn't match the stale override, so the override was **never cleared** and incorrectly applied to the new card.
-2. **Stale `currentCardData` in intervalMultiplierType reset effect (PracticeOverlay.tsx):** The reset effect depended on `currentCardData`, which is updated asynchronously by `useCurrentCardData`'s Effect 1. During the first render after a card change, `currentCardData` still contained the **previous** card's data. The effect used this stale data to set `intervalMultiplierType`, copying the previous card's Progressive type to the new card. On the next render, `cardChanged` was `false`, preventing correction.
-
-**Fix (2 files):**
-- **`useCurrentCardData.tsx`:** Effect 2 now **always** clears `reviewModeOverride` and resets `reviewMode` to `latestSession?.reviewMode` on card navigation, regardless of whether `dataPageTitle` is available. Additionally, `latestSession` is now exposed as a return value for use by `PracticeOverlay`.
-- **`PracticeOverlay.tsx`:** The `intervalMultiplierType` reset effect now uses `latestSession` (derived immediately from sessions via `useMemo`) instead of the asynchronously-updated `currentCardData`. This ensures the effect always operates on the correct new card's data during card transitions.
-
-**Test coverage (5 new tests):**
-- Progressive → SPACED_INTERVAL card navigation loads correct mode
-- Multiple cards with different modes switch correctly in sequence
-- Review history consistency with actual review mode
-- `reviewModeOverride` cleared on card navigation to prevent mode inheritance
-- `latestSession` correctly derived from sessions
-
-### Review Mode Field Inference Fix
-
-**Problem:** Some live or legacy session records could lose their explicit `reviewMode::` field even though they still contained valid Spaced Interval data (`repetitions`, `interval`, `eFactor`). In that state, polling could misidentify the current card as `Fixed Interval Mode`, causing the badge, controls, and review behavior to drift away from the stored session data.
-
-**Root causes (additional, 2026-04-14):**
-1. **`cardScopedFields` overriding inferred reviewMode (data.ts):** `getCardScopedFields()` collected all fields from the `meta` block or legacy metadata, including `reviewMode` if present. When `Object.assign(record, cardScopedFields)` ran after `parseFieldValuesFromChildren({ inferReviewMode: true })`, the card-scoped `reviewMode` (often stale or from a different session) overwrote the correctly inferred per-session reviewMode. Fix: `delete cardScopedFields.reviewMode` before returning, since `reviewMode` is session-scoped, not card-scoped.
-2. **Unsorted session array in `mapPluginPageData` (data.ts):** The Datalog query returns child blocks in unspecified order, but `mapPluginPageData` iterated them as-is. Downstream consumers (useCurrentCardData, today.ts) use `sessions[sessions.length - 1]` as the latest session, which could return a stale session instead of the one with `order === 0`. Fix: sort `sessionChildren` by `b.order - a.order` so the newest session (order 0) is always last in the array.
-
-**Fix:**
-- `src/queries/data.ts` now infers the effective review mode from the latest session fields instead of blindly defaulting missing `reviewMode::` values
-- Spaced Interval fields take priority, so any session with SM2 data is resolved as `SPACED_INTERVAL`
-- `FIXED_INTERVAL` is only used when the record is empty or when the latest session clearly contains Fixed Interval fields
-- The polling flow in `useCurrentCardData` benefits automatically because it already reads through `getPluginPageData({ limitToLatest: true })`
-- `getCardScopedFields()` now strips `reviewMode` before returning, preventing meta-block data from overriding per-session inference
-- `mapPluginPageData()` now sorts sessions by `:block/order` so `sessions[sessions.length - 1]` is always the latest session
-
-**Test coverage (3 new tests):**
-- Missing `reviewMode::` + SM2 fields resolves to `SPACED_INTERVAL`
-- Missing `reviewMode::` + no SM2 fields resolves to `FIXED_INTERVAL`
-- Live polling updates a stale Fixed UI back to `SPACED_INTERVAL` when the Data Page contains Spaced fields
+**Shallow comparison:** Polling compares only key session fields (interval, repetitions, eFactor, reviewMode, nextDueDate, dateCreated) to avoid unnecessary re-renders when data hasn't meaningfully changed.
 
 ## Development
 
@@ -345,13 +357,14 @@ src/
 ├── extension.tsx          # Plugin entry point (onload/onunload)
 ├── app.tsx                # Root React component, orchestrates review workflow
 ├── practice.ts            # SM2 algorithm + Fixed Interval algorithm
+├── constants.ts           # Shared constants (meta block name, meta-session key routing)
 ├── models/
-│   ├── session.ts         # Session data model (review modes, interval types)
+│   ├── session.ts         # Session & CardMeta data models, review mode definitions
 │   └── practice.ts        # Today's review status model
 ├── queries/
-│   ├── data.ts            # Core data layer (read/write practice data)
+│   ├── data.ts            # Core data layer (read practice data from Roam page)
 │   ├── today.ts           # Today's review calculation (due/new/completed)
-│   ├── save.ts            # Write practice data to Roam blocks
+│   ├── save.ts            # Write practice data + card metadata to Roam blocks
 │   ├── cache.ts           # Per-tag cache (renderMode, etc.)
 │   ├── settings.ts        # Settings persistence to Roam page
 │   ├── utils.ts           # Roam API query helpers
@@ -372,12 +385,12 @@ src/
 │   │   └── Footer.tsx           # Grading controls + navigation
 │   ├── SidePanelWidget.tsx      # Sidebar review button + stats
 │   ├── ButtonTags.tsx           # Deck selector buttons
+│   ├── MigrateLegacyDataPanel.tsx # Data migration tool
 │   └── RoamSrImportPanel.tsx    # Roam-SR data import
 ├── utils/
 │   ├── date.ts            # Date operations (addDays, customFromNow)
 │   ├── string.ts          # String parsing (Roam date format, config strings)
 │   ├── dom.ts             # DOM simulation (mouse click events)
-│   ├── object.ts          # Deep clone utility
 │   ├── async.ts           # Sleep + debounce
 │   ├── mediaQueries.ts    # Responsive breakpoints
 │   └── zIndexFix.ts       # CSS z-index fix injection

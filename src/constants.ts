@@ -1,3 +1,18 @@
+/**
+ * Constants
+ *
+ * CARD_META_BLOCK_NAME: The block name for card metadata on the data page.
+ *
+ * CARD_META_SESSION_KEYS: Fields that appear in the practice result data
+ * but should be routed to the meta block (not session records) when saving.
+ * Currently only reviewMode — it must be persisted to meta on every practice
+ * click to ensure new cards get their reviewMode written to meta immediately.
+ *
+ * lineByLineReview and lineByLineProgress were previously in this set but
+ * are now handled exclusively by updateCardType() and updateLineByLineProgress()
+ * respectively, so they no longer need to be routed through savePracticeData.
+ */
+
 export const CARD_META_BLOCK_NAME = 'meta';
 
-export const CARD_META_SESSION_KEYS = new Set(['lineByLineReview', 'lineByLineProgress', 'reviewMode']);
+export const CARD_META_SESSION_KEYS = new Set(['reviewMode']);

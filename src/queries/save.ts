@@ -1,3 +1,14 @@
+/**
+ * Practice Data Persistence
+ *
+ * Handles writing practice results and card metadata to the Roam data page.
+ *
+ * Key design decisions:
+ * - reviewMode is saved to the meta block (not session records) via CARD_META_SESSION_KEYS
+ * - lineByLineReview is managed by updateCardType() only
+ * - lineByLineProgress is managed by updateLineByLineProgress() only
+ * - Session records contain only algorithm-specific parameters (grade, interval, eFactor, etc.)
+ */
 import * as stringUtils from '~/utils/string';
 import * as dateUtils from '~/utils/date';
 import { CompleteRecords, LineByLineProgressMap, ReviewModes } from '~/models/session';
@@ -61,6 +72,18 @@ const upsertCardMetaField = async ({
   });
 };
 
+/**
+ * Save a single practice session result to the data page.
+ *
+ * Data layout created:
+ *   ((cardUid))
+ *   ├── meta                    ← upserted with reviewMode via CARD_META_SESSION_KEYS
+ *   │   └── reviewMode:: ...
+ *   └── [[Date]] 🟢            ← new session block
+ *       ├── nextDueDate:: [[Date]]
+ *       ├── grade:: 5
+ *       └── ...
+ */
 export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...data }) => {
   await getOrCreatePage(dataPageTitle);
   const dataBlockUid = await getOrCreateBlockOnPage(dataPageTitle, 'data', -1, {
@@ -119,6 +142,11 @@ interface RoamBatchAction {
   location?: { 'parent-uid': string; order: number };
 }
 
+/**
+ * Extract meta-level fields from session history for bulk save.
+ * Only reviewMode needs to be extracted — lineByLineReview and lineByLineProgress
+ * are managed by updateCardType() and updateLineByLineProgress() respectively.
+ */
 const getLatestCardMetaFromSessions = (sessions: CompleteRecords[string] = []) => {
   const meta = {} as Record<string, string>;
 
@@ -309,6 +337,7 @@ export const updateLineByLineProgress = async ({
   });
 
   const earliestDueDate = Object.values(progress).reduce((earliest, child) => {
+    if (!child?.nextDueDate) return earliest;
     const d = new Date(child.nextDueDate);
     return !earliest || d < earliest ? d : earliest;
   }, null as Date | null);

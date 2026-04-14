@@ -1,8 +1,30 @@
+/**
+ * useCurrentCardData Hook
+ *
+ * Provides real-time card data for the currently displayed card in the practice overlay.
+ *
+ * Data sources:
+ * 1. sessions prop: Complete session history from the initial data fetch (synchronous)
+ * 2. Polling: Periodic Datalog queries to detect external changes (e.g., updateCardType)
+ *
+ * Key outputs:
+ * - currentCardData: Latest session data for the current card (Session type)
+ * - cardMeta: Card-level metadata (reviewMode, lineByLine*) from the meta block
+ * - reviewMode: Resolved from cardMeta as the SINGLE SOURCE OF TRUTH
+ * - applyOptimisticCardMeta: Instant UI update before polling confirms the change
+ */
 import * as React from 'react';
-import { CardMeta, NewSession, ReviewModes, Session, DEFAULT_REVIEW_MODE, resolveReviewMode } from '~/models/session';
+import { CardMeta, NewSession, ReviewModes, Session, DEFAULT_REVIEW_MODE } from '~/models/session';
 import { generateNewSession, getPluginPageData } from '~/queries';
 
-const CARD_DATA_POLL_INTERVAL = 1000;
+/**
+ * Polling interval for live card data updates.
+ * 2000ms balances responsiveness (detecting external changes like updateCardType)
+ * with performance (avoiding excessive Datalog queries).
+ * Optimistic updates (applyOptimisticCardMeta) provide instant UI feedback
+ * without waiting for the next poll cycle.
+ */
+const CARD_DATA_POLL_INTERVAL = 2000;
 
 const isSessionDataChanged = (prev: Session | undefined, next: Session | undefined): boolean => {
   if (prev === next) return false;
@@ -36,6 +58,12 @@ const isCardMetaChanged = (prev: CardMeta | undefined, next: CardMeta | undefine
   );
 };
 
+/**
+ * Extract CardMeta from the plugin page data for a specific card.
+ * reviewMode is read from the session data (which already has meta merged in
+ * by mapPluginPageDataLatest). If reviewMode is missing, the card has not
+ * been migrated yet — use DEFAULT_REVIEW_MODE.
+ */
 const extractCardMetaFromPluginData = (
   pluginData: Record<string, any>,
   cardUid: string
@@ -48,7 +76,7 @@ const extractCardMetaFromPluginData = (
     : cardData as Session;
 
   return {
-    reviewMode: latestSession.reviewMode,
+    reviewMode: latestSession.reviewMode || DEFAULT_REVIEW_MODE,
     lineByLineReview: latestSession.lineByLineReview as 'Y' | 'N' | undefined,
     lineByLineProgress: latestSession.lineByLineProgress as string | undefined,
     nextDueDate: latestSession.nextDueDate,
@@ -68,12 +96,17 @@ export default function useCurrentCardData({
   const [currentCardData, setCurrentCardData] = React.useState<Session | undefined>(latestSession);
   const [cardMeta, setCardMeta] = React.useState<CardMeta | undefined>(undefined);
 
+  /**
+   * reviewMode: meta is the single source of truth.
+   * - If cardMeta is loaded and has reviewMode → use it
+   * - If cardMeta is loaded but has no reviewMode → use DEFAULT_REVIEW_MODE
+   * - If cardMeta is undefined (not yet loaded) → use DEFAULT_REVIEW_MODE (will be resolved when meta loads)
+   */
   const reviewMode = React.useMemo(() => {
-    if (cardMeta?.reviewMode) return cardMeta.reviewMode;
     if (cardMeta === undefined) return DEFAULT_REVIEW_MODE;
-    if (latestSession?.reviewMode) return latestSession.reviewMode;
+    if (cardMeta?.reviewMode) return cardMeta.reviewMode;
     return DEFAULT_REVIEW_MODE;
-  }, [cardMeta, latestSession?.reviewMode]);
+  }, [cardMeta]);
 
   const prevCardDataRef = React.useRef<Session | undefined>();
   const prevCardMetaRef = React.useRef<CardMeta | undefined>();

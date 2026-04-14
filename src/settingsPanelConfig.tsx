@@ -41,9 +41,9 @@ const settingsPanelConfig = ({ settings, setSettings }) => {
       },
       {
         id: 'migrate-legacy-data',
-        name: 'Migrate Legacy Data (Add cardType)',
+        name: 'Data Migration',
         description:
-          'Add cardType metadata to cards created before v2.1. This ensures proper review mode detection when card history is deleted. Run once after upgrading.',
+          'Migrate card data to the current architecture: rename cardType→reviewMode in meta, add missing reviewMode to meta, and remove redundant reviewMode from session records. Safe to run multiple times.',
         action: {
           type: 'reactComponent',
           component: () => <MigrateLegacyDataPanel dataPageTitle={settings.dataPageTitle} />,

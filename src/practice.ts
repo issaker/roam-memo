@@ -2,6 +2,11 @@ import { savePracticeData } from '~/queries';
 import * as dateUtils from '~/utils/date';
 import { ReviewModes, isFixedMode, Session } from '~/models/session';
 
+/**
+ * SM2 (SuperMemo 2) algorithm implementation.
+ * Calculates next interval, repetition count, and easiness factor
+ * based on the current state and the user's grade (0-5).
+ */
 export const supermemo = (item: { interval: number; repetition: number; efactor: number }, grade: number) => {
   let nextInterval;
   let nextRepetition;
@@ -34,9 +39,18 @@ export const supermemo = (item: { interval: number; repetition: number; efactor:
 
 type PracticeDataResult = Session & { nextDueDateFromNow?: string };
 
+/**
+ * Generate practice result data based on the review mode and current card state.
+ *
+ * reviewMode determines which algorithm branch to use:
+ * - SpacedInterval / SpacedIntervalLBL: SM2 algorithm
+ * - Fixed* modes: Fixed interval with mode-specific calculations
+ *
+ * Note: lineByLineReview and lineByLineProgress are meta-level fields
+ * managed by updateCardType() and updateLineByLineProgress() respectively.
+ * They are no longer passed through this function.
+ */
 export const generatePracticeData = ({ dateCreated, reviewMode, ...props }: Session): PracticeDataResult => {
-  const { lineByLineReview, lineByLineProgress } = props;
-  const shared = { reviewMode, lineByLineReview, lineByLineProgress };
   const today = new Date();
 
   if (reviewMode === ReviewModes.SpacedInterval || reviewMode === ReviewModes.SpacedIntervalLBL) {
@@ -48,7 +62,6 @@ export const generatePracticeData = ({ dateCreated, reviewMode, ...props }: Sess
     const nextDueDate = dateUtils.addDays(dateCreated, sm2Result.interval);
 
     return {
-      ...shared,
       reviewMode,
       grade,
       repetitions: sm2Result.repetition,
@@ -65,7 +78,8 @@ export const generatePracticeData = ({ dateCreated, reviewMode, ...props }: Sess
   let calculatedIntervalMultiplier = intervalMultiplier;
 
   switch (reviewMode) {
-    case ReviewModes.FixedProgressive: {
+    case ReviewModes.FixedProgressive:
+    case ReviewModes.FixedProgressiveLBL: {
       const progReps = progressiveRepetitions || 0;
       if (progReps === 0) {
         nextDueDate = dateUtils.addDays(today, 2);
@@ -98,10 +112,9 @@ export const generatePracticeData = ({ dateCreated, reviewMode, ...props }: Sess
   }
 
   return {
-    ...shared,
     reviewMode,
     intervalMultiplier: calculatedIntervalMultiplier,
-    progressiveRepetitions: reviewMode === ReviewModes.FixedProgressive
+    progressiveRepetitions: (reviewMode === ReviewModes.FixedProgressive || reviewMode === ReviewModes.FixedProgressiveLBL)
       ? (progressiveRepetitions || 0) + 1
       : progressiveRepetitions,
     repetitions: (repetitions || 0) + 1,
@@ -123,13 +136,12 @@ const practice = async (practiceProps: PracticeProps, isDryRun = false) => {
     refUid, dataPageTitle, dateCreated, isCramming,
     grade, interval, repetitions, eFactor,
     intervalMultiplier, progressiveRepetitions,
-    reviewMode, lineByLineReview, lineByLineProgress,
+    reviewMode,
   } = practiceProps;
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { nextDueDateFromNow, ...practiceResultData } = generatePracticeData({
     grade, interval, repetitions, eFactor, dateCreated, reviewMode,
-    intervalMultiplier, progressiveRepetitions, lineByLineReview, lineByLineProgress,
+    intervalMultiplier, progressiveRepetitions,
   });
 
   if (!isDryRun && !isCramming) {

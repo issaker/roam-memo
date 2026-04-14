@@ -7,14 +7,16 @@
  *   roam/memo (page)
  *   ├── data (heading block)
  *   │   ├── ((cardUid1))
- *   │   │   ├── meta
+ *   │   │   ├── meta                    ← Card-level persistent data (SINGLE SOURCE OF TRUTH)
+ *   │   │   │   ├── reviewMode:: SPACED_INTERVAL
  *   │   │   │   ├── lineByLineReview:: Y
  *   │   │   │   ├── lineByLineProgress:: {...}
  *   │   │   │   └── nextDueDate:: [[Date]]
- *   │   │   ├── [[Date]] 🟢  (session heading, emoji = grade)
+ *   │   │   ├── [[Date]] 🟢            ← Session record (emoji = grade)
  *   │   │   │   ├── nextDueDate:: [[Date]]
  *   │   │   │   ├── grade:: 5
- *   │   │   │   └── ...
+ *   │   │   │   ├── eFactor:: 2.5
+ *   │   │   │   └── repetitions:: 3
  *   │   │   └── [[Date]] 🔴
  *   │   │       └── ...
  *   │   └── ((cardUid2))
@@ -26,6 +28,12 @@
  *   └── settings (heading block)
  *       ├── tagsListString:: memo
  *       └── ...
+ *
+ * Key Design Principle:
+ *   reviewMode lives ONLY in the meta block. Session records contain
+ *   algorithm-specific parameters (grade, interval, eFactor, etc.) but
+ *   NOT reviewMode. When reading data, reviewMode is merged from meta
+ *   into the Session object for convenience, but meta is the authority.
  */
 import { getStringBetween, parseConfigString, parseRoamDateString } from '~/utils/string';
 import * as stringUtils from '~/utils/string';
@@ -78,9 +86,7 @@ export const getPracticeData = async ({
   addDueCards({ today, tagsList, sessionData, isCramming, shuffleCards });
 
   calculateCombinedCounts({ today, tagsList });
-
   limitRemainingPracticeData({ today, dailyLimit, tagsList, isCramming });
-
   calculateCombinedCounts({ today, tagsList });
 
   calculateTodayStatus({ today, tagsList });
@@ -131,7 +137,13 @@ const FIXED_MODE_KEYS = [
   'progressiveRepetitions',
 ] as const;
 
-const inferReviewModeFromFields = (fields: Partial<{ reviewMode: string; intervalMultiplierType: string } & Record<string, any>>) => {
+/**
+ * Infer reviewMode from session field patterns (for legacy data without meta blocks).
+ * If reviewMode is explicitly set, resolve it. Otherwise, guess from field presence:
+ * - SM2 fields (grade, repetitions, interval, eFactor) → SpacedInterval
+ * - Fixed fields (intervalMultiplier, progressiveRepetitions) → FixedProgressive
+ */
+export const inferReviewModeFromFields = (fields: Partial<{ reviewMode: string; intervalMultiplierType: string } & Record<string, any>>) => {
   if (fields.reviewMode) {
     return resolveReviewMode(fields.reviewMode, fields.intervalMultiplierType);
   }
@@ -150,7 +162,6 @@ const inferReviewModeFromFields = (fields: Partial<{ reviewMode: string; interva
 const parseFieldValuesFromChildren = (
   object,
   children,
-  { inferReviewMode = false }: { inferReviewMode?: boolean } = {}
 ) => {
   for (const field of children) {
     if (!field?.string) continue;
@@ -166,10 +177,6 @@ const parseFieldValuesFromChildren = (
       object[key] = value;
     }
   }
-
-  if (inferReviewMode) {
-    object.reviewMode = inferReviewModeFromFields(object);
-  }
 };
 
 const isSessionHeadingBlock = (child) => {
@@ -180,16 +187,20 @@ const isSessionHeadingBlock = (child) => {
 
 const isCardMetaBlock = (child) => child?.string === CARD_META_BLOCK_NAME;
 
+/**
+ * Read card-scoped fields from the meta block.
+ * After migration, all cards should have a meta block with reviewMode.
+ * Cards without a meta block will return empty fields.
+ */
 const getCardScopedFields = (children: any[] = []) => {
   const cardScopedFields: Record<string, any> = {};
   const cardMetaBlock = children.find(isCardMetaBlock) as { children?: any[] } | undefined;
-  const legacyCardMetadataBlocks = children.filter(
-    (child) => !isSessionHeadingBlock(child) && !isCardMetaBlock(child)
-  );
-  const cardMetadataBlocks = (cardMetaBlock?.children || legacyCardMetadataBlocks).filter(c => c?.string);
 
-  if (cardMetadataBlocks.length) {
-    parseFieldValuesFromChildren(cardScopedFields, cardMetadataBlocks);
+  if (!cardMetaBlock?.children) return cardScopedFields;
+
+  const metaChildren = cardMetaBlock.children.filter(c => c?.string);
+  if (metaChildren.length) {
+    parseFieldValuesFromChildren(cardScopedFields, metaChildren);
   }
 
   return cardScopedFields;
@@ -221,7 +232,7 @@ const mapPluginPageDataLatest = (queryResultsData): Records =>
         : undefined;
 
       if (!latestChild?.children) return acc;
-      parseFieldValuesFromChildren(acc[uid], latestChild.children, { inferReviewMode: true });
+      parseFieldValuesFromChildren(acc[uid], latestChild.children);
       Object.assign(acc[uid], cardScopedFields);
 
       return acc;
@@ -266,12 +277,9 @@ const mapPluginPageData = (queryResultsData): CompleteRecords =>
           continue;
         }
 
-        parseFieldValuesFromChildren(record, child.children, { inferReviewMode: true });
-        const sessionReviewMode = (record as any).reviewMode;
+        parseFieldValuesFromChildren(record, child.children);
         Object.assign(record, cardScopedFields);
-        if (sessionReviewMode) {
-          (record as any).reviewMode = sessionReviewMode;
-        }
+
         acc[uid].push(record);
       }
 

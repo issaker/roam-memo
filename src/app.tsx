@@ -41,6 +41,7 @@ const App = () => {
     rtlEnabled,
     shuffleCards,
     forgotReinsertOffset,
+    showBreadcrumbs,
     showModeBorders,
   } = useSettings();
   const { selectedTag, setSelectedTag, tagsList } = useTags({ tagsListString });
@@ -160,6 +161,7 @@ const App = () => {
             today={today}
             forgotReinsertOffset={forgotReinsertOffset}
             dataPageTitle={dataPageTitle}
+            showBreadcrumbs={showBreadcrumbs}
             showModeBorders={showModeBorders}
           />
         )}

@@ -7,7 +7,7 @@ import * as asyncUtils from '~/utils/async';
 import { generatePracticeData } from '~/practice';
 import Tooltip from '~/components/Tooltip';
 import ButtonTags from '~/components/ButtonTags';
-import { ReviewModes, isFixedMode } from '~/models/session';
+import { ReviewModes, isFixedMode, isReadingMode } from '~/models/session';
 import { MainContext } from '~/components/overlay/PracticeOverlay';
 import { getIntentColor, colors } from '~/theme';
 
@@ -289,6 +289,7 @@ const GradingControlsWrapper = ({
   const { reviewMode, onSelectReviewMode, cardMeta } = React.useContext(MainContext);
 
   const isFixedModeActive = isFixedMode(reviewMode);
+  const isReadingModeActive = isReadingMode(reviewMode);
   return (
     <div className="flex items-center flex-wrap justify-evenly gap-3 w-full">
       <button
@@ -333,7 +334,13 @@ const GradingControlsWrapper = ({
       >
         ▶
       </button>
-      {isFixedModeActive ? (
+      {isReadingModeActive ? (
+        <ReadingModeControls
+          activeButtonKey={activeButtonKey}
+          intervalPractice={intervalPractice}
+          intervalEstimates={intervalEstimates}
+        />
+      ) : isFixedModeActive ? (
         <FixedIntervalModeControls
           activeButtonKey={activeButtonKey}
           intervalPractice={intervalPractice}
@@ -354,6 +361,61 @@ const GradingControlsWrapper = ({
         onSelectReviewMode={onSelectReviewMode}
       />
     </div>
+  );
+};
+
+/**
+ * ReadingModeControls
+ *
+ * Simplified grading UI for Incremental Read mode (FIXED_PROGRESSIVE_LBL).
+ * Displays a "Read" indicator with the next interval and a "Next" button
+ * that advances to the next card. No grading buttons — the per-child
+ * Progressive interval is calculated automatically in onLineByLineGrade.
+ */
+const ReadingModeControls = ({
+  activeButtonKey,
+  intervalPractice,
+  intervalEstimates,
+}: {
+  activeButtonKey: string;
+  intervalPractice: () => void;
+  intervalEstimates: IntervalEstimates;
+}): JSX.Element => {
+  const { reviewMode } = React.useContext(MainContext);
+  if (!intervalEstimates) {
+    console.error('Interval estimates not set');
+    return <></>;
+  }
+
+  return (
+    <>
+      <ControlButton
+        icon="book"
+        className="text-base font-normal py-1"
+        intent="default"
+        tooltipText={`Next section in ${intervalEstimates[0]?.nextDueDateFromNow}`}
+        active={activeButtonKey === 'change-interval-button'}
+        outlined
+      >
+        <span className="ml-2">
+          Read <span className="font-medium mr-3">{intervalEstimates[0]?.nextDueDateFromNow || 'Progressive'}</span>
+        </span>
+      </ControlButton>
+      <ControlButton
+        icon="tick"
+        className="text-base font-medium py-1"
+        intent="success"
+        onClick={() => intervalPractice()}
+        tooltipText={`Next card — resume reading in ${intervalEstimates[0]?.nextDueDateFromNow}`}
+        active={activeButtonKey === 'next-button'}
+        outlined
+      >
+        Next{' '}
+        <span className="ml-2">
+          <ButtonTags>SPACE</ButtonTags>
+        </span>
+      </ControlButton>
+    </>
   );
 };
 
@@ -631,6 +693,7 @@ const REVIEW_MODE_OPTIONS: ReviewModeOption[] = [
   { reviewMode: ReviewModes.SpacedInterval, label: 'Spaced Interval', icon: 'history', group: 'Spaced' },
   { reviewMode: ReviewModes.SpacedIntervalLBL, label: 'LBL Spaced', icon: 'list', group: 'Spaced' },
   { reviewMode: ReviewModes.FixedProgressive, label: 'Progressive', icon: 'trending-up', group: 'Fixed' },
+  { reviewMode: ReviewModes.FixedProgressiveLBL, label: 'Incremental Read', icon: 'book', group: 'Reading' },
   { reviewMode: ReviewModes.FixedDays, label: 'Days', icon: 'calendar', group: 'Fixed' },
   { reviewMode: ReviewModes.FixedWeeks, label: 'Weeks', icon: 'calendar', group: 'Fixed' },
   { reviewMode: ReviewModes.FixedMonths, label: 'Months', icon: 'calendar', group: 'Fixed' },

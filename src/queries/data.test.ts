@@ -1,4 +1,4 @@
-import { getPluginPageBlockDataQuery, getPluginPageData } from '~/queries/data';
+import { getPluginPageBlockDataQuery, getPluginPageData, inferReviewModeFromFields } from '~/queries/data';
 
 const parseMockRoamDate = (value: string) => {
   if (!value || value.split(' ').length < 3) return undefined;
@@ -27,7 +27,7 @@ describe('getPluginPageData', () => {
     jest.restoreAllMocks();
   });
 
-  it('prefers card meta fields over session-level legacy copies', async () => {
+  it('prefers card meta fields over session-level fields', async () => {
     Object.defineProperty(window, 'roamAlphaAPI', {
       value: {
         q: jest.fn(() => [
@@ -40,6 +40,7 @@ describe('getPluginPageData', () => {
                     {
                       string: 'meta',
                       children: [
+                        { string: 'reviewMode:: SPACED_INTERVAL' },
                         { string: 'lineByLineReview:: Y' },
                         { string: 'lineByLineProgress:: {"child-1":{"interval":6}}' },
                         { string: 'nextDueDate:: [[April 20th, 2026]]' },
@@ -49,9 +50,6 @@ describe('getPluginPageData', () => {
                       string: '[[April 14th, 2026]] 🟢',
                       order: 0,
                       children: [
-                        { string: 'reviewMode:: SPACED_INTERVAL' },
-                        { string: 'lineByLineReview:: N' },
-                        { string: 'lineByLineProgress:: {"legacy":true}' },
                         { string: 'nextDueDate:: [[April 15th, 2026]]' },
                       ],
                     },
@@ -87,7 +85,7 @@ describe('getPluginPageData', () => {
     expect(cardData.nextDueDate).toEqual(new Date('2026-04-20T00:00:00.000Z'));
   });
 
-  it('infers SPACED_INTERVAL when reviewMode is missing but SM2 fields exist', async () => {
+  it('reads reviewMode from meta block when session has no reviewMode', async () => {
     Object.defineProperty(window, 'roamAlphaAPI', {
       value: {
         q: jest.fn(() => [
@@ -97,6 +95,12 @@ describe('getPluginPageData', () => {
                 {
                   string: '((card-spaced))',
                   children: [
+                    {
+                      string: 'meta',
+                      children: [
+                        { string: 'reviewMode:: SPACED_INTERVAL' },
+                      ],
+                    },
                     {
                       string: '[[April 14th, 2026]] 🟢',
                       order: 0,
@@ -133,7 +137,7 @@ describe('getPluginPageData', () => {
     });
   });
 
-  it('falls back to FIXED_INTERVAL when reviewMode is missing and no SM2 fields exist', async () => {
+  it('returns no reviewMode when card has no meta block (unmigrated data)', async () => {
     Object.defineProperty(window, 'roamAlphaAPI', {
       value: {
         q: jest.fn(() => [
@@ -167,7 +171,30 @@ describe('getPluginPageData', () => {
     });
 
     expect(result['card-fixed']).toMatchObject({
-      reviewMode: 'FIXED_PROGRESSIVE',
+      dateCreated: new Date('2026-04-14T00:00:00.000Z'),
+      nextDueDate: new Date('2026-04-20T00:00:00.000Z'),
     });
+    expect((result['card-fixed'] as any).reviewMode).toBeUndefined();
+  });
+});
+
+describe('inferReviewModeFromFields', () => {
+  it('infers SPACED_INTERVAL from SM2 fields', () => {
+    expect(inferReviewModeFromFields({ repetitions: 3, interval: 12, eFactor: 2.4 }))
+      .toBe('SPACED_INTERVAL');
+  });
+
+  it('infers FIXED_PROGRESSIVE from fixed-mode fields', () => {
+    expect(inferReviewModeFromFields({ intervalMultiplier: 3 }))
+      .toBe('FIXED_PROGRESSIVE');
+  });
+
+  it('returns FIXED_PROGRESSIVE as default when no clues exist', () => {
+    expect(inferReviewModeFromFields({})).toBe('FIXED_PROGRESSIVE');
+  });
+
+  it('resolves explicit reviewMode', () => {
+    expect(inferReviewModeFromFields({ reviewMode: 'SPACED_INTERVAL' }))
+      .toBe('SPACED_INTERVAL');
   });
 });
