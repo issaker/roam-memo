@@ -5,7 +5,7 @@
  *
  * Data sources:
  * 1. sessions prop: Complete session history from the initial data fetch (synchronous)
- * 2. Polling: Periodic Datalog queries to detect external changes (e.g., updateCardType)
+ * 2. Meta-only polling: Periodic lightweight queries to detect reviewMode changes
  *
  * Key outputs:
  * - currentCardData: Latest session data for the current card (Session type)
@@ -14,39 +14,16 @@
  * - applyOptimisticCardMeta: Instant UI update before polling confirms the change
  */
 import * as React from 'react';
-import { CardMeta, NewSession, ReviewModes, Session, DEFAULT_REVIEW_MODE } from '~/models/session';
-import { generateNewSession, getPluginPageData } from '~/queries';
+import { CardMeta, Session, DEFAULT_REVIEW_MODE } from '~/models/session';
+import { getCardMetaOnly } from '~/queries';
 
 /**
  * Polling interval for live card data updates.
- * 2000ms balances responsiveness (detecting external changes like updateCardType)
- * with performance (avoiding excessive Datalog queries).
- * Optimistic updates (applyOptimisticCardMeta) provide instant UI feedback
- * without waiting for the next poll cycle.
+ * 2000ms balances responsiveness with performance.
+ * Polling now reads ONLY the meta block (reviewMode, nextDueDate, etc.)
+ * to detect mode changes — full session data is not re-queried on each poll.
  */
 const CARD_DATA_POLL_INTERVAL = 2000;
-
-const isSessionDataChanged = (prev: Session | undefined, next: Session | undefined): boolean => {
-  if (prev === next) return false;
-  if (!prev || !next) return true;
-  const isSameDate = (a?: Date, b?: Date) => {
-    if (a === b) return true;
-    if (!a || !b) return false;
-    return a.getTime() === b.getTime();
-  };
-  return (
-    prev.interval !== next.interval ||
-    prev.repetitions !== next.repetitions ||
-    prev.eFactor !== next.eFactor ||
-    prev.reviewMode !== next.reviewMode ||
-    !isSameDate(prev.nextDueDate, next.nextDueDate) ||
-    !isSameDate(prev.dateCreated, next.dateCreated) ||
-    prev.intervalMultiplier !== next.intervalMultiplier ||
-    prev.progressiveRepetitions !== next.progressiveRepetitions ||
-    prev.lineByLineReview !== next.lineByLineReview ||
-    prev.lineByLineProgress !== next.lineByLineProgress
-  );
-};
 
 const isCardMetaChanged = (prev: CardMeta | undefined, next: CardMeta | undefined): boolean => {
   if (prev === next) return false;
@@ -56,31 +33,6 @@ const isCardMetaChanged = (prev: CardMeta | undefined, next: CardMeta | undefine
     prev.lineByLineReview !== next.lineByLineReview ||
     prev.lineByLineProgress !== next.lineByLineProgress
   );
-};
-
-/**
- * Extract CardMeta from the plugin page data for a specific card.
- * reviewMode is read from the session data (which already has meta merged in
- * by mapPluginPageDataLatest). If reviewMode is missing, the card has not
- * been migrated yet — use DEFAULT_REVIEW_MODE.
- */
-const extractCardMetaFromPluginData = (
-  pluginData: Record<string, any>,
-  cardUid: string
-): CardMeta | undefined => {
-  const cardData = pluginData[cardUid];
-  if (!cardData) return undefined;
-
-  const latestSession = Array.isArray(cardData)
-    ? cardData[cardData.length - 1] as Session
-    : cardData as Session;
-
-  return {
-    reviewMode: latestSession.reviewMode || DEFAULT_REVIEW_MODE,
-    lineByLineReview: latestSession.lineByLineReview as 'Y' | 'N' | undefined,
-    lineByLineProgress: latestSession.lineByLineProgress as string | undefined,
-    nextDueDate: latestSession.nextDueDate,
-  };
 };
 
 export default function useCurrentCardData({
@@ -99,14 +51,13 @@ export default function useCurrentCardData({
   /**
    * reviewMode: meta is the single source of truth.
    * - If cardMeta is loaded and has reviewMode → use it
-   * - If cardMeta is loaded but has no reviewMode → use DEFAULT_REVIEW_MODE
-   * - If cardMeta is undefined (not yet loaded) → use DEFAULT_REVIEW_MODE (will be resolved when meta loads)
+   * - If cardMeta is loaded but has no reviewMode → use latestSession's reviewMode or DEFAULT
+   * - If cardMeta is undefined (not yet loaded) → use latestSession's reviewMode or DEFAULT
    */
   const reviewMode = React.useMemo(() => {
-    if (cardMeta === undefined) return DEFAULT_REVIEW_MODE;
     if (cardMeta?.reviewMode) return cardMeta.reviewMode;
-    return DEFAULT_REVIEW_MODE;
-  }, [cardMeta]);
+    return latestSession?.reviewMode || DEFAULT_REVIEW_MODE;
+  }, [cardMeta, latestSession]);
 
   const prevCardDataRef = React.useRef<Session | undefined>();
   const prevCardMetaRef = React.useRef<CardMeta | undefined>();
@@ -146,47 +97,32 @@ export default function useCurrentCardData({
 
     let cancelled = false;
 
-    const fetchLiveData = async () => {
+    const fetchLiveMeta = async () => {
       try {
-        const latestPluginData = await getPluginPageData({ dataPageTitle, limitToLatest: true });
+        const metaOnlyData = await getCardMetaOnly({ dataPageTitle });
         if (cancelled) return;
 
-        const liveSession = latestPluginData[currentCardRefUid] as Session | NewSession | undefined;
+        const cardMetaRaw = metaOnlyData[currentCardRefUid];
+        if (!cardMetaRaw) return;
 
-        if (!liveSession || !('reviewMode' in liveSession)) {
-          const resolvedMeta = extractCardMetaFromPluginData(latestPluginData, currentCardRefUid);
-          const newSession = generateNewSession({
-            reviewMode: resolvedMeta?.reviewMode || DEFAULT_REVIEW_MODE,
-          });
-          if (isSessionDataChanged(prevCardDataRef.current, newSession)) {
-            setCurrentCardData(newSession);
-            prevCardDataRef.current = newSession;
-          }
-          if (isCardMetaChanged(prevCardMetaRef.current, resolvedMeta)) {
-            setCardMeta(resolvedMeta);
-            prevCardMetaRef.current = resolvedMeta;
-          }
-          return;
-        }
+        const resolvedMeta: CardMeta = {
+          reviewMode: cardMetaRaw.reviewMode || DEFAULT_REVIEW_MODE,
+          lineByLineReview: cardMetaRaw.lineByLineReview as 'Y' | 'N' | undefined,
+          lineByLineProgress: cardMetaRaw.lineByLineProgress as string | undefined,
+          nextDueDate: cardMetaRaw.nextDueDate,
+        };
 
-        const liveSessionData = liveSession as Session;
-        if (isSessionDataChanged(prevCardDataRef.current, liveSessionData)) {
-          setCurrentCardData(liveSessionData);
-          prevCardDataRef.current = liveSessionData;
-        }
-
-        const resolvedMeta = extractCardMetaFromPluginData(latestPluginData, currentCardRefUid);
         if (isCardMetaChanged(prevCardMetaRef.current, resolvedMeta)) {
           setCardMeta(resolvedMeta);
           prevCardMetaRef.current = resolvedMeta;
         }
       } catch (error) {
-        console.error('[Memo] Error polling live card data:', error);
+        console.error('[Memo] Error polling live card meta:', error);
       }
     };
 
-    fetchLiveData();
-    const intervalId = setInterval(fetchLiveData, CARD_DATA_POLL_INTERVAL);
+    fetchLiveMeta();
+    const intervalId = setInterval(fetchLiveMeta, CARD_DATA_POLL_INTERVAL);
 
     return () => {
       cancelled = true;
@@ -202,5 +138,3 @@ export default function useCurrentCardData({
     applyOptimisticCardMeta,
   };
 }
-
-export { extractCardMetaFromPluginData };

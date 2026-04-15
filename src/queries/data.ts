@@ -256,10 +256,6 @@ const mapPluginPageData = (queryResultsData): CompleteRecords =>
         return acc;
       }
 
-      // Sort sessions by block order descending (highest order = oldest first,
-      // order 0 = newest last) so that sessions[sessions.length - 1] is the
-      // latest session — consistent with mapPluginPageDataLatest and downstream
-      // consumers (useCurrentCardData, today.ts, etc.).
       const sortedSessionChildren = [...sessionChildren].sort(
         (a, b) => b.order - a.order
       );
@@ -311,6 +307,34 @@ export const getPluginPageData = async ({ dataPageTitle, limitToLatest = true })
   return limitToLatest
     ? mapPluginPageDataLatest(queryResultsData)
     : mapPluginPageData(queryResultsData);
+};
+
+/**
+ * Lightweight meta-only query: reads only the meta block for each card,
+ * skipping all session records. Used by polling to detect reviewMode changes
+ * without the overhead of parsing full session history.
+ *
+ * Returns: { [cardUid]: CardMeta }
+ */
+export const getCardMetaOnly = async ({ dataPageTitle }: { dataPageTitle: string }) => {
+  const queryResultsData = await getPluginPageBlockData({ dataPageTitle, blockName: 'data' });
+
+  if (!queryResultsData.length) return {};
+
+  const result: Record<string, any> = {};
+
+  queryResultsData
+    .map((arr) => arr[0])[0]
+    .children?.forEach((cur) => {
+      if (!cur?.string) return;
+      const uid = getStringBetween(cur.string, '((', '))');
+      const cardScopedFields = getCardScopedFields(cur.children);
+      if (Object.keys(cardScopedFields).length) {
+        result[uid] = cardScopedFields;
+      }
+    });
+
+  return result;
 };
 
 const mapPluginPageCachedData = (queryResultsData) => {

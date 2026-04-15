@@ -37,14 +37,45 @@ export const supermemo = (item: { interval: number; repetition: number; efactor:
   return { interval: nextInterval, repetition: nextRepetition, efactor: nextEfactor };
 };
 
+/**
+ * Progressive interval curve — independent of SM2.
+ *
+ * A simple exponential growth schedule: 2 → 6 → 12 → 24 → 48 → 96 days...
+ * The first two intervals are short on-ramps, then each subsequent interval
+ * doubles from the 6-day base.
+ *
+ *   interval(progReps):
+ *     0 → 2 days
+ *     1 → 6 days
+ *     n → 6 × 2^(n-1) days   (for n ≥ 2)
+ *
+ * This is a standalone function curve, not derived from SM2.
+ */
+export const progressiveInterval = (progressiveRepetitions: number): number => {
+  if (progressiveRepetitions <= 0) return 2;
+  if (progressiveRepetitions === 1) return 6;
+  return 6 * Math.pow(2, progressiveRepetitions - 1);
+};
+
 type PracticeDataResult = Session & { nextDueDateFromNow?: string };
 
 /**
  * Generate practice result data based on the review mode and current card state.
  *
- * reviewMode determines which algorithm branch to use:
- * - SpacedInterval / SpacedIntervalLBL: SM2 algorithm
- * - Fixed* modes: Fixed interval with mode-specific calculations
+ * Mode Independence Principle:
+ *   Each mode only calculates/updates its OWN fields. All other fields are
+ *   inherited unchanged from the previous session, ensuring that switching
+ *   modes never loses data from any mode.
+ *
+ *   SM2 fields (calculated only by SM2 mode):
+ *     grade, interval, repetitions, eFactor
+ *   Progressive fields (calculated only by Progressive mode):
+ *     progressiveRepetitions, intervalMultiplier
+ *   Fixed interval fields (calculated by Days/Weeks/Months/Years):
+ *     intervalMultiplier
+ *
+ *   nextDueDate is calculated by all modes but written only to the meta block
+ *   (via CARD_META_SESSION_KEYS), not to session records.
  *
  * Note: lineByLineReview and lineByLineProgress are meta-level fields
  * managed by updateCardType() and updateLineByLineProgress() respectively.
@@ -54,7 +85,7 @@ export const generatePracticeData = ({ dateCreated, reviewMode, ...props }: Sess
   const today = new Date();
 
   if (reviewMode === ReviewModes.SpacedInterval || reviewMode === ReviewModes.SpacedIntervalLBL) {
-    const { grade, interval, repetitions, eFactor } = props;
+    const { grade, interval, repetitions, eFactor, progressiveRepetitions, intervalMultiplier } = props;
     const sm2Result = supermemo(
       { interval: interval || 0, repetition: repetitions || 0, efactor: eFactor || 2.5 },
       grade || 0
@@ -67,30 +98,24 @@ export const generatePracticeData = ({ dateCreated, reviewMode, ...props }: Sess
       repetitions: sm2Result.repetition,
       interval: sm2Result.interval,
       eFactor: sm2Result.efactor,
+      ...(progressiveRepetitions !== undefined && { progressiveRepetitions }),
+      ...(intervalMultiplier !== undefined && { intervalMultiplier }),
       dateCreated,
       nextDueDate,
       nextDueDateFromNow: dateUtils.customFromNow(nextDueDate),
     };
   }
 
-  const { intervalMultiplier, progressiveRepetitions, repetitions, eFactor, interval: prevInterval } = props;
+  const { intervalMultiplier, progressiveRepetitions, repetitions, eFactor, interval } = props;
   let nextDueDate: Date | undefined;
   let calculatedIntervalMultiplier = intervalMultiplier;
 
   switch (reviewMode) {
     case ReviewModes.FixedProgressive:
     case ReviewModes.FixedProgressiveLBL: {
-      const progReps = progressiveRepetitions || 0;
-      if (progReps === 0) {
-        nextDueDate = dateUtils.addDays(today, 2);
-        calculatedIntervalMultiplier = 2;
-      } else if (progReps === 1) {
-        nextDueDate = dateUtils.addDays(today, 6);
-        calculatedIntervalMultiplier = 6;
-      } else {
-        calculatedIntervalMultiplier = Math.round(6 * Math.pow(2, progReps - 2));
-        nextDueDate = dateUtils.addDays(today, calculatedIntervalMultiplier);
-      }
+      const currentProgReps = progressiveRepetitions || 0;
+      calculatedIntervalMultiplier = progressiveInterval(currentProgReps);
+      nextDueDate = dateUtils.addDays(today, calculatedIntervalMultiplier);
       break;
     }
     case ReviewModes.FixedDays:
@@ -117,9 +142,9 @@ export const generatePracticeData = ({ dateCreated, reviewMode, ...props }: Sess
     progressiveRepetitions: (reviewMode === ReviewModes.FixedProgressive || reviewMode === ReviewModes.FixedProgressiveLBL)
       ? (progressiveRepetitions || 0) + 1
       : progressiveRepetitions,
-    repetitions: (repetitions || 0) + 1,
-    eFactor: eFactor || 2.5,
-    interval: prevInterval || 0,
+    ...(repetitions !== undefined && { repetitions }),
+    ...(eFactor !== undefined && { eFactor }),
+    ...(interval !== undefined && { interval }),
     nextDueDate,
     nextDueDateFromNow: dateUtils.customFromNow(nextDueDate),
   };

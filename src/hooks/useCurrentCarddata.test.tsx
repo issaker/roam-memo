@@ -142,12 +142,10 @@ describe('useCurrentCardData', () => {
       await new Promise((resolve) => setTimeout(resolve, 1500));
     });
 
-    expect(result.current.currentCardData).toMatchObject({
-      reviewMode: ReviewModes.SpacedInterval,
-      repetitions: 2,
-      interval: 6,
-      eFactor: 2.3,
-    });
+    // Polling now only reads meta, so reviewMode is updated from meta
+    // but currentCardData remains from the initial sessions prop
+    expect(result.current.reviewMode).toEqual(ReviewModes.SpacedInterval);
+    expect(result.current.cardMeta?.reviewMode).toEqual(ReviewModes.SpacedInterval);
   });
 
   it('reviewMode is derived from cardMeta.reviewMode', async () => {

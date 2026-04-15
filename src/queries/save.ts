@@ -108,25 +108,25 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
     }
   );
 
-  // Insert new block info
   const nextDueDate = data.nextDueDate || dateUtils.addDays(referenceDate, data.interval);
 
   for (const key of Object.keys(data)) {
+    if (data[key] === undefined) continue;
+
     if (CARD_META_SESSION_KEYS.has(key)) {
+      let metaValue = data[key];
+      if (key === 'nextDueDate') {
+        metaValue = `[[${stringUtils.dateToRoamDateString(nextDueDate)}]]`;
+      }
       await upsertCardMetaField({
         cardDataBlockUid,
         key,
-        value: data[key],
+        value: metaValue,
       });
       continue;
     }
 
-    let value = data[key];
-    if (key === 'nextDueDate') {
-      value = `[[${stringUtils.dateToRoamDateString(nextDueDate)}]]`;
-    }
-
-    await createChildBlock(newDataBlockId, `${key}:: ${value}`, -1);
+    await createChildBlock(newDataBlockId, `${key}:: ${data[key]}`, -1);
   }
 };
 interface BulkSavePracticeDataOptions {

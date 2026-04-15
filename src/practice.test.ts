@@ -110,6 +110,21 @@ describe('supermemo: simulate practice', () => {
     });
   });
 
+  describe('Progressive interval curve', () => {
+    test('progressiveInterval produces correct schedule: 2, 6, 12, 24, 48, 96', () => {
+      expect(practice.progressiveInterval(0)).toBe(2);
+      expect(practice.progressiveInterval(1)).toBe(6);
+      expect(practice.progressiveInterval(2)).toBe(12);
+      expect(practice.progressiveInterval(3)).toBe(24);
+      expect(practice.progressiveInterval(4)).toBe(48);
+      expect(practice.progressiveInterval(5)).toBe(96);
+    });
+
+    test('progressiveInterval handles negative input as 0', () => {
+      expect(practice.progressiveInterval(-1)).toBe(2);
+    });
+  });
+
   describe('Line-by-line metadata', () => {
     test('generatePracticeData does not pass through line-by-line fields (managed separately)', () => {
       const result = practice.generatePracticeData({
@@ -124,6 +139,140 @@ describe('supermemo: simulate practice', () => {
       expect(result.lineByLineReview).toBeUndefined();
       expect(result.lineByLineProgress).toBeUndefined();
       expect(result.reviewMode).toBe(ReviewModes.SpacedInterval);
+    });
+  });
+
+  describe('Mode independence: Progressive mode must not pollute SM2 fields', () => {
+    test('Progressive mode does not increment SM2 repetitions', () => {
+      const result = practice.generatePracticeData({
+        dateCreated: new Date('2026-04-15T00:00:00.000Z'),
+        reviewMode: ReviewModes.FixedProgressive,
+        interval: 11,
+        repetitions: 3,
+        eFactor: 2.26,
+        progressiveRepetitions: 1,
+        intervalMultiplier: 2,
+      });
+
+      expect(result.repetitions).toBe(3);
+      expect(result.progressiveRepetitions).toBe(2);
+    });
+
+    test('Progressive mode inherits SM2 interval and eFactor unchanged', () => {
+      const result = practice.generatePracticeData({
+        dateCreated: new Date('2026-04-15T00:00:00.000Z'),
+        reviewMode: ReviewModes.FixedProgressive,
+        interval: 11,
+        repetitions: 3,
+        eFactor: 2.26,
+        progressiveRepetitions: 1,
+        intervalMultiplier: 2,
+      });
+
+      expect(result.interval).toBe(11);
+      expect(result.eFactor).toBe(2.26);
+    });
+
+    test('Progressive mode does not write SM2 fields when they are undefined', () => {
+      const result = practice.generatePracticeData({
+        dateCreated: new Date('2026-04-15T00:00:00.000Z'),
+        reviewMode: ReviewModes.FixedProgressive,
+        progressiveRepetitions: 0,
+      });
+
+      expect(result.interval).toBeUndefined();
+      expect(result.repetitions).toBeUndefined();
+      expect(result.eFactor).toBeUndefined();
+      expect(result.progressiveRepetitions).toBe(1);
+    });
+  });
+
+  describe('Mode independence: SM2 mode preserves Progressive fields', () => {
+    test('SM2 mode inherits progressiveRepetitions and intervalMultiplier', () => {
+      const result = practice.generatePracticeData({
+        dateCreated: new Date('2026-04-15T00:00:00.000Z'),
+        reviewMode: ReviewModes.SpacedInterval,
+        grade: 4,
+        interval: 6,
+        repetitions: 2,
+        eFactor: 2.26,
+        progressiveRepetitions: 3,
+        intervalMultiplier: 12,
+      });
+
+      expect(result.progressiveRepetitions).toBe(3);
+      expect(result.intervalMultiplier).toBe(12);
+      expect(result.repetitions).toBe(3);
+      expect(result.interval).toBe(11);
+    });
+
+    test('SM2 mode does not write Progressive fields when they are undefined', () => {
+      const result = practice.generatePracticeData({
+        dateCreated: new Date('2026-04-15T00:00:00.000Z'),
+        reviewMode: ReviewModes.SpacedInterval,
+        grade: 5,
+        interval: 0,
+        repetitions: 0,
+        eFactor: 2.5,
+      });
+
+      expect(result.progressiveRepetitions).toBeUndefined();
+      expect(result.intervalMultiplier).toBeUndefined();
+    });
+  });
+
+  describe('Mode switching: full field inheritance across mode switches', () => {
+    test('Switching SM2 → Progressive preserves SM2 fields', () => {
+      const sm2Result = practice.generatePracticeData({
+        dateCreated: new Date('2026-04-15T00:00:00.000Z'),
+        reviewMode: ReviewModes.SpacedInterval,
+        grade: 4,
+        interval: 6,
+        repetitions: 2,
+        eFactor: 2.26,
+      });
+
+      const progResult = practice.generatePracticeData({
+        dateCreated: new Date('2026-04-15T00:00:00.000Z'),
+        reviewMode: ReviewModes.FixedProgressive,
+        interval: sm2Result.interval,
+        repetitions: sm2Result.repetitions,
+        eFactor: sm2Result.eFactor,
+        progressiveRepetitions: sm2Result.progressiveRepetitions,
+        intervalMultiplier: sm2Result.intervalMultiplier,
+      });
+
+      expect(progResult.interval).toBe(sm2Result.interval);
+      expect(progResult.repetitions).toBe(sm2Result.repetitions);
+      expect(progResult.eFactor).toBe(sm2Result.eFactor);
+      expect(progResult.progressiveRepetitions).toBe(1);
+    });
+
+    test('Switching Progressive → SM2 preserves Progressive fields', () => {
+      const progResult = practice.generatePracticeData({
+        dateCreated: new Date('2026-04-15T00:00:00.000Z'),
+        reviewMode: ReviewModes.FixedProgressive,
+        interval: 11,
+        repetitions: 3,
+        eFactor: 2.26,
+        progressiveRepetitions: 2,
+        intervalMultiplier: 12,
+      });
+
+      const sm2Result = practice.generatePracticeData({
+        dateCreated: new Date('2026-04-15T00:00:00.000Z'),
+        reviewMode: ReviewModes.SpacedInterval,
+        grade: 4,
+        interval: progResult.interval,
+        repetitions: progResult.repetitions,
+        eFactor: progResult.eFactor,
+        progressiveRepetitions: progResult.progressiveRepetitions,
+        intervalMultiplier: progResult.intervalMultiplier,
+      });
+
+      expect(sm2Result.progressiveRepetitions).toBe(3);
+      expect(sm2Result.intervalMultiplier).toBe(12);
+      expect(sm2Result.repetitions).toBe(4);
     });
   });
 });

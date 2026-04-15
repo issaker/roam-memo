@@ -110,8 +110,10 @@ Uses a **modified SM2 algorithm** to optimize long-term memory retention with gr
 A relaxed approach for content you want to revisit regularly. Includes **Progressive Mode** with automatic interval growth:
 
 - Review schedule: 2 → 6 → 12 → 24 → 48 → 96 days...
-- Calculation: `nextInterval = 6 × 2^(progressiveRepetitions - 2)` for progReps ≥ 2; progReps 0 and 1 use hardcoded 2 and 6 days
-- Progressive mode maintains its own `progressiveRepetitions` counter, independent of SM2's `repetitions`, `interval`, and `eFactor`
+- Calculation: `progressiveInterval(n)` — a standalone exponential curve independent of SM2:
+  - n=0 → 2 days, n=1 → 6 days (hardcoded on-ramps)
+  - n≥2 → `6 × 2^(n-1)` days (exponential growth from 6-day base)
+- Progressive mode is fully independent: its only parameter is `progressiveRepetitions`, which it increments on each review. It does NOT modify SM2 fields (`repetitions`, `interval`, `eFactor`), preventing cross-mode data pollution
 - Also supports manual intervals: Days, Weeks, Months, Years
 
 > **Tip:** New cards default to Progressive mode for a gentler learning experience. Switch to Spaced Interval mode anytime for more granular control.
@@ -200,9 +202,9 @@ Stored in the `meta` block. These fields define the card's identity and behavior
 ((cardUid))
 ├── meta                        ← Card-level persistent data
 │   ├── reviewMode:: SPACED_INTERVAL    ← Algorithm mode (SINGLE SOURCE OF TRUTH)
+│   ├── nextDueDate:: [[Date]]          ← Next due date (SINGLE SOURCE OF TRUTH)
 │   ├── lineByLineReview:: Y            ← Line-by-line toggle
-│   ├── lineByLineProgress:: {...}      ← Per-child progress data
-│   └── nextDueDate:: [[Date]]          ← Earliest due date
+│   └── lineByLineProgress:: {...}      ← Per-child progress data
 ```
 
 ### 2. Session Records (per-review, historical)
@@ -211,15 +213,31 @@ Stored as date-headed blocks. These record algorithm-specific parameters at each
 
 ```
 ├── [[Date]] 🟢                ← Session heading (emoji = grade)
-│   ├── nextDueDate:: [[Date]]
 │   ├── grade:: 5
 │   ├── eFactor:: 2.5
-│   └── repetitions:: 3
+│   ├── repetitions:: 3
+│   ├── interval:: 6
+│   ├── progressiveRepetitions:: 2
+│   └── intervalMultiplier:: 6
 └── [[Date]] 🔴
     └── ...
 ```
 
-**Key principle:** `reviewMode` lives ONLY in the meta block. Session records contain algorithm-specific parameters (grade, interval, eFactor, etc.) but NOT reviewMode. This ensures a single source of truth and prevents mode conflicts.
+**Key principles:**
+- `reviewMode` and `nextDueDate` live ONLY in the meta block. Session records contain algorithm-specific parameters but NOT these meta-level fields. This ensures a single source of truth and prevents mode conflicts.
+- Each mode only modifies its OWN fields; all other fields are inherited unchanged from the previous session (see Mode Independence below).
+
+### Mode Independence & Full Field Inheritance
+
+Each review mode only calculates and updates its own data fields. When saving, all fields from the previous session are fully inherited, ensuring that switching modes never loses data from any mode.
+
+| Mode | Calculated Fields | Inherited Fields (unchanged) |
+|------|-------------------|------------------------------|
+| SM2 (Spaced Interval) | `grade`, `interval`, `repetitions`, `eFactor` | `progressiveRepetitions`, `intervalMultiplier` |
+| Progressive | `progressiveRepetitions`, `intervalMultiplier` | `interval`, `repetitions`, `eFactor` |
+| Fixed Days/Weeks/Months/Years | `intervalMultiplier` | `interval`, `repetitions`, `eFactor`, `progressiveRepetitions` |
+
+**Example:** If a card has SM2 data (`interval=11, repetitions=3, eFactor=2.26`) and the user switches to Progressive mode, the Progressive session inherits those SM2 fields unchanged. When switching back to SM2, the algorithm uses the preserved SM2 values — Progressive mode never pollutes them.
 
 ### lineByLineProgress Data Format
 
@@ -256,11 +274,10 @@ roam/memo (page)
 │   ├── ((cardUid1))
 │   │   ├── meta
 │   │   │   ├── reviewMode:: SPACED_INTERVAL
-│   │   │   ├── lineByLineReview:: Y
-│   │   │   ├── lineByLineProgress:: {"childUid": {...}}
-│   │   │   └── nextDueDate:: [[Date]]
-│   │   ├── [[Date]] 🟢
 │   │   │   ├── nextDueDate:: [[Date]]
+│   │   │   ├── lineByLineReview:: Y
+│   │   │   └── lineByLineProgress:: {"childUid": {...}}
+│   │   ├── [[Date]] 🟢
 │   │   │   ├── grade:: 5
 │   │   │   └── eFactor:: 2.5
 │   │   └── [[Date]] 🔴
@@ -291,24 +308,24 @@ Safe to run multiple times — already-migrated cards are skipped.
 The `useCurrentCardData` hook implements a **dual-layer data resolution** strategy:
 
 ```
-Session Queue (one-time read)     Data Page (real-time polling, 2s)
+Session Queue (one-time read)     Data Page (meta-only polling, 2s)
         │                                    │
         ▼                                    ▼
-  Card queue + sessions[]           getPluginPageData()
-  (captured at session start)       (reads latest session per card)
+  Card queue + sessions[]           getCardMetaOnly()
+  (captured at session start)       (reads only meta block per card)
         │                                    │
         └──────────┬─────────────────────────┘
                    ▼
-          currentCardData (displayed in UI)
+          currentCardData + cardMeta (displayed in UI)
 ```
 
 **Layer 1 — Session Queue (one-time read):** The card queue and full session history are read once when the review session starts and remain fixed until the session closes. This ensures stable card ordering and prevents queue disruption.
 
-**Layer 2 — Data Page Polling (real-time):** Every 2 seconds, the hook reads the latest session data for the current card directly from the Data Page via `getPluginPageData({ limitToLatest: true })`. This detects external changes (history deletion, reviewMode edits) and updates the display immediately.
+**Layer 2 — Meta-Only Polling (real-time):** Every 2 seconds, the hook reads only the meta block for the current card via `getCardMetaOnly()`. This detects external changes (reviewMode edits, nextDueDate updates) with minimal Datalog query overhead — no session records are parsed during polling.
 
 **Optimistic updates:** When the user toggles reviewMode in the UI, `applyOptimisticCardMeta` provides instant feedback before the next poll confirms the change.
 
-**Shallow comparison:** Polling compares only key session fields (interval, repetitions, eFactor, reviewMode, nextDueDate, dateCreated) to avoid unnecessary re-renders when data hasn't meaningfully changed.
+**Fallback:** When cardMeta is not yet loaded (or the card has no meta block), reviewMode falls back to the session queue's reviewMode, then to DEFAULT_REVIEW_MODE.
 
 ## Development
 

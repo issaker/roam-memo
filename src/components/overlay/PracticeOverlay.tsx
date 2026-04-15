@@ -366,6 +366,37 @@ const PracticeOverlay = ({
     loadSettings();
   }, []);
 
+  // Auto-save settings: debounce 500ms after any localSettings change
+  const autoSaveTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const isInitialLoadRef = React.useRef(true);
+
+  React.useEffect(() => {
+    if (isInitialLoadRef.current) {
+      isInitialLoadRef.current = false;
+      return;
+    }
+
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+
+    autoSaveTimerRef.current = setTimeout(async () => {
+      await saveSettingsToPage(localSettings.dataPageTitle, localSettings);
+      if (window.roamMemo?.extensionAPI?.settings) {
+        Object.entries(localSettings).forEach(([key, value]) => {
+          window.roamMemo.extensionAPI.settings.set(key, value);
+        });
+      }
+      window.dispatchEvent(new Event('roamMemoSettingsChanged'));
+    }, 500);
+
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [localSettings]);
+
   // Reset showAnswers state
   React.useEffect(() => {
     if (isLineByLine || isFixedMode(reviewMode)) {
@@ -852,34 +883,6 @@ const PracticeOverlay = ({
               Migrate card data to the current architecture: rename cardType→reviewMode in meta, add missing reviewMode, and remove redundant reviewMode from session records. Safe to run multiple times.
             </p>
             <MigrateLegacyDataPanel dataPageTitle={dataPageTitle} />
-          </div>
-        </div>
-
-        <div className="bp3-dialog-footer">
-          <div className="bp3-dialog-footer-actions">
-            <button
-              className="bp3-button bp3-intent-primary"
-              onClick={async () => {
-                await saveSettingsToPage(localSettings.dataPageTitle, localSettings);
-                if (window.roamMemo?.extensionAPI?.settings) {
-                  Object.entries(localSettings).forEach(([key, value]) => {
-                    window.roamMemo.extensionAPI.settings.set(key, value);
-                  });
-                }
-                window.dispatchEvent(new Event('roamMemoSettingsChanged'));
-                setShowSettings(false);
-              }}
-            >
-              Apply & Close
-            </button>
-            <button
-              className="bp3-button"
-              onClick={() => {
-                setShowSettings(false);
-              }}
-            >
-              Cancel
-            </button>
           </div>
         </div>
       </Blueprint.Dialog>

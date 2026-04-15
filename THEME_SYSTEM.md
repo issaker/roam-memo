@@ -109,10 +109,38 @@ src/
 
 ### 架构优化
 - `reviewMode` 确立为 meta 块唯一数据源，session 记录不再包含 `reviewMode::`
-- `CARD_META_SESSION_KEYS` 精简为仅 `reviewMode`，`lineByLineReview` 和 `lineByLineProgress` 由专门函数管理
+- `nextDueDate` 确立为 meta 块唯一数据源，session 记录不再包含 `nextDueDate::`，避免不同模式间 nextDueDate 冗余写入造成的混乱
+- `CARD_META_SESSION_KEYS` 扩展为 `reviewMode` + `nextDueDate`，`lineByLineReview` 和 `lineByLineProgress` 由专门函数管理
 - 运行时移除所有向后兼容推理代码（`cardType` 映射、`legacyCardMetadataBlocks` 回退、`inferReviewModeFromFields` 运行时推理）
 - `getCardScopedFields` 只从 meta 块读取，无 meta 则返回空
 - 设置统一：`showBreadcrumbs` 从 `useSettings` 统一传递，消除 PracticeOverlay 内部双源
+
+### 模式独立性与数据继承
+- **核心修复**：Progressive 模式不再递增 SM2 的 `repetitions`，不再覆盖 `interval` 和 `eFactor`
+- **全量继承**：每个模式只计算/修改自己的字段，其他字段从上一次 session 原样继承
+  - SM2 模式计算字段：`grade`, `interval`, `repetitions`, `eFactor`；继承字段：`progressiveRepetitions`, `intervalMultiplier`
+  - Progressive 模式计算字段：`progressiveRepetitions`, `intervalMultiplier`；继承字段：`interval`, `repetitions`, `eFactor`
+  - Fixed Days/Weeks/Months/Years 计算字段：`intervalMultiplier`；继承字段：`interval`, `repetitions`, `eFactor`, `progressiveRepetitions`
+- `savePracticeData` 新增 `undefined` 值过滤，避免将未定义字段写入 session 记录
+- 此修复确保用户在模式间自由切换时，每个模式的数据字段不会丢失或被其他模式污染
+
+### Progressive 算法独立化
+- 提取 `progressiveInterval()` 为独立函数，明确其与 SM2 无关
+- 修复间隔计算 BUG：旧公式 `6 × 2^(n-2)` 导致 progReps=2 时间隔为 6（与 progReps=1 重复），修正为 `6 × 2^(n-1)`
+- 正确递进序列：2 → 6 → 12 → 24 → 48 → 96 天
+- 函数签名：`progressiveInterval(progressiveRepetitions: number): number`
+
+### 性能优化：Meta-Only 轮询
+- `useCurrentCardData` 轮询从 `getPluginPageData({ limitToLatest: true })` 改为 `getCardMetaOnly()`
+- 新增 `getCardMetaOnly()` 轻量查询函数，只读取 meta 块，不解析 session 记录
+- 轮询仅更新 `cardMeta`（reviewMode, nextDueDate 等），不再更新 `currentCardData`
+- `reviewMode` 解析增加 fallback：cardMeta → latestSession.reviewMode → DEFAULT_REVIEW_MODE
+- 移除不再使用的 `isSessionDataChanged`、`extractCardMetaFromPluginData` 函数
+
+### Settings 实时保存
+- Settings 对话框新增 500ms debounce 自动保存，设置变更即时持久化
+- 移除 "Apply & Close" 和 "Cancel" 按钮，关闭对话框即完成
+- 首次加载跳过自动保存（避免覆盖已加载数据）
 
 ### 新增功能：增量阅读模式（Incremental Read）
 - 新增 `FIXED_PROGRESSIVE_LBL` 模式，用于长文章逐行阅读
