@@ -6,25 +6,8 @@ import * as testUtils from '~/utils/testUtils';
 import React from 'react';
 
 describe('useCurrentCardData', () => {
-  const originalLocation = window;
-  const parseMockRoamDate = (value: string) => {
-    if (!value || value.split(' ').length < 3) return undefined;
-    const months = {
-      January: 0, February: 1, March: 2, April: 3, May: 4, June: 5,
-      July: 6, August: 7, September: 8, October: 9, November: 10, December: 11,
-    };
-    const [month, dayWithSuffix, year] = value.replace(',', '').split(' ');
-    if (!(month in months) || !dayWithSuffix || !year) return undefined;
-    const day = Number(dayWithSuffix.replace(/(st|nd|rd|th)$/, ''));
-    return new Date(Date.UTC(Number(year), months[month as keyof typeof months], day));
-  };
-
   afterEach(() => {
-    jest.useRealTimers();
     jest.restoreAllMocks();
-    Object.defineProperty(globalThis, 'window', {
-      value: originalLocation,
-    });
   });
 
   it('should return current card when review mode unchanged', async () => {
@@ -80,130 +63,37 @@ describe('useCurrentCardData', () => {
     expect(result.current.currentCardData).toEqual(undefined);
   });
 
-  it('polling reads reviewMode from meta block via live data', async () => {
-    const currentCardRefUid = 'card-live-spaced';
-    const staleQueueSession = generateNewSession({
-      reviewMode: ReviewModes.FixedProgressive,
+  it('initializes cardMeta from latestSession reviewMode', async () => {
+    const currentCardRefUid = 'card-spaced';
+    const session = generateNewSession({
+      reviewMode: ReviewModes.SpacedInterval,
       isNew: false,
     });
 
-    const sessions = [staleQueueSession];
-
-    Object.defineProperty(window, 'roamAlphaAPI', {
-      value: {
-        q: jest.fn(() => [
-          [
-            {
-              children: [
-                {
-                  string: `((${currentCardRefUid}))`,
-                  children: [
-                    {
-                      string: 'meta',
-                      order: 0,
-                      children: [
-                        { string: 'reviewMode:: SPACED_INTERVAL' },
-                      ],
-                    },
-                    {
-                      string: '[[April 14th, 2026]] 🟢',
-                      order: 0,
-                      children: [
-                        { string: 'repetitions:: 2' },
-                        { string: 'interval:: 6' },
-                        { string: 'eFactor:: 2.3' },
-                        { string: 'nextDueDate:: [[April 20th, 2026]]' },
-                      ],
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        ]),
-        util: {
-          pageTitleToDate: jest.fn((value: string) => parseMockRoamDate(value)),
-        },
-      },
-      writable: true,
-    });
+    const sessions = [session];
 
     const { result } = renderHook(() =>
       useCurrentCardData({
         sessions,
         currentCardRefUid,
-        dataPageTitle: 'roam/memo',
       })
     );
 
-    expect(result.current.reviewMode).toEqual(ReviewModes.FixedProgressive);
-
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-    });
-
-    // Polling now only reads meta, so reviewMode is updated from meta
-    // but currentCardData remains from the initial sessions prop
     expect(result.current.reviewMode).toEqual(ReviewModes.SpacedInterval);
     expect(result.current.cardMeta?.reviewMode).toEqual(ReviewModes.SpacedInterval);
   });
 
-  it('reviewMode is derived from cardMeta.reviewMode', async () => {
-    const currentCardRefUid = 'id_reviewmode';
-
-    Object.defineProperty(window, 'roamAlphaAPI', {
-      value: {
-        q: jest.fn(() => [
-          [
-            {
-              children: [
-                {
-                  string: `((${currentCardRefUid}))`,
-                  children: [
-                    {
-                      string: 'meta',
-                      order: 0,
-                      children: [
-                        { string: 'reviewMode:: SPACED_INTERVAL' },
-                      ],
-                    },
-                    {
-                      string: '[[April 14th, 2026]] 🟢',
-                      order: 0,
-                      children: [
-                        { string: 'reviewMode:: SPACED_INTERVAL' },
-                        { string: 'repetitions:: 1' },
-                        { string: 'interval:: 1' },
-                        { string: 'eFactor:: 2.5' },
-                      ],
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        ]),
-        util: {
-          pageTitleToDate: jest.fn((value: string) => parseMockRoamDate(value)),
-        },
-      },
-      writable: true,
-    });
+  it('reviewMode falls back to DEFAULT when latestSession has no reviewMode', async () => {
+    const currentCardRefUid = 'id_empty';
 
     const { result } = renderHook(() =>
       useCurrentCardData({
         sessions: [],
         currentCardRefUid,
-        dataPageTitle: 'roam/memo',
       })
     );
 
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-    });
-
-    expect(result.current.reviewMode).toEqual(ReviewModes.SpacedInterval);
-    expect(result.current.cardMeta?.reviewMode).toEqual(ReviewModes.SpacedInterval);
+    expect(result.current.reviewMode).toEqual(ReviewModes.FixedProgressive);
   });
 
   describe('Card navigation', () => {
@@ -275,65 +165,52 @@ describe('useCurrentCardData', () => {
     });
   });
 
-  describe('Card meta integration', () => {
-    it('cardMeta reflects LBL state from polling data', async () => {
+  describe('Card meta initialization', () => {
+    it('cardMeta is initialized from latestSession with LBL fields', async () => {
       const currentCardRefUid = 'id_lbl';
-
-      Object.defineProperty(window, 'roamAlphaAPI', {
-        value: {
-          q: jest.fn(() => [
-            [
-              {
-                children: [
-                  {
-                    string: `((${currentCardRefUid}))`,
-                    children: [
-                      {
-                        string: 'meta',
-                        order: 0,
-                        children: [
-                          { string: 'reviewMode:: SPACED_INTERVAL_LBL' },
-                          { string: 'lineByLineReview:: Y' },
-                        ],
-                      },
-                      {
-                        string: '[[April 14th, 2026]] 🟢',
-                        order: 0,
-                        children: [
-                          { string: 'reviewMode:: SPACED_INTERVAL' },
-                          { string: 'repetitions:: 1' },
-                          { string: 'interval:: 1' },
-                          { string: 'eFactor:: 2.5' },
-                        ],
-                      },
-                    ],
-                  },
-                ],
-              },
-            ],
-          ]),
-          util: {
-            pageTitleToDate: jest.fn((value: string) => parseMockRoamDate(value)),
-          },
-        },
-        writable: true,
-      });
+      const session = {
+        ...generateNewSession({ reviewMode: ReviewModes.SpacedIntervalLBL, isNew: false }),
+        lineByLineReview: 'Y',
+      };
 
       const { result } = renderHook(() =>
         useCurrentCardData({
-          sessions: [],
+          sessions: [session],
           currentCardRefUid,
-          dataPageTitle: 'roam/memo',
         })
       );
-
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-      });
 
       expect(result.current.cardMeta?.lineByLineReview).toEqual('Y');
       expect(result.current.cardMeta?.reviewMode).toEqual(ReviewModes.SpacedIntervalLBL);
       expect(result.current.reviewMode).toEqual(ReviewModes.SpacedIntervalLBL);
+    });
+
+    it('applyOptimisticCardMeta updates cardMeta immediately', async () => {
+      const currentCardRefUid = 'id_opt';
+      const session = generateNewSession({
+        reviewMode: ReviewModes.FixedProgressive,
+        isNew: false,
+      });
+
+      const { result } = renderHook(() =>
+        useCurrentCardData({
+          sessions: [session],
+          currentCardRefUid,
+        })
+      );
+
+      expect(result.current.reviewMode).toEqual(ReviewModes.FixedProgressive);
+
+      act(() => {
+        result.current.applyOptimisticCardMeta({
+          reviewMode: ReviewModes.SpacedInterval,
+          lineByLineReview: undefined,
+          lineByLineProgress: undefined,
+        });
+      });
+
+      expect(result.current.cardMeta?.reviewMode).toEqual(ReviewModes.SpacedInterval);
+      expect(result.current.reviewMode).toEqual(ReviewModes.SpacedInterval);
     });
   });
 });

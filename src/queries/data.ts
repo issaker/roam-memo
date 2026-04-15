@@ -309,34 +309,6 @@ export const getPluginPageData = async ({ dataPageTitle, limitToLatest = true })
     : mapPluginPageData(queryResultsData);
 };
 
-/**
- * Lightweight meta-only query: reads only the meta block for each card,
- * skipping all session records. Used by polling to detect reviewMode changes
- * without the overhead of parsing full session history.
- *
- * Returns: { [cardUid]: CardMeta }
- */
-export const getCardMetaOnly = async ({ dataPageTitle }: { dataPageTitle: string }) => {
-  const queryResultsData = await getPluginPageBlockData({ dataPageTitle, blockName: 'data' });
-
-  if (!queryResultsData.length) return {};
-
-  const result: Record<string, any> = {};
-
-  queryResultsData
-    .map((arr) => arr[0])[0]
-    .children?.forEach((cur) => {
-      if (!cur?.string) return;
-      const uid = getStringBetween(cur.string, '((', '))');
-      const cardScopedFields = getCardScopedFields(cur.children);
-      if (Object.keys(cardScopedFields).length) {
-        result[uid] = cardScopedFields;
-      }
-    });
-
-  return result;
-};
-
 const mapPluginPageCachedData = (queryResultsData) => {
   const data = queryResultsData.map((arr) => arr[0])[0].children;
   if (!data?.length) return {};
