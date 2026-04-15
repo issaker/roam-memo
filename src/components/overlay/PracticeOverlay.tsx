@@ -574,18 +574,15 @@ const PracticeOverlay = ({
   const onSelectReviewMode = React.useCallback(async (newReviewMode: ReviewModes) => {
     if (!currentCardRefUid) return;
 
-    const isLbl = isLineByLineMode(newReviewMode);
     applyOptimisticCardMeta({
       ...cardMeta,
       reviewMode: newReviewMode,
-      lineByLineReview: isLbl ? 'Y' : cardMeta?.lineByLineReview,
     });
 
     await updateCardType({
       refUid: currentCardRefUid,
       dataPageTitle,
       reviewMode: newReviewMode,
-      lineByLineReview: isLbl ? 'Y' : undefined,
     });
   }, [currentCardRefUid, dataPageTitle, cardMeta, applyOptimisticCardMeta]);
 
@@ -901,33 +898,21 @@ const Dialog = styled(Blueprint.Dialog)<{
   width: 90vw;
   /* Background and text color inherit from Roam body automatically */
 
-  /* Dynamic border color based on card review mode */
+  /* Dynamic border color: Spaced=green, Fixed/Read=orange */
   border: 2px solid ${({ $reviewMode }) =>
     ($reviewMode === ReviewModes.SpacedInterval || $reviewMode === ReviewModes.SpacedIntervalLBL)
       ? colors.modeSpaced
-      : $reviewMode === ReviewModes.FixedProgressiveLBL
-        ? colors.modeReading
-        : $reviewMode === ReviewModes.FixedProgressive ||
-          $reviewMode === ReviewModes.FixedDays ||
-          $reviewMode === ReviewModes.FixedWeeks ||
-          $reviewMode === ReviewModes.FixedMonths ||
-          $reviewMode === ReviewModes.FixedYears
-          ? colors.modeFixed
-          : colors.borderSubtle};
+      : isFixedMode($reviewMode) || isReadingMode($reviewMode)
+        ? colors.modeFixed
+        : colors.borderSubtle};
   border-color: ${({ $showModeBorders, $reviewMode }) =>
     $showModeBorders === false
       ? colors.borderSubtle
       : ($reviewMode === ReviewModes.SpacedInterval || $reviewMode === ReviewModes.SpacedIntervalLBL)
         ? colors.modeSpaced
-        : $reviewMode === ReviewModes.FixedProgressiveLBL
-          ? colors.modeReading
-          : $reviewMode === ReviewModes.FixedProgressive ||
-            $reviewMode === ReviewModes.FixedDays ||
-            $reviewMode === ReviewModes.FixedWeeks ||
-            $reviewMode === ReviewModes.FixedMonths ||
-            $reviewMode === ReviewModes.FixedYears
-            ? colors.modeFixed
-            : colors.borderSubtle};
+        : isFixedMode($reviewMode) || isReadingMode($reviewMode)
+          ? colors.modeFixed
+          : colors.borderSubtle};
 
   ${mediaQueries.lg} {
     width: 80vw;
@@ -1252,7 +1237,7 @@ const ModeBadge = ({ reviewMode }) => {
   }
   if (isReadingMode(reviewMode)) {
     return (
-      <Blueprint.Tag intent="primary" minimal>
+      <Blueprint.Tag intent="warning" minimal>
         Read
       </Blueprint.Tag>
     );

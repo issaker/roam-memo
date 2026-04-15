@@ -58,7 +58,6 @@ export default function useCurrentCardData({
 
         const initialMeta: CardMeta = {
           reviewMode: latestSession.reviewMode || DEFAULT_REVIEW_MODE,
-          lineByLineReview: latestSession.lineByLineReview as 'Y' | 'N' | undefined,
           lineByLineProgress: latestSession.lineByLineProgress as string | undefined,
           nextDueDate: latestSession.nextDueDate,
         };

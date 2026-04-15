@@ -1,13 +1,24 @@
 /**
  * Practice Data Persistence
  *
- * Handles writing practice results and card metadata to the Roam data page.
+ * Handles writing practice results to the Roam data page.
  *
- * Key design decisions:
- * - reviewMode is saved to the meta block (not session records) via CARD_META_SESSION_KEYS
- * - lineByLineReview is managed by updateCardType() only
- * - lineByLineProgress is managed by updateLineByLineProgress() only
- * - Session records contain only algorithm-specific parameters (grade, interval, eFactor, etc.)
+ * Unified data layout — all fields stored in session blocks:
+ *   ((cardUid))
+ *   ├── [[Date]] 🟢            ← latest session block
+ *   │   ├── reviewMode:: FIXED_PROGRESSIVE
+ *   │   ├── nextDueDate:: [[Date]]
+ *   │   ├── lineByLineProgress:: {...}
+ *   │   ├── grade:: 5
+ *   │   ├── eFactor:: 2.5
+ *   │   └── ...
+ *   └── [[Date]] 🔴            ← older session block
+ *       └── ...
+ *
+ * The meta block has been removed. reviewMode and nextDueDate are now
+ * stored in each session record alongside algorithm-specific fields.
+ * lineByLineReview is no longer stored — its function is encoded in
+ * the reviewMode value (e.g. SPACED_INTERVAL_LBL, FIXED_PROGRESSIVE_LBL).
  */
 import * as stringUtils from '~/utils/string';
 import * as dateUtils from '~/utils/date';
@@ -20,7 +31,7 @@ import {
   getOrCreatePage,
 } from '~/queries/utils';
 
-import { CARD_META_BLOCK_NAME, CARD_META_SESSION_KEYS } from '~/constants';
+import { CARD_META_SESSION_KEYS } from '~/constants';
 
 const getEmojiFromGrade = (grade) => {
   switch (grade) {
@@ -41,12 +52,11 @@ const getEmojiFromGrade = (grade) => {
   }
 };
 
-const getOrCreateCardMetaBlock = async (cardDataBlockUid: string) =>
-  getOrCreateChildBlock(cardDataBlockUid, CARD_META_BLOCK_NAME, 0, {
-    open: false,
-  });
-
-const upsertCardMetaField = async ({
+/**
+ * Upsert a field in the latest session block for a card.
+ * Finds the most recent date-headed block and updates or creates the field.
+ */
+const upsertLatestSessionField = async ({
   cardDataBlockUid,
   key,
   value,
@@ -55,34 +65,48 @@ const upsertCardMetaField = async ({
   key: string;
   value: string;
 }) => {
-  const cardMetaBlockUid = await getOrCreateCardMetaBlock(cardDataBlockUid);
-  const existingFieldBlockUid = await getChildBlock(cardMetaBlockUid, `${key}::`, {
-    exactMatch: false,
-  });
+  const cardChildren = await window.roamAlphaAPI.q(
+    `[:find (pull ?card [:block/children :block/uid {:block/children [:block/uid :block/string :block/order]}])
+         :in $ ?cardUid
+         :where [?card :block/uid ?cardUid]]`,
+    cardDataBlockUid
+  );
 
-  if (existingFieldBlockUid) {
-    await window.roamAlphaAPI.updateBlock({
-      block: { uid: existingFieldBlockUid, string: `${key}:: ${value}` },
-    });
+  const children = cardChildren?.[0]?.[0]?.children || [];
+  const dateBlocks = children
+    .filter((c) => {
+      if (!c?.string) return false;
+      const dateStr = stringUtils.getStringBetween(c.string, '[[', ']]');
+      return !!stringUtils.parseRoamDateString(dateStr);
+    })
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  if (!dateBlocks.length) return;
+
+  const latestDateBlock = dateBlocks[0];
+  if (!latestDateBlock?.children) {
+    await createChildBlock(latestDateBlock.uid, `${key}:: ${value}`, -1, { open: false });
     return;
   }
 
-  await createChildBlock(cardMetaBlockUid, `${key}:: ${value}`, -1, {
-    open: false,
+  const existingField = latestDateBlock.children.find((c) => {
+    if (!c?.string) return false;
+    return c.string.startsWith(`${key}::`);
   });
+
+  if (existingField) {
+    await window.roamAlphaAPI.updateBlock({
+      block: { uid: existingField.uid, string: `${key}:: ${value}` },
+    });
+  } else {
+    await createChildBlock(latestDateBlock.uid, `${key}:: ${value}`, -1, { open: false });
+  }
 };
 
 /**
  * Save a single practice session result to the data page.
- *
- * Data layout created:
- *   ((cardUid))
- *   ├── meta                    ← upserted with reviewMode via CARD_META_SESSION_KEYS
- *   │   └── reviewMode:: ...
- *   └── [[Date]] 🟢            ← new session block
- *       ├── nextDueDate:: [[Date]]
- *       ├── grade:: 5
- *       └── ...
+ * All fields (including reviewMode, nextDueDate, lineByLineProgress)
+ * are written to the session block.
  */
 export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...data }) => {
   await getOrCreatePage(dataPageTitle);
@@ -91,7 +115,6 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
     heading: 3,
   });
 
-  // Get child that matches refUid
   const cardDataBlockUid = await getOrCreateChildBlock(dataBlockUid, `((${refUid}))`, 0, {
     open: false,
   });
@@ -103,32 +126,27 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
     cardDataBlockUid,
     `[[${dateCreatedRoamDateString}]] ${emoji}`,
     0,
-    {
-      open: false,
-    }
+    { open: false }
   );
 
   const nextDueDate = data.nextDueDate || dateUtils.addDays(referenceDate, data.interval);
 
   for (const key of Object.keys(data)) {
     if (data[key] === undefined) continue;
+    if (CARD_META_SESSION_KEYS.has(key)) continue;
 
-    if (CARD_META_SESSION_KEYS.has(key)) {
-      let metaValue = data[key];
-      if (key === 'nextDueDate') {
-        metaValue = `[[${stringUtils.dateToRoamDateString(nextDueDate)}]]`;
-      }
-      await upsertCardMetaField({
-        cardDataBlockUid,
-        key,
-        value: metaValue,
-      });
-      continue;
+    let value = data[key];
+    if (key === 'nextDueDate') {
+      value = `[[${stringUtils.dateToRoamDateString(nextDueDate)}]]`;
+    }
+    if (key === 'lineByLineProgress') {
+      value = JSON.stringify(data[key]);
     }
 
-    await createChildBlock(newDataBlockId, `${key}:: ${data[key]}`, -1);
+    await createChildBlock(newDataBlockId, `${key}:: ${value}`, -1);
   }
 };
+
 interface BulkSavePracticeDataOptions {
   token: string;
   records: CompleteRecords;
@@ -142,41 +160,12 @@ interface RoamBatchAction {
   location?: { 'parent-uid': string; order: number };
 }
 
-/**
- * Extract meta-level fields from session history for bulk save.
- * Only reviewMode needs to be extracted — lineByLineReview and lineByLineProgress
- * are managed by updateCardType() and updateLineByLineProgress() respectively.
- */
-const getLatestCardMetaFromSessions = (sessions: CompleteRecords[string] = []) => {
-  const meta = {} as Record<string, string>;
-
-  for (let i = sessions.length - 1; i >= 0; i--) {
-    const session = sessions[i];
-    for (const key of Array.from(CARD_META_SESSION_KEYS)) {
-      if (!(key in meta) && session[key] !== undefined) {
-        meta[key] = session[key];
-      }
-    }
-
-    if (Object.keys(meta).length === CARD_META_SESSION_KEYS.size) {
-      break;
-    }
-  }
-
-  return meta;
-};
-
 export const bulkSavePracticeData = async ({
   token,
   records,
   selectedUids,
   dataPageTitle,
 }: BulkSavePracticeDataOptions) => {
-  // Uncomment during development to prevent accidental data loss
-  // if (dataPageTitle === 'roam/memo') {
-  //   alert('NOPE! Protecting your graph data. Cannot save data to memo page during dev');
-  //   return;
-  // }
   await getOrCreatePage(dataPageTitle);
   const dataBlockUid = await getOrCreateBlockOnPage(dataPageTitle, 'data', -1, {
     open: false,
@@ -192,79 +181,31 @@ export const bulkSavePracticeData = async ({
     },
   };
 
-  // Create practice entries
   for (const refUid of selectedUids) {
-    // Check if entry already exists, if it does, delete it first so we don't
-    // have duplicates
     const existingEntryUid = await getChildBlock(dataBlockUid, `((${refUid}))`);
     if (existingEntryUid) {
       payload.data.actions.push({
         action: 'delete-block',
-        block: {
-          uid: existingEntryUid,
-        },
+        block: { uid: existingEntryUid },
       });
     }
 
     const entryUid = window.roamAlphaAPI.util.generateUID();
     payload.data.actions.push({
       action: 'create-block',
-      location: {
-        'parent-uid': dataBlockUid,
-        order: 0,
-      },
-      block: {
-        string: `((${refUid}))`,
-        uid: entryUid,
-        open: false,
-      },
+      location: { 'parent-uid': dataBlockUid, order: 0 },
+      block: { string: `((${refUid}))`, uid: entryUid, open: false },
     });
 
-    // Add sessions
     const sessions = records[refUid];
-    const cardMeta = getLatestCardMetaFromSessions(sessions);
-
-    if (Object.keys(cardMeta).length) {
-      const metaBlockUid = window.roamAlphaAPI.util.generateUID();
-      payload.data.actions.push({
-        action: 'create-block',
-        location: {
-          'parent-uid': entryUid,
-          order: 0,
-        },
-        block: {
-          string: CARD_META_BLOCK_NAME,
-          uid: metaBlockUid,
-          open: false,
-        },
-      });
-
-      for (const [key, value] of Object.entries(cardMeta)) {
-        payload.data.actions.push({
-          action: 'create-block',
-          location: {
-            'parent-uid': metaBlockUid,
-            order: -1,
-          },
-          block: {
-            string: `${key}:: ${value}`,
-            open: false,
-          },
-        });
-      }
-    }
 
     for (const session of sessions) {
-      // Add Session Heading
       const dateCreatedRoamDateString = stringUtils.dateToRoamDateString(session.dateCreated);
       const emoji = getEmojiFromGrade(session.grade);
       const sessionHeadingUid = window.roamAlphaAPI.util.generateUID();
       payload.data.actions.push({
         action: 'create-block',
-        location: {
-          'parent-uid': entryUid,
-          order: 0,
-        },
+        location: { 'parent-uid': entryUid, order: 0 },
         block: {
           string: `[[${dateCreatedRoamDateString}]] ${emoji}`,
           uid: sessionHeadingUid,
@@ -272,34 +213,29 @@ export const bulkSavePracticeData = async ({
         },
       });
 
-      // Add Session Data
       for (const key of Object.keys(session)) {
         if (CARD_META_SESSION_KEYS.has(key)) continue;
         let value = session[key];
-        if (key === 'dateCreated') continue; // no need to store this
+        if (key === 'dateCreated') continue;
         if (key === 'nextDueDate') {
           value = `[[${stringUtils.dateToRoamDateString(value)}]]`;
         }
+        if (key === 'lineByLineProgress') {
+          value = JSON.stringify(value);
+        }
         payload.data.actions.push({
           action: 'create-block',
-          location: {
-            'parent-uid': sessionHeadingUid,
-            order: -1,
-          },
-          block: {
-            string: `${key}:: ${value}`,
-            open: false,
-          },
+          location: { 'parent-uid': sessionHeadingUid, order: -1 },
+          block: { string: `${key}:: ${value}`, open: false },
         });
       }
     }
   }
+
   const baseUrl = 'https://roam-memo-server.onrender.com';
-  // const baseUrl = 'http://localhost:3000';
   try {
     await fetch(`${baseUrl}/save-roam-sr-data`, {
       method: 'POST',
-
       body: JSON.stringify(payload),
       headers: {
         Authorization: `Bearer ${token}`,
@@ -311,6 +247,10 @@ export const bulkSavePracticeData = async ({
   }
 };
 
+/**
+ * Update lineByLineProgress in the latest session block.
+ * Also updates nextDueDate to the earliest child due date.
+ */
 export const updateLineByLineProgress = async ({
   refUid,
   dataPageTitle,
@@ -330,7 +270,7 @@ export const updateLineByLineProgress = async ({
   if (!cardDataBlockUid) return;
 
   const progressString = JSON.stringify(progress);
-  await upsertCardMetaField({
+  await upsertLatestSessionField({
     cardDataBlockUid,
     key: 'lineByLineProgress',
     value: progressString,
@@ -344,7 +284,7 @@ export const updateLineByLineProgress = async ({
 
   if (earliestDueDate) {
     const dueDateString = `[[${stringUtils.dateToRoamDateString(earliestDueDate)}]]`;
-    await upsertCardMetaField({
+    await upsertLatestSessionField({
       cardDataBlockUid,
       key: 'nextDueDate',
       value: dueDateString,
@@ -352,11 +292,14 @@ export const updateLineByLineProgress = async ({
   }
 };
 
+/**
+ * Update reviewMode in the latest session block.
+ * lineByLineReview is no longer stored — LBL is encoded in reviewMode.
+ */
 export const updateCardType = async ({
   refUid,
   dataPageTitle,
   reviewMode,
-  lineByLineReview,
 }: {
   refUid: string;
   dataPageTitle: string;
@@ -373,13 +316,5 @@ export const updateCardType = async ({
     open: false,
   });
 
-  await upsertCardMetaField({ cardDataBlockUid, key: 'reviewMode', value: reviewMode });
-
-  if (lineByLineReview !== undefined) {
-    await upsertCardMetaField({
-      cardDataBlockUid,
-      key: 'lineByLineReview',
-      value: lineByLineReview,
-    });
-  }
+  await upsertLatestSessionField({ cardDataBlockUid, key: 'reviewMode', value: reviewMode });
 };

@@ -74,12 +74,9 @@ type PracticeDataResult = Session & { nextDueDateFromNow?: string };
  *   Fixed interval fields (calculated by Days/Weeks/Months/Years):
  *     intervalMultiplier
  *
- *   nextDueDate is calculated by all modes but written only to the meta block
- *   (via CARD_META_SESSION_KEYS), not to session records.
- *
- * Note: lineByLineReview and lineByLineProgress are meta-level fields
- * managed by updateCardType() and updateLineByLineProgress() respectively.
- * They are no longer passed through this function.
+ *   nextDueDate is calculated by all modes and written to the session block.
+ *   lineByLineProgress is managed by updateLineByLineProgress() and written
+ *   to the latest session block.
  */
 export const generatePracticeData = ({ dateCreated, reviewMode, ...props }: Session): PracticeDataResult => {
   const today = new Date();

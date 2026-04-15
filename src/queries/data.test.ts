@@ -27,7 +27,7 @@ describe('getPluginPageData', () => {
     jest.restoreAllMocks();
   });
 
-  it('prefers card meta fields over session-level fields', async () => {
+  it('reads all fields from the latest session block', async () => {
     Object.defineProperty(window, 'roamAlphaAPI', {
       value: {
         q: jest.fn(() => [
@@ -38,19 +38,12 @@ describe('getPluginPageData', () => {
                   string: '((card-1))',
                   children: [
                     {
-                      string: 'meta',
-                      children: [
-                        { string: 'reviewMode:: SPACED_INTERVAL' },
-                        { string: 'lineByLineReview:: Y' },
-                        { string: 'lineByLineProgress:: {"child-1":{"interval":6}}' },
-                        { string: 'nextDueDate:: [[April 20th, 2026]]' },
-                      ],
-                    },
-                    {
                       string: '[[April 14th, 2026]] 🟢',
                       order: 0,
                       children: [
-                        { string: 'nextDueDate:: [[April 15th, 2026]]' },
+                        { string: 'reviewMode:: SPACED_INTERVAL' },
+                        { string: 'lineByLineProgress:: {"child-1":{"interval":6}}' },
+                        { string: 'nextDueDate:: [[April 20th, 2026]]' },
                       ],
                     },
                   ],
@@ -78,14 +71,13 @@ describe('getPluginPageData', () => {
     );
     expect(result['card-1']).toMatchObject({
       reviewMode: 'SPACED_INTERVAL',
-      lineByLineReview: 'Y',
       lineByLineProgress: '{"child-1":{"interval":6}}',
     });
     const cardData = result['card-1'] as any;
     expect(cardData.nextDueDate).toEqual(new Date('2026-04-20T00:00:00.000Z'));
   });
 
-  it('reads reviewMode from meta block when session has no reviewMode', async () => {
+  it('reads reviewMode from latest session block', async () => {
     Object.defineProperty(window, 'roamAlphaAPI', {
       value: {
         q: jest.fn(() => [
@@ -96,15 +88,10 @@ describe('getPluginPageData', () => {
                   string: '((card-spaced))',
                   children: [
                     {
-                      string: 'meta',
-                      children: [
-                        { string: 'reviewMode:: SPACED_INTERVAL' },
-                      ],
-                    },
-                    {
                       string: '[[April 14th, 2026]] 🟢',
                       order: 0,
                       children: [
+                        { string: 'reviewMode:: SPACED_INTERVAL' },
                         { string: 'repetitions:: 3' },
                         { string: 'interval:: 12' },
                         { string: 'eFactor:: 2.4' },
@@ -137,7 +124,7 @@ describe('getPluginPageData', () => {
     });
   });
 
-  it('returns no reviewMode when card has no meta block (unmigrated data)', async () => {
+  it('returns no reviewMode when session block has none', async () => {
     Object.defineProperty(window, 'roamAlphaAPI', {
       value: {
         q: jest.fn(() => [

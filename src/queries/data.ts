@@ -1,19 +1,16 @@
 /**
  * Practice Data Queries
  *
- * Core data layer that reads/writes practice session data from the Roam data page.
+ * Core data layer that reads practice session data from the Roam data page.
  *
- * Data Page Structure:
+ * Unified Data Page Structure (no meta block):
  *   roam/memo (page)
  *   ├── data (heading block)
  *   │   ├── ((cardUid1))
- *   │   │   ├── meta                    ← Card-level persistent data (SINGLE SOURCE OF TRUTH)
- *   │   │   │   ├── reviewMode:: SPACED_INTERVAL
- *   │   │   │   ├── lineByLineReview:: Y
- *   │   │   │   ├── lineByLineProgress:: {...}
- *   │   │   │   └── nextDueDate:: [[Date]]
- *   │   │   ├── [[Date]] 🟢            ← Session record (emoji = grade)
+ *   │   │   ├── [[Date]] 🟢            ← Latest session (all fields here)
+ *   │   │   │   ├── reviewMode:: FIXED_PROGRESSIVE
  *   │   │   │   ├── nextDueDate:: [[Date]]
+ *   │   │   │   ├── lineByLineProgress:: {...}
  *   │   │   │   ├── grade:: 5
  *   │   │   │   ├── eFactor:: 2.5
  *   │   │   │   └── repetitions:: 3
@@ -30,10 +27,9 @@
  *       └── ...
  *
  * Key Design Principle:
- *   reviewMode lives ONLY in the meta block. Session records contain
- *   algorithm-specific parameters (grade, interval, eFactor, etc.) but
- *   NOT reviewMode. When reading data, reviewMode is merged from meta
- *   into the Session object for convenience, but meta is the authority.
+ *   All fields (reviewMode, nextDueDate, lineByLineProgress, grade, etc.)
+ *   are stored uniformly in session blocks. The latest session block is the
+ *   single source of truth for the card's current state.
  */
 import { getStringBetween, parseConfigString, parseRoamDateString } from '~/utils/string';
 import * as stringUtils from '~/utils/string';
@@ -49,8 +45,6 @@ import {
   restoreCompletedUids,
 } from '~/queries/today';
 import { generateNewSession, getChildBlocksOnPage } from './utils';
-
-import { CARD_META_BLOCK_NAME } from '~/constants';
 
 export const getPracticeData = async ({
   tagsList,
@@ -169,6 +163,8 @@ const parseFieldValuesFromChildren = (
 
     if (key === 'nextDueDate') {
       object[key] = parseRoamDateString(getStringBetween(value, '[[', ']]'));
+    } else if (key === 'lineByLineProgress') {
+      object[key] = value;
     } else if (value === 'true' || value === 'false') {
       object[key] = value === 'true';
     } else if (stringUtils.isNumeric(value)) {
@@ -185,27 +181,6 @@ const isSessionHeadingBlock = (child) => {
   return !!parseRoamDateString(headingDateString);
 };
 
-const isCardMetaBlock = (child) => child?.string === CARD_META_BLOCK_NAME;
-
-/**
- * Read card-scoped fields from the meta block.
- * After migration, all cards should have a meta block with reviewMode.
- * Cards without a meta block will return empty fields.
- */
-const getCardScopedFields = (children: any[] = []) => {
-  const cardScopedFields: Record<string, any> = {};
-  const cardMetaBlock = children.find(isCardMetaBlock) as { children?: any[] } | undefined;
-
-  if (!cardMetaBlock?.children) return cardScopedFields;
-
-  const metaChildren = cardMetaBlock.children.filter(c => c?.string);
-  if (metaChildren.length) {
-    parseFieldValuesFromChildren(cardScopedFields, metaChildren);
-  }
-
-  return cardScopedFields;
-};
-
 const mapPluginPageDataLatest = (queryResultsData): Records =>
   queryResultsData
     .map((arr) => arr[0])[0]
@@ -213,12 +188,10 @@ const mapPluginPageDataLatest = (queryResultsData): Records =>
       if (!cur?.string) return acc;
       const uid = getStringBetween(cur.string, '((', '))');
       const sessionChildren = cur.children?.filter(isSessionHeadingBlock) || [];
-      const cardScopedFields = getCardScopedFields(cur.children);
 
       if (!sessionChildren.length) {
         acc[uid] = {
           ...generateNewSession(),
-          ...cardScopedFields,
         };
         return acc;
       }
@@ -233,7 +206,6 @@ const mapPluginPageDataLatest = (queryResultsData): Records =>
 
       if (!latestChild?.children) return acc;
       parseFieldValuesFromChildren(acc[uid], latestChild.children);
-      Object.assign(acc[uid], cardScopedFields);
 
       return acc;
     }, {}) || {};
@@ -245,13 +217,11 @@ const mapPluginPageData = (queryResultsData): CompleteRecords =>
       if (!cur?.string) return acc;
       const uid = getStringBetween(cur.string, '((', '))');
       const sessionChildren = cur.children?.filter(isSessionHeadingBlock) || [];
-      const cardScopedFields = getCardScopedFields(cur.children);
       acc[uid] = [];
 
       if (!sessionChildren.length) {
         acc[uid].push({
           ...generateNewSession(),
-          ...cardScopedFields,
         });
         return acc;
       }
@@ -268,13 +238,11 @@ const mapPluginPageData = (queryResultsData): CompleteRecords =>
         };
 
         if (!child.children) {
-          Object.assign(record, cardScopedFields);
           acc[uid].push(record);
           continue;
         }
 
         parseFieldValuesFromChildren(record, child.children);
-        Object.assign(record, cardScopedFields);
 
         acc[uid].push(record);
       }

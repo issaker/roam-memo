@@ -71,7 +71,7 @@ The header bar displays a color-coded mode badge to the left of the status tags 
 |------------|-------------|-------|--------------|
 | **Spaced** | Spaced Interval Mode | Green | Same as "New" tag |
 | **Fixed** | Fixed Interval Mode | Orange | Same as "Past Due" tag |
-| **Read** | Incremental Read Mode | Blue | Same as primary intent |
+| **Read** | Incremental Read Mode | Orange | Same as "Past Due" tag |
 
 The dialog border color also dynamically matches the mode badge color, reinforcing the visual cue across the entire window. Can be toggled via the "Show Review Mode Borders" setting.
 
@@ -147,7 +147,7 @@ A line-by-line reading mode designed for long-form content. Based on the **Incre
 
 ### Dynamic Review Mode Switching
 
-Each card's `reviewMode` is stored in the **meta block** on the Data Page as the single source of truth. Changes take effect immediately on card navigation — no session restart required.
+Each card's `reviewMode` is stored in the **latest session block** on the Data Page. Changes take effect immediately on card navigation — no session restart required.
 
 ### Urgency-Based Due Card Sorting
 
@@ -182,7 +182,7 @@ A specialized card-level review mode for cards with multiple child blocks (outli
 - Children with `nextDueDate` in the future are considered mastered — shown directly, no "Show Answer" needed
 - Children with no review history or past-due `nextDueDate` require active review
 - The card's main `nextDueDate` is set to the earliest child due date, ensuring the card appears as "due" when any child needs review
-- `lineByLineReview`, `lineByLineProgress`, and the line-by-line parent `nextDueDate` are stored in a dedicated card-level `meta` block, so card metadata stays structurally separate from historical review sessions
+- `lineByLineProgress` and the line-by-line parent `nextDueDate` are stored in the latest session block
 
 **Visual indicators:**
 - **LBL checkbox** in the header toggles line-by-line mode for the current card
@@ -192,40 +192,32 @@ A specialized card-level review mode for cards with multiple child blocks (outli
 
 ## Data Architecture
 
-All practice data is stored on a Roam page (default: `roam/memo`). Each card's data is split into two layers:
+All practice data is stored on a Roam page (default: `roam/memo`). Each card's data follows a **unified session-block architecture** — all fields are stored in session records, with no separate meta block.
 
-### 1. CardMeta (persistent, card-level) — Single Source of Truth
+### Unified Session Block Layout
 
-Stored in the `meta` block. These fields define the card's identity and behavior:
+All fields (reviewMode, nextDueDate, lineByLineProgress, grade, eFactor, etc.) are stored uniformly in session blocks. The latest session block is the single source of truth for the card's current state:
 
 ```
 ((cardUid))
-├── meta                        ← Card-level persistent data
-│   ├── reviewMode:: SPACED_INTERVAL    ← Algorithm mode (SINGLE SOURCE OF TRUTH)
-│   ├── nextDueDate:: [[Date]]          ← Next due date (SINGLE SOURCE OF TRUTH)
-│   ├── lineByLineReview:: Y            ← Line-by-line toggle
-│   └── lineByLineProgress:: {...}      ← Per-child progress data
-```
-
-### 2. Session Records (per-review, historical)
-
-Stored as date-headed blocks. These record algorithm-specific parameters at each review:
-
-```
-├── [[Date]] 🟢                ← Session heading (emoji = grade)
+├── [[April 14th, 2026]] 🟢    ← Latest session (SINGLE SOURCE OF TRUTH)
+│   ├── reviewMode:: FIXED_PROGRESSIVE
+│   ├── nextDueDate:: [[April 15th, 2026]]
+│   ├── lineByLineProgress:: {"childUid": {...}}
 │   ├── grade:: 5
 │   ├── eFactor:: 2.5
 │   ├── repetitions:: 3
 │   ├── interval:: 6
 │   ├── progressiveRepetitions:: 2
 │   └── intervalMultiplier:: 6
-└── [[Date]] 🔴
+└── [[April 13th, 2026]] 🔴    ← Older session
     └── ...
 ```
 
 **Key principles:**
-- `reviewMode` and `nextDueDate` live ONLY in the meta block. Session records contain algorithm-specific parameters but NOT these meta-level fields. This ensures a single source of truth and prevents mode conflicts.
-- Each mode only modifies its OWN fields; all other fields are inherited unchanged from the previous session (see Mode Independence below).
+- `reviewMode` and `nextDueDate` are stored in each session block alongside algorithm-specific fields
+- `lineByLineReview` has been removed — LBL functionality is encoded directly in the `reviewMode` value (e.g. `SPACED_INTERVAL_LBL`, `FIXED_PROGRESSIVE_LBL`)
+- Each mode only modifies its OWN fields; all other fields are inherited unchanged from the previous session (see Mode Independence below)
 
 ### Mode Independence & Full Field Inheritance
 
@@ -241,7 +233,7 @@ Each review mode only calculates and updates its own data fields. When saving, a
 
 ### lineByLineProgress Data Format
 
-The `lineByLineProgress` field in the meta block stores per-child scheduling data as JSON:
+The `lineByLineProgress` field in the latest session block stores per-child scheduling data as JSON:
 
 ```json
 {
@@ -272,12 +264,10 @@ The `lineByLineProgress` field in the meta block stores per-child scheduling dat
 roam/memo (page)
 ├── data (heading block)
 │   ├── ((cardUid1))
-│   │   ├── meta
+│   │   ├── [[Date]] 🟢
 │   │   │   ├── reviewMode:: SPACED_INTERVAL
 │   │   │   ├── nextDueDate:: [[Date]]
-│   │   │   ├── lineByLineReview:: Y
-│   │   │   └── lineByLineProgress:: {"childUid": {...}}
-│   │   ├── [[Date]] 🟢
+│   │   │   ├── lineByLineProgress:: {"childUid": {...}}
 │   │   │   ├── grade:: 5
 │   │   │   └── eFactor:: 2.5
 │   │   └── [[Date]] 🔴
@@ -295,37 +285,35 @@ roam/memo (page)
 
 ## Data Migration
 
-The Data Migration tool (accessible via Settings → Data Migration) performs three tasks:
+The Data Migration tool (accessible via Settings → Data Migration) performs four tasks:
 
 1. **cardType → reviewMode**: Renames legacy `cardType::` to `reviewMode::` in meta blocks
-2. **Missing reviewMode**: Infers and writes `reviewMode` to meta for cards without one
-3. **Session cleanup**: Removes redundant `reviewMode::` from session records (reviewMode belongs only in meta)
+2. **Missing reviewMode**: Infers and writes `reviewMode` for cards without one
+3. **Meta block merge**: Moves `reviewMode`, `nextDueDate`, `lineByLineProgress` from the meta block into the latest session block, then deletes the meta block
+4. **lineByLineReview → LBL reviewMode**: Converts `lineByLineReview:: Y` to the corresponding LBL reviewMode (e.g. `SPACED_INTERVAL` → `SPACED_INTERVAL_LBL`)
 
 Safe to run multiple times — already-migrated cards are skipped.
 
 ## Real-Time Data Synchronization
 
-The `useCurrentCardData` hook implements a **dual-layer data resolution** strategy:
+The `useCurrentCardData` hook reads card data from the session queue and derives the current reviewMode from the latest session:
 
 ```
-Session Queue (one-time read)     Data Page (meta-only polling, 2s)
-        │                                    │
-        ▼                                    ▼
-  Card queue + sessions[]           getCardMetaOnly()
-  (captured at session start)       (reads only meta block per card)
-        │                                    │
-        └──────────┬─────────────────────────┘
-                   ▼
-          currentCardData + cardMeta (displayed in UI)
+Session Queue (one-time read)
+        │
+        ▼
+  Card queue + sessions[]
+  (captured at session start)
+        │
+        ▼
+  latestSession → cardMeta → reviewMode (displayed in UI)
 ```
 
-**Layer 1 — Session Queue (one-time read):** The card queue and full session history are read once when the review session starts and remain fixed until the session closes. This ensures stable card ordering and prevents queue disruption.
+**Data resolution:** The card queue and full session history are read once when the review session starts. The latest session record is the single source of truth for `reviewMode`, `nextDueDate`, and `lineByLineProgress`.
 
-**Layer 2 — Meta-Only Polling (real-time):** Every 2 seconds, the hook reads only the meta block for the current card via `getCardMetaOnly()`. This detects external changes (reviewMode edits, nextDueDate updates) with minimal Datalog query overhead — no session records are parsed during polling.
+**Optimistic updates:** When the user toggles reviewMode in the UI, `applyOptimisticCardMeta` provides instant feedback before the data is persisted.
 
-**Optimistic updates:** When the user toggles reviewMode in the UI, `applyOptimisticCardMeta` provides instant feedback before the next poll confirms the change.
-
-**Fallback:** When cardMeta is not yet loaded (or the card has no meta block), reviewMode falls back to the session queue's reviewMode, then to DEFAULT_REVIEW_MODE.
+**Fallback:** When cardMeta is not yet loaded, reviewMode falls back to the session queue's reviewMode, then to DEFAULT_REVIEW_MODE.
 
 ## Development
 
@@ -374,14 +362,14 @@ src/
 ├── extension.tsx          # Plugin entry point (onload/onunload)
 ├── app.tsx                # Root React component, orchestrates review workflow
 ├── practice.ts            # SM2 algorithm + Fixed Interval algorithm
-├── constants.ts           # Shared constants (meta block name, meta-session key routing)
+├── constants.ts           # Shared constants (session key routing)
 ├── models/
 │   ├── session.ts         # Session & CardMeta data models, review mode definitions
 │   └── practice.ts        # Today's review status model
 ├── queries/
 │   ├── data.ts            # Core data layer (read practice data from Roam page)
 │   ├── today.ts           # Today's review calculation (due/new/completed)
-│   ├── save.ts            # Write practice data + card metadata to Roam blocks
+│   ├── save.ts            # Write practice data to Roam session blocks
 │   ├── cache.ts           # Per-tag cache (renderMode, etc.)
 │   ├── settings.ts        # Settings persistence to Roam page
 │   ├── utils.ts           # Roam API query helpers
@@ -389,7 +377,7 @@ src/
 ├── hooks/
 │   ├── useSettings.ts     # Settings management with dual-mode support
 │   ├── usePracticeData.tsx # Practice data fetching with ref-based caching
-│   ├── useCurrentCardData.tsx # Active card data with real-time Data Page polling
+│   ├── useCurrentCardData.tsx # Active card data with latest-session resolution
 │   ├── useBlockInfo.tsx   # Block content + breadcrumbs
 │   ├── useCloze.tsx       # Cloze deletion ({text} masking)
 │   ├── useCachedData.ts   # Per-tag cache management

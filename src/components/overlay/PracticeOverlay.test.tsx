@@ -197,8 +197,7 @@ describe('PracticeOverlay', () => {
     const dueCard1 = 'id_due_fixed_lbl';
 
     mockBuilder.withCard({ uid: dueCard1 }).withSession(dueCard1, {
-      reviewMode: ReviewModes.FixedProgressive,
-      lineByLineReview: 'Y',
+      reviewMode: ReviewModes.FixedProgressiveLBL,
       lineByLineProgress: JSON.stringify({}),
       grade: 1,
       dateCreated: dateUtils.subtractDays(new Date(), 1),

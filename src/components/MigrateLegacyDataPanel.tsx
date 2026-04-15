@@ -1,5 +1,16 @@
+/**
+ * Data Migration Panel
+ *
+ * Migrates legacy data structures to the unified session-block architecture:
+ *
+ * Phase 1: cardType → reviewMode rename in meta blocks
+ * Phase 2: Merge meta block fields (reviewMode, nextDueDate, lineByLineProgress)
+ *          into the latest session block, then delete the meta block
+ * Phase 3: Convert lineByLineReview:: Y → LBL reviewMode
+ * Phase 4: Clean up redundant session-level reviewMode blocks
+ */
 import * as React from 'react';
-import { ReviewModes } from '~/models/session';
+import { ReviewModes, isLineByLineMode } from '~/models/session';
 import { updateCardType } from '~/queries';
 import { getPluginPageData, inferReviewModeFromFields } from '~/queries/data';
 
@@ -14,8 +25,13 @@ const CARD_DELAY_MS = 100;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const findMetaBlock = (cardChildren: any[] = []) =>
+  cardChildren.find((child) => child?.string === CARD_META_BLOCK_NAME);
+
+const hasMetaBlock = (cardChildren: any[] = []): boolean => !!findMetaBlock(cardChildren);
+
 const hasMetaReviewMode = (cardChildren: any[] = []): boolean => {
-  const metaBlock = cardChildren.find((child) => child?.string === CARD_META_BLOCK_NAME);
+  const metaBlock = findMetaBlock(cardChildren);
   const metaChildren = metaBlock?.children || [];
 
   for (const block of metaChildren) {
@@ -28,7 +44,7 @@ const hasMetaReviewMode = (cardChildren: any[] = []): boolean => {
 };
 
 const hasLegacyCardType = (cardChildren: any[] = []): boolean => {
-  const metaBlock = cardChildren.find((child) => child?.string === CARD_META_BLOCK_NAME);
+  const metaBlock = findMetaBlock(cardChildren);
   const metaChildren = metaBlock?.children || [];
   let hasCardType = false;
   let hasReviewMode = false;
@@ -44,7 +60,7 @@ const hasLegacyCardType = (cardChildren: any[] = []): boolean => {
 };
 
 const hasDuplicateReviewMode = (cardChildren: any[] = []): boolean => {
-  const metaBlock = cardChildren.find((child) => child?.string === CARD_META_BLOCK_NAME);
+  const metaBlock = findMetaBlock(cardChildren);
   const metaChildren = metaBlock?.children || [];
   let reviewModeCount = 0;
   let hasCardType = false;
@@ -60,7 +76,7 @@ const hasDuplicateReviewMode = (cardChildren: any[] = []): boolean => {
 };
 
 const findMetaCardTypeBlock = (cardChildren: any[] = []): { uid: string; value: string } | null => {
-  const metaBlock = cardChildren.find((child) => child?.string === CARD_META_BLOCK_NAME);
+  const metaBlock = findMetaBlock(cardChildren);
   const metaChildren = metaBlock?.children || [];
 
   for (const block of metaChildren) {
@@ -75,7 +91,7 @@ const findMetaCardTypeBlock = (cardChildren: any[] = []): { uid: string; value: 
 };
 
 const findDuplicateMetaBlocks = (cardChildren: any[] = []): { uid: string; key: string }[] => {
-  const metaBlock = cardChildren.find((child) => child?.string === CARD_META_BLOCK_NAME);
+  const metaBlock = findMetaBlock(cardChildren);
   const metaChildren = metaBlock?.children || [];
   const keyCount: Record<string, number> = {};
   const duplicates: { uid: string; key: string }[] = [];
@@ -122,6 +138,35 @@ const findSessionReviewModeBlocks = (cardChildren: any[] = []): { uid: string }[
   return results;
 };
 
+const extractMetaFields = (cardChildren: any[] = []): Record<string, { uid: string; value: string }> => {
+  const metaBlock = findMetaBlock(cardChildren);
+  const metaChildren = metaBlock?.children || [];
+  const fields: Record<string, { uid: string; value: string }> = {};
+
+  for (const block of metaChildren) {
+    if (!block?.string || !block.uid) continue;
+    const [key, value] = parseConfigString(block.string);
+    if (key && value !== undefined) {
+      fields[key] = { uid: block.uid, value };
+    }
+  }
+
+  return fields;
+};
+
+const findLatestSessionBlock = (cardChildren: any[] = []): { uid: string; children: any[] } | null => {
+  const sessionBlocks = cardChildren.filter((child) => {
+    if (!child?.string) return false;
+    const dateStr = getStringBetween(child.string, '[[', ']]');
+    return !!dateStr;
+  });
+
+  if (!sessionBlocks.length) return null;
+
+  const sorted = [...sessionBlocks].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  return sorted[0];
+};
+
 interface MigrationTask {
   cardUid: string;
   needsCardTypeRename: boolean;
@@ -132,7 +177,10 @@ interface MigrationTask {
   duplicateBlockUids: string[];
   sessionReviewModeUids: string[];
   resolvedMode: ReviewModes;
-  lineByLineReview?: 'Y';
+  needsMetaMerge: boolean;
+  metaBlockUid?: string;
+  metaFields: Record<string, { uid: string; value: string }>;
+  latestSessionBlockUid?: string;
 }
 
 const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) => {
@@ -189,7 +237,13 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
           : [];
         const sessionReviewModeUids = findSessionReviewModeBlocks(rawCardChildren).map((b) => b.uid);
 
-        const hasWork = needsCardTypeRename || needsReviewModeWrite || needsDuplicateCleanup || sessionReviewModeUids.length > 0;
+        const needsMetaMerge = hasMetaBlock(rawCardChildren);
+        const metaFields = needsMetaMerge ? extractMetaFields(rawCardChildren) : {};
+        const metaBlock = findMetaBlock(rawCardChildren);
+        const latestSessionBlock = findLatestSessionBlock(rawCardChildren);
+
+        const hasWork = needsCardTypeRename || needsReviewModeWrite || needsDuplicateCleanup
+          || sessionReviewModeUids.length > 0 || needsMetaMerge;
 
         if (!hasWork) {
           skipped++;
@@ -200,10 +254,13 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
         const latestSession = sessions[sessions.length - 1];
 
         const resolvedMode = inferReviewModeFromFields(latestSession);
-        const isLineByLine = latestSession?.lineByLineReview === 'Y';
+        const isLineByLine = latestSession?.lineByLineReview === 'Y'
+          || isLineByLineMode(resolvedMode);
         const finalMode = isLineByLine && resolvedMode === ReviewModes.SpacedInterval
           ? ReviewModes.SpacedIntervalLBL
-          : resolvedMode;
+          : isLineByLine && resolvedMode === ReviewModes.FixedProgressive
+            ? ReviewModes.FixedProgressiveLBL
+            : resolvedMode;
 
         let cardTypeBlockUid: string | undefined;
         let cardTypeBlockValue: string | undefined;
@@ -225,11 +282,14 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
           duplicateBlockUids,
           sessionReviewModeUids,
           resolvedMode: finalMode,
-          lineByLineReview: isLineByLine ? 'Y' : undefined,
+          needsMetaMerge,
+          metaBlockUid: metaBlock?.uid,
+          metaFields,
+          latestSessionBlockUid: latestSessionBlock?.uid,
         });
       }
 
-      setProgress({ total, migrated: 0, skipped, phase: `Phase 1: Renaming cardType → reviewMode` });
+      setProgress({ total, migrated: 0, skipped, phase: 'Phase 1: Renaming cardType → reviewMode' });
 
       let migrated = 0;
       let errors = 0;
@@ -249,13 +309,41 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
               refUid: task.cardUid,
               dataPageTitle,
               reviewMode: task.resolvedMode,
-              lineByLineReview: task.lineByLineReview,
             });
           }
 
           if (task.needsDuplicateCleanup && task.duplicateBlockUids.length > 0) {
             for (const uid of task.duplicateBlockUids) {
               await window.roamAlphaAPI.deleteBlock({ block: { uid } });
+            }
+          }
+
+          if (task.needsMetaMerge && task.latestSessionBlockUid) {
+            const { reviewMode, nextDueDate, lineByLineProgress } = task.metaFields;
+
+            if (reviewMode && task.latestSessionBlockUid) {
+              await window.roamAlphaAPI.createBlock({
+                location: { 'parent-uid': task.latestSessionBlockUid, order: -1 },
+                block: { string: `reviewMode:: ${reviewMode.value}`, open: false },
+              });
+            }
+
+            if (nextDueDate && task.latestSessionBlockUid) {
+              await window.roamAlphaAPI.createBlock({
+                location: { 'parent-uid': task.latestSessionBlockUid, order: -1 },
+                block: { string: `nextDueDate:: ${nextDueDate.value}`, open: false },
+              });
+            }
+
+            if (lineByLineProgress && task.latestSessionBlockUid) {
+              await window.roamAlphaAPI.createBlock({
+                location: { 'parent-uid': task.latestSessionBlockUid, order: -1 },
+                block: { string: `lineByLineProgress:: ${lineByLineProgress.value}`, open: false },
+              });
+            }
+
+            if (task.metaBlockUid) {
+              await window.roamAlphaAPI.deleteBlock({ block: { uid: task.metaBlockUid } });
             }
           }
 

@@ -166,11 +166,10 @@ describe('useCurrentCardData', () => {
   });
 
   describe('Card meta initialization', () => {
-    it('cardMeta is initialized from latestSession with LBL fields', async () => {
+    it('cardMeta is initialized from latestSession with LBL mode', async () => {
       const currentCardRefUid = 'id_lbl';
       const session = {
         ...generateNewSession({ reviewMode: ReviewModes.SpacedIntervalLBL, isNew: false }),
-        lineByLineReview: 'Y',
       };
 
       const { result } = renderHook(() =>
@@ -180,7 +179,6 @@ describe('useCurrentCardData', () => {
         })
       );
 
-      expect(result.current.cardMeta?.lineByLineReview).toEqual('Y');
       expect(result.current.cardMeta?.reviewMode).toEqual(ReviewModes.SpacedIntervalLBL);
       expect(result.current.reviewMode).toEqual(ReviewModes.SpacedIntervalLBL);
     });
@@ -204,7 +202,6 @@ describe('useCurrentCardData', () => {
       act(() => {
         result.current.applyOptimisticCardMeta({
           reviewMode: ReviewModes.SpacedInterval,
-          lineByLineReview: undefined,
           lineByLineProgress: undefined,
         });
       });

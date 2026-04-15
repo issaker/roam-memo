@@ -136,7 +136,6 @@ describe('supermemo: simulate practice', () => {
         eFactor: 2.5,
       });
 
-      expect(result.lineByLineReview).toBeUndefined();
       expect(result.lineByLineProgress).toBeUndefined();
       expect(result.reviewMode).toBe(ReviewModes.SpacedInterval);
     });
