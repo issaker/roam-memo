@@ -22,7 +22,7 @@
  */
 import * as stringUtils from '~/utils/string';
 import * as dateUtils from '~/utils/date';
-import { CompleteRecords, LineByLineProgressMap, ReviewModes } from '~/models/session';
+import { LineByLineProgressMap, ReviewModes } from '~/models/session';
 import {
   createChildBlock,
   getChildBlock,
@@ -144,106 +144,6 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
     }
 
     await createChildBlock(newDataBlockId, `${key}:: ${value}`, -1);
-  }
-};
-
-interface BulkSavePracticeDataOptions {
-  token: string;
-  records: CompleteRecords;
-  selectedUids: string[];
-  dataPageTitle: string;
-}
-
-interface RoamBatchAction {
-  action: string;
-  block?: { uid?: string; string?: string; open?: boolean };
-  location?: { 'parent-uid': string; order: number };
-}
-
-export const bulkSavePracticeData = async ({
-  token,
-  records,
-  selectedUids,
-  dataPageTitle,
-}: BulkSavePracticeDataOptions) => {
-  await getOrCreatePage(dataPageTitle);
-  const dataBlockUid = await getOrCreateBlockOnPage(dataPageTitle, 'data', -1, {
-    open: false,
-    heading: 3,
-  });
-  const graphName = window.roamAlphaAPI.graph.name;
-
-  const payload = {
-    graphName,
-    data: {
-      action: 'batch-actions',
-      actions: [] as RoamBatchAction[],
-    },
-  };
-
-  for (const refUid of selectedUids) {
-    const existingEntryUid = await getChildBlock(dataBlockUid, `((${refUid}))`);
-    if (existingEntryUid) {
-      payload.data.actions.push({
-        action: 'delete-block',
-        block: { uid: existingEntryUid },
-      });
-    }
-
-    const entryUid = window.roamAlphaAPI.util.generateUID();
-    payload.data.actions.push({
-      action: 'create-block',
-      location: { 'parent-uid': dataBlockUid, order: 0 },
-      block: { string: `((${refUid}))`, uid: entryUid, open: false },
-    });
-
-    const sessions = records[refUid];
-
-    for (const session of sessions) {
-      const dateCreatedRoamDateString = stringUtils.dateToRoamDateString(session.dateCreated);
-      const emoji = getEmojiFromGrade(session.grade);
-      const sessionHeadingUid = window.roamAlphaAPI.util.generateUID();
-      payload.data.actions.push({
-        action: 'create-block',
-        location: { 'parent-uid': entryUid, order: 0 },
-        block: {
-          string: `[[${dateCreatedRoamDateString}]] ${emoji}`,
-          uid: sessionHeadingUid,
-          open: false,
-        },
-      });
-
-      for (const key of Object.keys(session)) {
-        if (CARD_META_SESSION_KEYS.has(key)) continue;
-        let value = session[key];
-        if (key === 'dateCreated') continue;
-        if (key === 'nextDueDate') {
-          value = `[[${stringUtils.dateToRoamDateString(value)}]]`;
-        }
-        if (key === 'lineByLineProgress') {
-          value = JSON.stringify(value);
-        }
-        payload.data.actions.push({
-          action: 'create-block',
-          location: { 'parent-uid': sessionHeadingUid, order: -1 },
-          block: { string: `${key}:: ${value}`, open: false },
-        });
-      }
-    }
-  }
-
-  const baseUrl = 'https://roam-memo-server.onrender.com';
-  try {
-    await fetch(`${baseUrl}/save-roam-sr-data`, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
-  } catch (error) {
-    console.error('Error Bulk Saving', error);
   }
 };
 

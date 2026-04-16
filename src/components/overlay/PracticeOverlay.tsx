@@ -540,10 +540,14 @@ const PracticeOverlay = ({
         return;
       }
 
+      // Always persist the UI-resolved review mode.
+      // currentCardData can lag behind optimistic mode switching.
+      const resolvedReviewMode = reviewMode || currentCardData?.reviewMode || DEFAULT_REVIEW_MODE;
       const practiceProps = {
         ...currentCardData,
         ...gradeData,
         intervalMultiplier,
+        reviewMode: resolvedReviewMode,
       };
 
       if (!isCramming && currentCardRefUid) {
@@ -584,6 +588,7 @@ const PracticeOverlay = ({
       handlePracticeClick,
       isDone,
       currentCardData,
+      reviewMode,
       intervalMultiplier,
       currentCardRefUid,
       forgotReinsertOffset,

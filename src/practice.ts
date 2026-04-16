@@ -86,7 +86,7 @@ export const generatePracticeData = ({
   reviewMode,
   ...props
 }: Session): PracticeDataResult => {
-  const today = new Date();
+  const referenceDate = dateCreated || new Date();
 
   if (reviewMode === ReviewModes.SpacedInterval || reviewMode === ReviewModes.SpacedIntervalLBL) {
     const {
@@ -102,7 +102,7 @@ export const generatePracticeData = ({
       { interval: interval || 0, repetition: repetitions || 0, efactor: eFactor || 2.5 },
       grade || 0
     );
-    const nextDueDate = dateUtils.addDays(dateCreated, sm2Result.interval);
+    const nextDueDate = dateUtils.addDays(referenceDate, sm2Result.interval);
 
     return {
       reviewMode,
@@ -113,7 +113,7 @@ export const generatePracticeData = ({
       ...(progressiveRepetitions !== undefined && { progressiveRepetitions }),
       ...(intervalMultiplier !== undefined && { intervalMultiplier }),
       ...(lineByLineProgress !== undefined && { lineByLineProgress }),
-      dateCreated,
+      dateCreated: referenceDate,
       nextDueDate,
       nextDueDateFromNow: dateUtils.customFromNow(nextDueDate),
     };
@@ -135,24 +135,24 @@ export const generatePracticeData = ({
     case ReviewModes.FixedProgressiveLBL: {
       const currentProgReps = progressiveRepetitions || 0;
       calculatedIntervalMultiplier = progressiveInterval(currentProgReps);
-      nextDueDate = dateUtils.addDays(today, calculatedIntervalMultiplier);
+      nextDueDate = dateUtils.addDays(referenceDate, calculatedIntervalMultiplier);
       break;
     }
     case ReviewModes.FixedDays:
       calculatedIntervalMultiplier = intervalMultiplier || 3;
-      nextDueDate = dateUtils.addDays(today, calculatedIntervalMultiplier);
+      nextDueDate = dateUtils.addDays(referenceDate, calculatedIntervalMultiplier);
       break;
     case ReviewModes.FixedWeeks:
       calculatedIntervalMultiplier = intervalMultiplier || 1;
-      nextDueDate = dateUtils.addDays(today, calculatedIntervalMultiplier * 7);
+      nextDueDate = dateUtils.addDays(referenceDate, calculatedIntervalMultiplier * 7);
       break;
     case ReviewModes.FixedMonths:
       calculatedIntervalMultiplier = intervalMultiplier || 1;
-      nextDueDate = dateUtils.addDays(today, calculatedIntervalMultiplier * 30);
+      nextDueDate = dateUtils.addDays(referenceDate, calculatedIntervalMultiplier * 30);
       break;
     case ReviewModes.FixedYears:
       calculatedIntervalMultiplier = intervalMultiplier || 1;
-      nextDueDate = dateUtils.addDays(today, calculatedIntervalMultiplier * 365);
+      nextDueDate = dateUtils.addDays(referenceDate, calculatedIntervalMultiplier * 365);
       break;
   }
 

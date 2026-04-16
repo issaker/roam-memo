@@ -102,6 +102,8 @@ src/
 - 修复 Incremental Read 插队后继续阅读的行为时，主题系统没有新增新的分支逻辑
 - 阅读模式重新插回当前会话队列后，仍继续复用既有的 `modeReading`、`lineByLineCurrentBorder`、`lineByLineMasteredBorder` 样式变量
 - 当读到最后一行时不再插队，这一规则只影响队列与数据流，不改变任何主题继承链路
+- 修复 `SPACED_INTERVAL` 打分保存回退问题时，仅调整了模式持久化数据流，主题层继续复用既有 `reviewMode → 颜色` 映射
+- 修复每日限额潜在死循环与 block 交互回调稳定性时，均未引入新的视觉状态或主题分支
 
 ### 样式变量结论
 
@@ -109,6 +111,7 @@ src/
 - 继续复用 `modeReading` 作为 Incremental Read 的模式色
 - 继续复用 `borderSubtle` 作为通用边框回退色
 - 继续复用 `lineByLineCurrentBorder` / `lineByLineMasteredBorder` 作为逐行阅读与逐行复习的行状态边框色
+- 本轮修复仍遵守“如无必要勿增实体”的样式策略：仅修正行为，不增加 token
 
 ### 架构结论
 

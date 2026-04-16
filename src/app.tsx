@@ -120,17 +120,35 @@ const App = () => {
   useCollapseReferenceList({ dataPageTitle });
 
   const [tagsOnEnter, setTagsOnEnter] = React.useState<string[]>([]);
+  const tagsOnEnterRef = React.useRef<string[]>([]);
+  const tagsListRef = React.useRef(tagsList);
+  const showPracticeOverlayRef = React.useRef(showPracticeOverlay);
+  const fetchPracticeDataRef = React.useRef(fetchPracticeData);
+
+  React.useEffect(() => {
+    tagsListRef.current = tagsList;
+  }, [tagsList]);
+
+  React.useEffect(() => {
+    showPracticeOverlayRef.current = showPracticeOverlay;
+  }, [showPracticeOverlay]);
+
+  React.useEffect(() => {
+    fetchPracticeDataRef.current = fetchPracticeData;
+  }, [fetchPracticeData]);
+
   const onBlockEnterHandler = (elm: HTMLTextAreaElement) => {
-    const tags = tagsList.filter((tag) => elm.value.includes(tag));
+    const tags = tagsListRef.current.filter((tag) => elm.value.includes(tag));
     setTagsOnEnter(tags);
+    tagsOnEnterRef.current = tags;
   };
   const onBlockLeaveHandler = (elm: HTMLTextAreaElement) => {
-    if (showPracticeOverlay) return;
+    if (showPracticeOverlayRef.current) return;
 
-    const tags = tagsList.filter((tag) => elm.value.includes(tag));
+    const tags = tagsListRef.current.filter((tag) => elm.value.includes(tag));
 
-    if (tagsOnEnter.length !== tags.length) {
-      fetchPracticeData();
+    if (tagsOnEnterRef.current.length !== tags.length) {
+      fetchPracticeDataRef.current();
     }
   };
 

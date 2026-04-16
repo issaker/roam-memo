@@ -1,5 +1,4 @@
 import * as asyncUtils from '~/utils/async';
-import RoamSrImportPanel from '~/components/RoamSrImportPanel';
 import MigrateLegacyDataPanel from '~/components/MigrateLegacyDataPanel';
 import { defaultSettings } from './hooks/useSettings';
 
@@ -28,15 +27,6 @@ const settingsPanelConfig = ({ settings, setSettings }) => {
             const tagsListString = e.target.value.trim();
             processChange({ key: 'tagsListString', value: tagsListString });
           },
-        },
-      },
-      {
-        id: 'migrate-roam-sr-data',
-        name: 'Migrate Roam/Sr Data',
-        description: 'A tool to import your Roam/Sr data into Memo.',
-        action: {
-          type: 'reactComponent',
-          component: () => <RoamSrImportPanel dataPageTitle={settings.dataPageTitle} />,
         },
       },
       {

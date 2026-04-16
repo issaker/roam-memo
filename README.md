@@ -98,6 +98,12 @@ The dialog border color also dynamically matches the mode badge color, reinforci
 
 Type "Memo: Start Review Session" in the command palette (`Cmd+P` / `Ctrl+P`).
 
+## Privacy & Security
+
+- All practice data is stored in your Roam graph on the configured data page.
+- Memo does not send practice/session payloads to any external server.
+- The legacy Roam-SR remote bulk import path has been removed to protect user privacy.
+
 ## Review Modes
 
 ### Spaced Interval Mode (Memory Training)
@@ -344,6 +350,10 @@ Session Queue (one-time read)
 - **Latest snapshot recovery:** Sparse historical sessions are normalized into a full latest-session snapshot during reads
 - **Full field inheritance:** Newly saved session blocks continue to carry forward unrelated mode state fields, including shared `lineByLineProgress`
 - **Mode isolation:** SM2 and Fixed/Progressive scheduling fields remain independent and do not overwrite each other
+- **ReviewMode persistence fix:** When switching a card to `SPACED_INTERVAL`, grading now persists the resolved UI mode instead of stale pre-switch session mode, preventing accidental fallback to `FIXED_PROGRESSIVE` when navigating back
+- **Loop safety fix:** Daily-limit round-robin selection now includes a no-progress guard to prevent potential infinite loops when no additional cards are selectable
+- **Block-interaction stability:** Enter/leave tag diff logic now uses refs to avoid stale callback state in long-lived DOM listeners
+- **Date baseline consistency:** Fixed/Progressive `nextDueDate` calculations now use the same `dateCreated` reference baseline as SM2
 
 ## Development
 
@@ -422,7 +432,7 @@ src/
 │   ├── SidePanelWidget.tsx      # Sidebar review button + stats
 │   ├── ButtonTags.tsx           # Deck selector buttons
 │   ├── MigrateLegacyDataPanel.tsx # Data migration tool
-│   └── RoamSrImportPanel.tsx    # Roam-SR data import
+│   └── ...                      # Other UI components
 ├── utils/
 │   ├── date.ts            # Date operations (addDays, customFromNow)
 │   ├── string.ts          # String parsing (Roam date format, config strings)

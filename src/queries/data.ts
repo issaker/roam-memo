@@ -423,6 +423,7 @@ const limitRemainingPracticeData = ({
   let totalAdded = totalNewAdded + totalDueAdded;
 
   roundRobinLoop: while (totalAdded < totalCards) {
+    let addedInThisRound = false;
     for (const currentTag of tagsList) {
       totalAdded = totalNewAdded + totalDueAdded;
 
@@ -444,14 +445,21 @@ const limitRemainingPracticeData = ({
       if (nextNewCard && (stillNeedNewCards || !stillHaveDueCards)) {
         selectedCards[currentTag].newUids.push(today.tags[currentTag].newUids[nextNewIndex]);
         totalNewAdded++;
+        addedInThisRound = true;
         continue;
       }
 
       if (nextDueCard && (stillNeedDueCards || !stillHaveNewCards)) {
         selectedCards[currentTag].dueUids.push(today.tags[currentTag].dueUids[nextDueIndex]);
         totalDueAdded++;
+        addedInThisRound = true;
         continue;
       }
+    }
+
+    // Guard against stale counters or empty sources causing an infinite loop.
+    if (!addedInThisRound) {
+      break;
     }
   }
 

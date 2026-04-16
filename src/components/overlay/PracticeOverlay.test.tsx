@@ -169,6 +169,39 @@ describe('PracticeOverlay', () => {
     });
   });
 
+  it('persists SPACED_INTERVAL when grading right after switching from fixed mode', async () => {
+    const mockBuilder = new testUtils.MockDataBuilder();
+    jest.spyOn(saveQueries, 'updateCardType').mockResolvedValue(undefined);
+
+    const dueCard1 = 'id_due_1';
+    mockBuilder.withCard({ uid: dueCard1 }).withSession(dueCard1, {
+      reviewMode: ReviewModes.FixedProgressive,
+      grade: 1,
+      dateCreated: dateUtils.subtractDays(new Date(), 1),
+      nextDueDate: new Date(),
+    });
+
+    mockBuilder.mockQueryResults();
+    await act(async () => {
+      render(<App />);
+    });
+
+    await act(async () => {
+      testUtils.actions.launchModal();
+    });
+
+    await act(async () => {
+      await testUtils.actions.clickSwitchReviewModeButton('Spaced Interval');
+    });
+
+    const result = await testUtils.grade('Good', mockBuilder);
+    expect(result.updatedRecord).toMatchObject({
+      reviewMode: ReviewModes.SpacedInterval,
+      dataPageTitle: testUtils.dataPageTitle,
+      refUid: 'id_due_1',
+    });
+  });
+
   it('Fixed Interval cards are expanded immediately without Show Answer', async () => {
     const mockBuilder = new testUtils.MockDataBuilder();
     const dueCard1 = 'id_due_fixed_1';
