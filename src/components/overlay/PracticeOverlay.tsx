@@ -222,6 +222,11 @@ const PracticeOverlay = ({
   const [hasCloze, setHasCloze] = React.useState(true);
   const [showSettings, setShowSettings] = React.useState(false);
 
+  // Reset hasCloze on card change to prevent stale state from previous card
+  React.useEffect(() => {
+    setHasCloze(true);
+  }, [currentCardRefUid]);
+
   const shouldShowAnswerFirst =
     renderMode === RenderMode.AnswerFirst && hasBlockChildrenUids && !showAnswers;
 
@@ -494,20 +499,25 @@ const PracticeOverlay = ({
     };
   }, [localSettings]);
 
-  // Reset showAnswers state
+  // Reset showAnswers state when card changes or mode updates
+  // Uses latestSession?.reviewMode to avoid stale cardMeta during card transitions
   React.useEffect(() => {
-    if (isProgressiveLBL) {
+    const effectiveReviewMode = latestSession?.reviewMode || reviewMode;
+    const effectiveIsProgressiveLBL = isProgressiveLBLMode(effectiveReviewMode) && hasBlockChildrenUids;
+    const effectiveIsSM2LBL = isSM2LBLMode(effectiveReviewMode) && hasBlockChildrenUids;
+
+    if (effectiveIsProgressiveLBL) {
       setShowAnswers(true);
-    } else if (isSM2LBL) {
+    } else if (effectiveIsSM2LBL) {
       setShowAnswers(false);
-    } else if (isFixedMode(reviewMode)) {
+    } else if (isFixedMode(effectiveReviewMode)) {
       setShowAnswers(true);
     } else if (hasBlockChildren || hasCloze) {
       setShowAnswers(false);
     } else {
       setShowAnswers(true);
     }
-  }, [hasBlockChildren, hasCloze, isSM2LBL, isProgressiveLBL, reviewMode, currentCardRefUid]);
+  }, [hasBlockChildren, hasCloze, hasBlockChildrenUids, reviewMode, currentCardRefUid, latestSession]);
 
   const onTagChange = async (tag) => {
     setCurrentIndex(0);
@@ -637,14 +647,14 @@ const PracticeOverlay = ({
     maxHeight: '40vh',
   };
 
-  const toggleBreadcrumbs = React.useCallback(async () => {
+  const toggleBreadcrumbs = React.useCallback(() => {
     const newState = !showBreadcrumbs;
+    setLocalSettings((prev) => ({ ...prev, showBreadcrumbs: newState }));
     if (window.roamMemo?.extensionAPI?.settings) {
       window.roamMemo.extensionAPI.settings.set('showBreadcrumbs', newState);
       window.dispatchEvent(new Event('roamMemoSettingsChanged'));
     }
-    await saveSettingsToPage(dataPageTitle, { ...localSettings, showBreadcrumbs: newState });
-  }, [showBreadcrumbs, dataPageTitle, localSettings]);
+  }, [showBreadcrumbs]);
 
   const hotkeys = React.useMemo(
     () => [
@@ -991,25 +1001,6 @@ const PracticeOverlay = ({
               placeholder="3"
               style={{ width: '100%' }}
             />
-          </div>
-
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                className="bp3-checkbox"
-                checked={localSettings.showBreadcrumbs}
-                onChange={(e) =>
-                  setLocalSettings({ ...localSettings, showBreadcrumbs: e.target.checked })
-                }
-                style={{ marginRight: '8px' }}
-              />
-              <span>Show Breadcrumbs</span>
-            </label>
-            <p style={{ fontSize: '12px', color: colors.textMuted, margin: '5px 0 0 0' }}>
-              Show breadcrumb navigation above each card during review. You can also toggle this
-              with the B key.
-            </p>
           </div>
 
           <div style={{ marginBottom: '20px' }}>

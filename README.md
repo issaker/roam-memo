@@ -361,6 +361,11 @@ Session Queue (one-time read)
 - **Blueprint integration hardening:** `Tooltip` and `Select` wrappers now use explicit typed adapters (`placement → position`, `Select.ofType<T>()`) instead of unsafe casts
 - **Legacy import typing:** `legacyRoamSr` now imports and types `practice()` correctly, preserving dry-run migration behavior without error suppression
 - **Strict utility guards:** Numeric/date checks now use explicit `Number.isNaN()` / `Date#getTime()` validation, reducing implicit coercion ambiguity
+- **Show Breadcrumbs settings removal:** Removed "Show Breadcrumbs" toggle from Memo Settings dialog; the status bar eye-icon toggle and `B` keyboard shortcut remain as the sole control, with persistence via Data Page settings
+- **Breadcrumbs toggle persistence fix:** The status bar breadcrumbs toggle now updates `localSettings` state, ensuring the auto-save effect correctly persists the preference to both the Data Page and `extensionAPI.settings`
+- **Cross-card showAnswers leak fix:** Removed `setShowAnswers(true)` from Incremental Read's `onLineByLineGrade` handler — the `showAnswers` reset effect now correctly determines answer visibility for the next card based on its own mode, preventing Spaced Interval cards from auto-expanding after an Incremental Read "Next" click
+- **Stale cardMeta guard in showAnswers reset:** The `showAnswers` reset effect now uses `latestSession?.reviewMode` (immediately available via useMemo) instead of the potentially stale `cardMeta`-derived `reviewMode`, preventing incorrect answer visibility during card transitions
+- **hasCloze cross-card state leak fix:** Added a `useEffect` to reset `hasCloze` to its safe default when `currentCardRefUid` changes, preventing the previous card's cloze status from influencing the new card's `showAnswers` calculation
 
 ## Development
 

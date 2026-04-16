@@ -105,6 +105,9 @@ src/
 - 修复 `SPACED_INTERVAL` 打分保存回退问题时，仅调整了模式持久化数据流，主题层继续复用既有 `reviewMode → 颜色` 映射
 - 修复每日限额潜在死循环与 block 交互回调稳定性时，均未引入新的视觉状态或主题分支
 - 本轮修复 `debounce`、命名一致性与历史清理策略时，同样不涉及主题渲染路径改动
+- 移除 Memo Settings 中的 "Show Breadcrumbs" 选项，状态栏 eye-icon 切换与 `B` 快捷键保持不变，不影响主题渲染
+- 修复跨卡片 `showAnswers` 状态泄漏时，仅调整了状态重置逻辑与 effect 依赖，未引入新的视觉状态
+- 修复 `hasCloze` 跨卡片状态泄漏时，仅添加了 `currentCardRefUid` 变化时的重置 effect，未改变任何样式
 
 ### 样式变量结论
 
@@ -112,14 +115,15 @@ src/
 - 继续复用 `modeReading` 作为 Incremental Read 的模式色
 - 继续复用 `borderSubtle` 作为通用边框回退色
 - 继续复用 `lineByLineCurrentBorder` / `lineByLineMasteredBorder` 作为逐行阅读与逐行复习的行状态边框色
-- 本轮修复仍遵守“如无必要勿增实体”的样式策略：仅修正行为，不增加 token
+- 本轮修复仍遵守"如无必要勿增实体"的样式策略：仅修正行为，不增加 token
 - 本轮仍 **未新增样式变量**
 
 ### 架构结论
 
 - 本次修复重点在会话快照继承与队列推进，不在视觉层新增实体
-- 主题系统继续遵守“能继承就继承，只把功能色放进 `theme.ts`”的原则
-- 数据层恢复“读取最新 session 即可得到完整当前状态”后，模式徽标和边框依旧只依赖既有的 `reviewMode` → 颜色映射，不需要新增主题适配代码
+- 主题系统继续遵守"能继承就继承，只把功能色放进 `theme.ts`"的原则
+- 数据层恢复"读取最新 session 即可得到完整当前状态"后，模式徽标和边框依旧只依赖既有的 `reviewMode` → 颜色映射，不需要新增主题适配代码
+- `showAnswers` 重置 effect 改用 `latestSession?.reviewMode` 替代可能过时的 `cardMeta` 派生值，确保卡片切换时模式颜色映射的输入数据正确，无需新增主题适配
 
 ## 2026-04-14 更新摘要
 

@@ -115,7 +115,6 @@ const settingsPanelConfig = ({ settings, setSettings }) => {
           },
         },
       },
-
       {
         id: 'showModeBorders',
         name: 'Show Review Mode Borders',
