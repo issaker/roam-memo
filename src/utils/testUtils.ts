@@ -51,6 +51,7 @@ const mockBlockInfo = {
   string: 'mock block string',
   children: [
     {
+      uid: 'mock-child-1',
       order: 0,
       string: 'mock child block string',
     },
@@ -423,7 +424,7 @@ export const actions = {
       const showAnswerButton = within(footerActionsElm).queryByText('Show Answer');
       const showAnswerElm = showAnswerButton?.closest<HTMLButtonElement>('button');
       showAnswerElm?.click();
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 200));
       targetButton = within(screen.getByTestId('footer-actions-wrapper')).queryByText(buttonText);
     }
 
@@ -432,7 +433,7 @@ export const actions = {
     }
     const buttonElm = targetButton.closest<HTMLButtonElement>('button');
     buttonElm?.click();
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise((resolve) => setTimeout(resolve, 200));
   },
   clickSwitchReviewModeButton: async (targetLabel?: string) => {
     const footerActionsElm = screen.getByTestId('footer-actions-wrapper');
@@ -442,7 +443,7 @@ export const actions = {
       const showAnswerButton = within(footerActionsElm).queryByText('Show Answer');
       const showAnswerElm = showAnswerButton?.closest<HTMLButtonElement>('button');
       showAnswerElm?.click();
-      await new Promise(resolve => setTimeout(resolve, 200));
+      await new Promise((resolve) => setTimeout(resolve, 200));
     }
 
     const button = screen.getByTestId('review-mode-button');
@@ -450,7 +451,7 @@ export const actions = {
 
     if (buttonElm) {
       buttonElm.click();
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 50));
     }
 
     const targetText = targetLabel || 'Spaced Interval';
@@ -460,13 +461,13 @@ export const actions = {
       for (const item of items) {
         if (item.textContent?.includes(targetText)) {
           (item as HTMLElement).click();
-          await new Promise(resolve => setTimeout(resolve, 200));
+          await new Promise((resolve) => setTimeout(resolve, 200));
           return;
         }
       }
     }
 
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise((resolve) => setTimeout(resolve, 200));
   },
 };
 

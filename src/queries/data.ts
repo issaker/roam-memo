@@ -33,7 +33,13 @@
  */
 import { getStringBetween, parseConfigString, parseRoamDateString } from '~/utils/string';
 import * as stringUtils from '~/utils/string';
-import { CompleteRecords, Records, RecordUid, ReviewModes, resolveReviewMode } from '~/models/session';
+import {
+  CompleteRecords,
+  Records,
+  RecordUid,
+  ReviewModes,
+  resolveReviewMode,
+} from '~/models/session';
 import { Today } from '~/models/practice';
 import {
   addDueCards,
@@ -131,13 +137,27 @@ const FIXED_MODE_KEYS = [
   'progressiveRepetitions',
 ] as const;
 
+const SESSION_SNAPSHOT_KEYS = [
+  'reviewMode',
+  'nextDueDate',
+  'lineByLineProgress',
+  'repetitions',
+  'interval',
+  'eFactor',
+  'intervalMultiplier',
+  'intervalMultiplierType',
+  'progressiveRepetitions',
+] as const;
+
 /**
  * Infer reviewMode from session field patterns (for legacy data without meta blocks).
  * If reviewMode is explicitly set, resolve it. Otherwise, guess from field presence:
  * - SM2 fields (grade, repetitions, interval, eFactor) → SpacedInterval
  * - Fixed fields (intervalMultiplier, progressiveRepetitions) → FixedProgressive
  */
-export const inferReviewModeFromFields = (fields: Partial<{ reviewMode: string; intervalMultiplierType: string } & Record<string, any>>) => {
+export const inferReviewModeFromFields = (
+  fields: Partial<{ reviewMode: string; intervalMultiplierType: string } & Record<string, any>>
+) => {
   if (fields.reviewMode) {
     return resolveReviewMode(fields.reviewMode, fields.intervalMultiplierType);
   }
@@ -153,10 +173,45 @@ export const inferReviewModeFromFields = (fields: Partial<{ reviewMode: string; 
   return ReviewModes.FixedProgressive;
 };
 
-const parseFieldValuesFromChildren = (
-  object,
-  children,
+const hasReviewModeClues = (fields: Record<string, any>) =>
+  SPACED_MODE_KEYS.some((key) => fields[key] !== undefined) ||
+  FIXED_MODE_KEYS.some((key) => fields[key] !== undefined);
+
+/**
+ * Rebuild a full latest-session snapshot from sparse historical session blocks.
+ *
+ * Older data may store only the fields touched by the active mode. We merge the
+ * latest known value for every mode-specific state field forward so the newest
+ * session once again becomes a complete card snapshot.
+ */
+const mergeSessionSnapshot = (
+  previousSnapshot: Record<string, any> | undefined,
+  rawSession: Record<string, any>
 ) => {
+  const nextSnapshot: Record<string, any> = {
+    ...(previousSnapshot || {}),
+    dateCreated: rawSession.dateCreated,
+  };
+
+  for (const key of SESSION_SNAPSHOT_KEYS) {
+    if (rawSession[key] !== undefined) {
+      nextSnapshot[key] = rawSession[key];
+    }
+  }
+
+  if (rawSession.reviewMode !== undefined) {
+    nextSnapshot.reviewMode = resolveReviewMode(
+      rawSession.reviewMode,
+      rawSession.intervalMultiplierType
+    );
+  } else if (!nextSnapshot.reviewMode && hasReviewModeClues(rawSession)) {
+    nextSnapshot.reviewMode = inferReviewModeFromFields(rawSession);
+  }
+
+  return nextSnapshot;
+};
+
+const parseFieldValuesFromChildren = (object, children) => {
   for (const field of children) {
     if (!field?.string) continue;
     const [key, value] = parseConfigString(field.string);
@@ -181,6 +236,35 @@ const isSessionHeadingBlock = (child) => {
   return !!parseRoamDateString(headingDateString);
 };
 
+const parseSessionHistory = (sessionChildren, uid) => {
+  if (!sessionChildren.length) {
+    return [{ ...generateNewSession(), refUid: uid }];
+  }
+
+  const sortedSessionChildren = [...sessionChildren].sort((a, b) => b.order - a.order);
+  const normalizedSessions: Record<string, any>[] = [];
+  let previousSnapshot: Record<string, any> | undefined = undefined;
+
+  for (const child of sortedSessionChildren) {
+    if (!child?.string) continue;
+
+    const rawRecord = {
+      refUid: uid,
+      dateCreated: parseRoamDateString(getStringBetween(child.string, '[[', ']]')),
+    };
+
+    if (child.children) {
+      parseFieldValuesFromChildren(rawRecord, child.children);
+    }
+
+    const normalizedRecord = mergeSessionSnapshot(previousSnapshot, rawRecord);
+    normalizedSessions.push(normalizedRecord);
+    previousSnapshot = normalizedRecord;
+  }
+
+  return normalizedSessions;
+};
+
 const mapPluginPageDataLatest = (queryResultsData): Records =>
   queryResultsData
     .map((arr) => arr[0])[0]
@@ -189,23 +273,8 @@ const mapPluginPageDataLatest = (queryResultsData): Records =>
       const uid = getStringBetween(cur.string, '((', '))');
       const sessionChildren = cur.children?.filter(isSessionHeadingBlock) || [];
 
-      if (!sessionChildren.length) {
-        acc[uid] = {
-          ...generateNewSession(),
-        };
-        return acc;
-      }
-
-      const latestChild = sessionChildren.reduce((min, cur) =>
-        cur && cur.order < min.order ? cur : min
-      );
-      acc[uid] = {};
-      acc[uid].dateCreated = latestChild?.string
-        ? parseRoamDateString(getStringBetween(latestChild.string, '[[', ']]'))
-        : undefined;
-
-      if (!latestChild?.children) return acc;
-      parseFieldValuesFromChildren(acc[uid], latestChild.children);
+      const normalizedSessions = parseSessionHistory(sessionChildren, uid);
+      acc[uid] = normalizedSessions[normalizedSessions.length - 1];
 
       return acc;
     }, {}) || {};
@@ -217,35 +286,7 @@ const mapPluginPageData = (queryResultsData): CompleteRecords =>
       if (!cur?.string) return acc;
       const uid = getStringBetween(cur.string, '((', '))');
       const sessionChildren = cur.children?.filter(isSessionHeadingBlock) || [];
-      acc[uid] = [];
-
-      if (!sessionChildren.length) {
-        acc[uid].push({
-          ...generateNewSession(),
-        });
-        return acc;
-      }
-
-      const sortedSessionChildren = [...sessionChildren].sort(
-        (a, b) => b.order - a.order
-      );
-
-      for (const child of sortedSessionChildren) {
-        if (!child?.string) continue;
-        const record = {
-          refUid: uid,
-          dateCreated: parseRoamDateString(getStringBetween(child.string, '[[', ']]')),
-        };
-
-        if (!child.children) {
-          acc[uid].push(record);
-          continue;
-        }
-
-        parseFieldValuesFromChildren(record, child.children);
-
-        acc[uid].push(record);
-      }
+      acc[uid] = parseSessionHistory(sessionChildren, uid);
 
       return acc;
     }, {}) || {};

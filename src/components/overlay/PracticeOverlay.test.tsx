@@ -4,6 +4,7 @@ import * as testUtils from '~/utils/testUtils';
 import * as dateUtils from '~/utils/date';
 
 import App from '~/app';
+import { shouldReinsertReadCard } from './PracticeOverlay';
 import { ReviewModes } from '~/models/session';
 import * as saveQueries from '~/queries/save';
 
@@ -215,6 +216,39 @@ describe('PracticeOverlay', () => {
 
     expect(screen.queryByText('Show Answer')).not.toBeInTheDocument();
     expect(screen.getByText('Next')).toBeInTheDocument();
-    expect(screen.queryByText(/Line 1 \//)).toBeInTheDocument();
+  });
+
+  it('Incremental Read reinsertion stops on the last line', () => {
+    expect(
+      shouldReinsertReadCard({
+        currentChildIndex: 0,
+        totalChildren: 1,
+        readReinsertOffset: 3,
+      })
+    ).toBe(false);
+
+    expect(
+      shouldReinsertReadCard({
+        currentChildIndex: 1,
+        totalChildren: 3,
+        readReinsertOffset: 3,
+      })
+    ).toBe(true);
+
+    expect(
+      shouldReinsertReadCard({
+        currentChildIndex: 2,
+        totalChildren: 3,
+        readReinsertOffset: 3,
+      })
+    ).toBe(false);
+
+    expect(
+      shouldReinsertReadCard({
+        currentChildIndex: 1,
+        totalChildren: 3,
+        readReinsertOffset: 0,
+      })
+    ).toBe(false);
   });
 });

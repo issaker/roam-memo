@@ -10,4 +10,4 @@
  * compatibility during the transition period.
  */
 
-export const CARD_META_SESSION_KEYS = new Set([]);
+export const CARD_META_SESSION_KEYS = new Set<string>();

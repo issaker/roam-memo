@@ -7,7 +7,10 @@ import { ReviewModes, isFixedMode, Session } from '~/models/session';
  * Calculates next interval, repetition count, and easiness factor
  * based on the current state and the user's grade (0-5).
  */
-export const supermemo = (item: { interval: number; repetition: number; efactor: number }, grade: number) => {
+export const supermemo = (
+  item: { interval: number; repetition: number; efactor: number },
+  grade: number
+) => {
   let nextInterval;
   let nextRepetition;
   let nextEfactor;
@@ -78,11 +81,23 @@ type PracticeDataResult = Session & { nextDueDateFromNow?: string };
  *   lineByLineProgress is managed by updateLineByLineProgress() and written
  *   to the latest session block.
  */
-export const generatePracticeData = ({ dateCreated, reviewMode, ...props }: Session): PracticeDataResult => {
+export const generatePracticeData = ({
+  dateCreated,
+  reviewMode,
+  ...props
+}: Session): PracticeDataResult => {
   const today = new Date();
 
   if (reviewMode === ReviewModes.SpacedInterval || reviewMode === ReviewModes.SpacedIntervalLBL) {
-    const { grade, interval, repetitions, eFactor, progressiveRepetitions, intervalMultiplier } = props;
+    const {
+      grade,
+      interval,
+      repetitions,
+      eFactor,
+      progressiveRepetitions,
+      intervalMultiplier,
+      lineByLineProgress,
+    } = props;
     const sm2Result = supermemo(
       { interval: interval || 0, repetition: repetitions || 0, efactor: eFactor || 2.5 },
       grade || 0
@@ -97,13 +112,21 @@ export const generatePracticeData = ({ dateCreated, reviewMode, ...props }: Sess
       eFactor: sm2Result.efactor,
       ...(progressiveRepetitions !== undefined && { progressiveRepetitions }),
       ...(intervalMultiplier !== undefined && { intervalMultiplier }),
+      ...(lineByLineProgress !== undefined && { lineByLineProgress }),
       dateCreated,
       nextDueDate,
       nextDueDateFromNow: dateUtils.customFromNow(nextDueDate),
     };
   }
 
-  const { intervalMultiplier, progressiveRepetitions, repetitions, eFactor, interval } = props;
+  const {
+    intervalMultiplier,
+    progressiveRepetitions,
+    repetitions,
+    eFactor,
+    interval,
+    lineByLineProgress,
+  } = props;
   let nextDueDate: Date | undefined;
   let calculatedIntervalMultiplier = intervalMultiplier;
 
@@ -136,12 +159,14 @@ export const generatePracticeData = ({ dateCreated, reviewMode, ...props }: Sess
   return {
     reviewMode,
     intervalMultiplier: calculatedIntervalMultiplier,
-    progressiveRepetitions: (reviewMode === ReviewModes.FixedProgressive || reviewMode === ReviewModes.FixedProgressiveLBL)
-      ? (progressiveRepetitions || 0) + 1
-      : progressiveRepetitions,
+    progressiveRepetitions:
+      reviewMode === ReviewModes.FixedProgressive || reviewMode === ReviewModes.FixedProgressiveLBL
+        ? (progressiveRepetitions || 0) + 1
+        : progressiveRepetitions,
     ...(repetitions !== undefined && { repetitions }),
     ...(eFactor !== undefined && { eFactor }),
     ...(interval !== undefined && { interval }),
+    ...(lineByLineProgress !== undefined && { lineByLineProgress }),
     nextDueDate,
     nextDueDateFromNow: dateUtils.customFromNow(nextDueDate),
   };
@@ -155,15 +180,28 @@ export type PracticeProps = Session & {
 
 const practice = async (practiceProps: PracticeProps, isDryRun = false) => {
   const {
-    refUid, dataPageTitle, dateCreated, isCramming,
-    grade, interval, repetitions, eFactor,
-    intervalMultiplier, progressiveRepetitions,
+    refUid,
+    dataPageTitle,
+    dateCreated,
+    isCramming,
+    grade,
+    interval,
+    repetitions,
+    eFactor,
+    intervalMultiplier,
+    progressiveRepetitions,
     reviewMode,
   } = practiceProps;
 
   const { nextDueDateFromNow, ...practiceResultData } = generatePracticeData({
-    grade, interval, repetitions, eFactor, dateCreated, reviewMode,
-    intervalMultiplier, progressiveRepetitions,
+    grade,
+    interval,
+    repetitions,
+    eFactor,
+    dateCreated,
+    reviewMode,
+    intervalMultiplier,
+    progressiveRepetitions,
   });
 
   if (!isDryRun && !isCramming) {

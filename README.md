@@ -12,7 +12,7 @@ Spaced repetition reviews information based on how well you remember it, focusin
 
 This is a modified and upgraded version of the original Memo plugin. It cannot be installed via Roam Depot. Instead, load it using the `{{[[roam/js]]}}` block on any page in your Roam graph:
 
-```
+````
 - {{[[roam/js]]}}
     - ```javascript
       if (!window.roamMemoLoaded) {
@@ -27,7 +27,7 @@ This is a modified and upgraded version of the original Memo plugin. It cannot b
         document.head.appendChild(script);
       }
       ```
-```
+````
 
 ## Getting Started
 
@@ -71,28 +71,28 @@ Show the block's page hierarchy as breadcrumbs for context. Toggle with `b` key.
 
 The header bar displays a color-coded mode badge to the left of the status tags (New / Past Due / etc.), providing instant visual identification of the current card's review mode:
 
-| Mode Badge | Review Mode | Color | Aligned With |
-|------------|-------------|-------|--------------|
-| **Spaced** | Spaced Interval Mode | Green | Same as "New" tag |
-| **Fixed** | Fixed Interval Mode | Orange | Same as "Past Due" tag |
-| **Read** | Incremental Read Mode | Orange | Same as "Past Due" tag |
+| Mode Badge | Review Mode           | Color  | Aligned With           |
+| ---------- | --------------------- | ------ | ---------------------- |
+| **Spaced** | Spaced Interval Mode  | Green  | Same as "New" tag      |
+| **Fixed**  | Fixed Interval Mode   | Orange | Same as "Past Due" tag |
+| **Read**   | Incremental Read Mode | Orange | Same as "Past Due" tag |
 
 The dialog border color also dynamically matches the mode badge color, reinforcing the visual cue across the entire window. Can be toggled via the "Show Review Mode Borders" setting.
 
 ### Keyboard Shortcuts
 
-| Action          | Shortcut   |
-| --------------- | ---------- |
-| Show answer     | `space`    |
-| Skip            | `s` or `→` |
-| Previous card   | `←`        |
-| Breadcrumbs     | `b`        |
-| Close memo      | `esc`      |
-| Perfect / Next  | `space`    |
-| Forgot          | `f`        |
-| Hard            | `h`        |
-| Good            | `g`        |
-| Edit interval   | `e`        |
+| Action         | Shortcut   |
+| -------------- | ---------- |
+| Show answer    | `space`    |
+| Skip           | `s` or `→` |
+| Previous card  | `←`        |
+| Breadcrumbs    | `b`        |
+| Close memo     | `esc`      |
+| Perfect / Next | `space`    |
+| Forgot         | `f`        |
+| Hard           | `h`        |
+| Good           | `g`        |
+| Edit interval  | `e`        |
 
 ### Command Palette
 
@@ -105,6 +105,7 @@ Type "Memo: Start Review Session" in the command palette (`Cmd+P` / `Ctrl+P`).
 Uses a **modified SM2 algorithm** to optimize long-term memory retention with grading: Forgot / Hard / Good / Perfect.
 
 **Algorithm:**
+
 - **Interval Calculation**: `interval × eFactor × (grade/5)` — grade-based adjustment (Grade 3 → 60%, Grade 4 → 80%, Grade 5 → 100%)
 - **E-Factor Update**: Always updated. Lower grades → more frequent reviews. Minimum eFactor = 1.3.
 - **Reset Behavior**: Grade 0 → review again today (interval=0); Grades 1-2 → review tomorrow (interval=1)
@@ -129,21 +130,23 @@ A line-by-line reading mode designed for long-form content. Based on the **Incre
 
 **How it differs from LBL Review:**
 
-| Aspect | LBL Review (SPACED_INTERVAL_LBL) | Incremental Read (FIXED_PROGRESSIVE_LBL) |
-|--------|-----------------------------------|------------------------------------------|
-| Purpose | Memory reinforcement | Reading comprehension |
-| Per session | Review all due children | Read one child, then next card |
-| Grading | SM2 buttons (Forgot/Hard/Good/Perfect) | "Next" button only |
-| Scheduling | SM2 per child | Progressive per child |
-| Next appearance | When any child is due | When next child is due |
+| Aspect          | LBL Review (SPACED_INTERVAL_LBL)       | Incremental Read (FIXED_PROGRESSIVE_LBL) |
+| --------------- | -------------------------------------- | ---------------------------------------- |
+| Purpose         | Memory reinforcement                   | Reading comprehension                    |
+| Per session     | Review all due children                | Read one child, then next card           |
+| Grading         | SM2 buttons (Forgot/Hard/Good/Perfect) | "Next" button only                       |
+| Scheduling      | SM2 per child                          | Progressive per child                    |
+| Next appearance | When any child is due                  | When next child is due                   |
 
 **Per-child Progressive intervals:**
+
 - Each child block gets its own independent Progressive interval counter
 - Schedule: 2 → 6 → 12 → 24 → 48 → 96 days per child
 - A 20-child article: all children start at 2-day intervals, not just the first few
 - The card's `nextDueDate` is set to the earliest child due date
 
 **Workflow:**
+
 1. Select "Incremental Read" from the mode selector (📖 icon)
 2. The first unread child block is revealed
 3. Click "Next" to mark it as read and advance to the next card
@@ -151,6 +154,12 @@ A line-by-line reading mode designed for long-form content. Based on the **Incre
 5. After all children are read, the cycle restarts from the beginning
 
 **Reinsertion:** When you click "Next" on an Incremental Read card, the card is automatically reinserted into the review queue N cards later (configurable via "Reinsert 'Incremental Read' Cards After N Cards" setting, default: 3). Set to 0 to disable reinsertion.
+
+**Queue progression rules:**
+
+- Reinsertion only happens when there is still another unread or due child line to continue later in the same review session
+- If the current child is already the last child block, clicking "Next" advances normally and does **not** reinsert the card into the current session queue
+- Reinserted cards now resume from the correct next child line inside the same session instead of replaying stale line progress from the session start snapshot
 
 ### Dynamic Review Mode Switching
 
@@ -160,11 +169,11 @@ Each card's `reviewMode` is stored in the **latest session block** on the Data P
 
 Due cards are sorted by **memory urgency** using a three-level priority system, ensuring the most at-risk cards are always reviewed first:
 
-| Priority | Sort Key | Direction | Rationale |
-|----------|----------|-----------|-----------|
-| 1st | `nextDueDate` | Earlier first | More overdue → lower retrieval strength → higher urgency |
-| 2nd | `eFactor` | Lower first | Lower eFactor → faster forgetting rate → higher urgency |
-| 3rd | `repetitions` | Fewer first | Fewer reps → less stable memory → higher urgency |
+| Priority | Sort Key      | Direction     | Rationale                                                |
+| -------- | ------------- | ------------- | -------------------------------------------------------- |
+| 1st      | `nextDueDate` | Earlier first | More overdue → lower retrieval strength → higher urgency |
+| 2nd      | `eFactor`     | Lower first   | Lower eFactor → faster forgetting rate → higher urgency  |
+| 3rd      | `repetitions` | Fewer first   | Fewer reps → less stable memory → higher urgency         |
 
 **Example:** A card 5 days overdue with eFactor 1.3 and 1 repetition will appear before a card 1 day overdue with eFactor 2.5 and 5 repetitions — because it has the highest risk of being forgotten.
 
@@ -175,6 +184,7 @@ When `shuffleCards` is enabled, this sort is overridden by random shuffling.
 A specialized card-level review mode for cards with multiple child blocks (outline structure). When enabled, each child block is treated as an independent Q&A item with its own spaced repetition schedule.
 
 **How it works:**
+
 1. Mark a card as line-by-line via the **LBL** checkbox in the header (only visible when a card has child blocks)
 2. The `LBL` switch belongs to the current card itself, not to a global session flag
 3. On review, the parent block (question) is shown with all children hidden
@@ -186,12 +196,14 @@ A specialized card-level review mode for cards with multiple child blocks (outli
 9. The line-by-line interaction only activates in `Spaced Interval Mode`; in `Fixed Interval Mode` the same card remains a fully expanded reading card
 
 **Memory state tracking:**
+
 - Children with `nextDueDate` in the future are considered mastered — shown directly, no "Show Answer" needed
 - Children with no review history or past-due `nextDueDate` require active review
 - The card's main `nextDueDate` is set to the earliest child due date, ensuring the card appears as "due" when any child needs review
 - `lineByLineProgress` and the line-by-line parent `nextDueDate` are stored in the latest session block
 
 **Visual indicators:**
+
 - **LBL checkbox** in the header toggles line-by-line mode for the current card
 - **L2/5** tag shows current line progress (current line / total lines)
 - Mastered lines display with reduced opacity and a subtle left border
@@ -222,6 +234,7 @@ All fields (reviewMode, nextDueDate, lineByLineProgress, grade, eFactor, etc.) a
 ```
 
 **Key principles:**
+
 - `reviewMode` and `nextDueDate` are stored in each session block alongside algorithm-specific fields
 - `lineByLineReview` has been removed — LBL functionality is encoded directly in the `reviewMode` value (e.g. `SPACED_INTERVAL_LBL`, `FIXED_PROGRESSIVE_LBL`)
 - Each mode only modifies its OWN fields; all other fields are inherited unchanged from the previous session (see Mode Independence below)
@@ -230,13 +243,15 @@ All fields (reviewMode, nextDueDate, lineByLineProgress, grade, eFactor, etc.) a
 
 Each review mode only calculates and updates its own data fields. When saving, all fields from the previous session are fully inherited, ensuring that switching modes never loses data from any mode.
 
-| Mode | Calculated Fields | Inherited Fields (unchanged) |
-|------|-------------------|------------------------------|
-| SM2 (Spaced Interval) | `grade`, `interval`, `repetitions`, `eFactor` | `progressiveRepetitions`, `intervalMultiplier` |
-| Progressive | `progressiveRepetitions`, `intervalMultiplier` | `interval`, `repetitions`, `eFactor` |
-| Fixed Days/Weeks/Months/Years | `intervalMultiplier` | `interval`, `repetitions`, `eFactor`, `progressiveRepetitions` |
+| Mode                          | Calculated Fields                              | Inherited Fields (unchanged)                                   |
+| ----------------------------- | ---------------------------------------------- | -------------------------------------------------------------- |
+| SM2 (Spaced Interval)         | `grade`, `interval`, `repetitions`, `eFactor`  | `progressiveRepetitions`, `intervalMultiplier`                 |
+| Progressive                   | `progressiveRepetitions`, `intervalMultiplier` | `interval`, `repetitions`, `eFactor`                           |
+| Fixed Days/Weeks/Months/Years | `intervalMultiplier`                           | `interval`, `repetitions`, `eFactor`, `progressiveRepetitions` |
 
 **Example:** If a card has SM2 data (`interval=11, repetitions=3, eFactor=2.26`) and the user switches to Progressive mode, the Progressive session inherits those SM2 fields unchanged. When switching back to SM2, the algorithm uses the preserved SM2 values — Progressive mode never pollutes them.
+
+**Backward compatibility:** Older sparse session histories are now normalized on read. The data layer reconstructs a complete latest-session snapshot by carrying forward the newest known value for each mode-owned state field, so querying the latest session block remains sufficient even for pre-fix data.
 
 ### lineByLineProgress Data Format
 
@@ -322,6 +337,14 @@ Session Queue (one-time read)
 
 **Fallback:** When cardMeta is not yet loaded, reviewMode falls back to the session queue's reviewMode, then to DEFAULT_REVIEW_MODE.
 
+## 2026-04-16 Update Summary
+
+- **Incremental Read:** Reinserted reading cards now continue from the correct next child line within the same review session
+- **Last-line guard:** Incremental Read cards stop reinsert-on-next once the current child is already the last child block
+- **Latest snapshot recovery:** Sparse historical sessions are normalized into a full latest-session snapshot during reads
+- **Full field inheritance:** Newly saved session blocks continue to carry forward unrelated mode state fields, including shared `lineByLineProgress`
+- **Mode isolation:** SM2 and Fixed/Progressive scheduling fields remain independent and do not overwrite each other
+
 ## Development
 
 ### Build
@@ -358,6 +381,7 @@ output: {
 This plugin is loaded via `{{[[roam/js]]}}` as described in the Installation section above.
 
 **roam/js Limitations:**
+
 - Settings are persisted to the `roam/memo` page (not Roam Depot's settings panel)
 - Uses `window.roamAlphaAPI` instead of full `extensionAPI`
 - Settings dialog is accessible via gear icon in the practice overlay

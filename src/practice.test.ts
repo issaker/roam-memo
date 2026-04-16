@@ -247,6 +247,45 @@ describe('supermemo: simulate practice', () => {
       expect(progResult.progressiveRepetitions).toBe(1);
     });
 
+    test('Mode switches preserve lineByLineProgress snapshot', () => {
+      const lineByLineProgress = JSON.stringify({
+        'child-1': {
+          nextDueDate: '2026-04-20T00:00:00.000Z',
+          interval: 6,
+          repetitions: 2,
+          eFactor: 2.5,
+          progressiveRepetitions: 1,
+        },
+      });
+
+      const progResult = practice.generatePracticeData({
+        dateCreated: new Date('2026-04-15T00:00:00.000Z'),
+        reviewMode: ReviewModes.FixedProgressive,
+        interval: 11,
+        repetitions: 3,
+        eFactor: 2.26,
+        progressiveRepetitions: 2,
+        intervalMultiplier: 12,
+        lineByLineProgress,
+      });
+
+      expect(progResult.lineByLineProgress).toBe(lineByLineProgress);
+
+      const sm2Result = practice.generatePracticeData({
+        dateCreated: new Date('2026-04-15T00:00:00.000Z'),
+        reviewMode: ReviewModes.SpacedInterval,
+        grade: 4,
+        interval: progResult.interval,
+        repetitions: progResult.repetitions,
+        eFactor: progResult.eFactor,
+        progressiveRepetitions: progResult.progressiveRepetitions,
+        intervalMultiplier: progResult.intervalMultiplier,
+        lineByLineProgress: progResult.lineByLineProgress,
+      });
+
+      expect(sm2Result.lineByLineProgress).toBe(lineByLineProgress);
+    });
+
     test('Switching Progressive → SM2 preserves Progressive fields', () => {
       const progResult = practice.generatePracticeData({
         dateCreated: new Date('2026-04-15T00:00:00.000Z'),

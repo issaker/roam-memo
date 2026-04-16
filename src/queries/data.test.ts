@@ -1,4 +1,8 @@
-import { getPluginPageBlockDataQuery, getPluginPageData, inferReviewModeFromFields } from '~/queries/data';
+import {
+  getPluginPageBlockDataQuery,
+  getPluginPageData,
+  inferReviewModeFromFields,
+} from '~/queries/data';
 
 const parseMockRoamDate = (value: string) => {
   if (!value || value.split(' ').length < 3) return undefined;
@@ -124,6 +128,64 @@ describe('getPluginPageData', () => {
     });
   });
 
+  it('rebuilds a full latest snapshot by inheriting mode fields from older sessions', async () => {
+    Object.defineProperty(window, 'roamAlphaAPI', {
+      value: {
+        q: jest.fn(() => [
+          [
+            {
+              children: [
+                {
+                  string: '((card-switching))',
+                  children: [
+                    {
+                      string: '[[April 12th, 2026]] 🟢',
+                      order: 1,
+                      children: [
+                        { string: 'reviewMode:: SPACED_INTERVAL' },
+                        { string: 'repetitions:: 3' },
+                        { string: 'interval:: 12' },
+                        { string: 'eFactor:: 2.4' },
+                      ],
+                    },
+                    {
+                      string: '[[April 14th, 2026]] 🟢',
+                      order: 0,
+                      children: [
+                        { string: 'reviewMode:: FIXED_PROGRESSIVE' },
+                        { string: 'progressiveRepetitions:: 1' },
+                        { string: 'intervalMultiplier:: 6' },
+                        { string: 'nextDueDate:: [[April 20th, 2026]]' },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        ]),
+        util: {
+          pageTitleToDate: jest.fn((value: string) => parseMockRoamDate(value)),
+        },
+      },
+      writable: true,
+    });
+
+    const result = await getPluginPageData({
+      dataPageTitle: 'roam/memo',
+      limitToLatest: true,
+    });
+
+    expect(result['card-switching']).toMatchObject({
+      reviewMode: 'FIXED_PROGRESSIVE',
+      progressiveRepetitions: 1,
+      intervalMultiplier: 6,
+      repetitions: 3,
+      interval: 12,
+      eFactor: 2.4,
+    });
+  });
+
   it('returns no reviewMode when session block has none', async () => {
     Object.defineProperty(window, 'roamAlphaAPI', {
       value: {
@@ -167,13 +229,13 @@ describe('getPluginPageData', () => {
 
 describe('inferReviewModeFromFields', () => {
   it('infers SPACED_INTERVAL from SM2 fields', () => {
-    expect(inferReviewModeFromFields({ repetitions: 3, interval: 12, eFactor: 2.4 }))
-      .toBe('SPACED_INTERVAL');
+    expect(inferReviewModeFromFields({ repetitions: 3, interval: 12, eFactor: 2.4 })).toBe(
+      'SPACED_INTERVAL'
+    );
   });
 
   it('infers FIXED_PROGRESSIVE from fixed-mode fields', () => {
-    expect(inferReviewModeFromFields({ intervalMultiplier: 3 }))
-      .toBe('FIXED_PROGRESSIVE');
+    expect(inferReviewModeFromFields({ intervalMultiplier: 3 })).toBe('FIXED_PROGRESSIVE');
   });
 
   it('returns FIXED_PROGRESSIVE as default when no clues exist', () => {
@@ -181,7 +243,6 @@ describe('inferReviewModeFromFields', () => {
   });
 
   it('resolves explicit reviewMode', () => {
-    expect(inferReviewModeFromFields({ reviewMode: 'SPACED_INTERVAL' }))
-      .toBe('SPACED_INTERVAL');
+    expect(inferReviewModeFromFields({ reviewMode: 'SPACED_INTERVAL' })).toBe('SPACED_INTERVAL');
   });
 });
