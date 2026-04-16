@@ -78,29 +78,6 @@ const settingsPanelConfig = ({ settings, setSettings }) => {
         },
       },
       {
-        id: 'rtlEnabled',
-        name: 'Right-to-Left (RTL) Enabled',
-        description: 'Enable RTL for languages like Arabic, Hebrew, etc.',
-        action: {
-          type: 'switch',
-          onChange: (e) => {
-            processChange({ key: 'rtlEnabled', value: e.target.checked });
-          },
-        },
-      },
-      {
-        id: 'shuffleCards',
-        name: 'Shuffle Cards',
-        description:
-          'OFF: Due cards sorted by urgency (most overdue → hardest → least mature). New cards in reverse creation order. ON: All cards randomly shuffled.',
-        action: {
-          type: 'switch',
-          onChange: (e) => {
-            processChange({ key: 'shuffleCards', value: e.target.checked });
-          },
-        },
-      },
-      {
         id: 'forgotReinsertOffset',
         name: 'Reinsert "Forgot" Cards After N Cards',
         description:
@@ -112,6 +89,21 @@ const settingsPanelConfig = ({ settings, setSettings }) => {
             const value = e.target.value.trim();
             const isNumber = !isNaN(Number(value));
             processChange({ key: 'forgotReinsertOffset', value: isNumber ? Number(value) : 3 });
+          },
+        },
+      },
+      {
+        id: 'readReinsertOffset',
+        name: 'Reinsert "Incremental Read" Cards After N Cards',
+        description:
+          'When you click "Next" on an Incremental Read card, it will be reinserted into the current review session N cards later. Set to 0 to disable reinsertion.',
+        action: {
+          type: 'input',
+          placeholder: defaultSettings.readReinsertOffset,
+          onChange: (e) => {
+            const value = e.target.value.trim();
+            const isNumber = !isNaN(Number(value));
+            processChange({ key: 'readReinsertOffset', value: isNumber ? Number(value) : 3 });
           },
         },
       },
@@ -136,6 +128,29 @@ const settingsPanelConfig = ({ settings, setSettings }) => {
           type: 'switch',
           onChange: (e) => {
             processChange({ key: 'showModeBorders', value: e.target.checked });
+          },
+        },
+      },
+      {
+        id: 'rtlEnabled',
+        name: 'Right-to-Left (RTL) Enabled',
+        description: 'Enable RTL for languages like Arabic, Hebrew, etc.',
+        action: {
+          type: 'switch',
+          onChange: (e) => {
+            processChange({ key: 'rtlEnabled', value: e.target.checked });
+          },
+        },
+      },
+      {
+        id: 'shuffleCards',
+        name: 'Shuffle Cards',
+        description:
+          'OFF: Due cards sorted by urgency (most overdue → hardest → least mature). New cards in reverse creation order. ON: All cards randomly shuffled.',
+        action: {
+          type: 'switch',
+          onChange: (e) => {
+            processChange({ key: 'shuffleCards', value: e.target.checked });
           },
         },
       },

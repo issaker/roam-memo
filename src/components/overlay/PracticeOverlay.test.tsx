@@ -192,7 +192,7 @@ describe('PracticeOverlay', () => {
     expect(screen.getByText('Next')).toBeInTheDocument();
   });
 
-  it('Fixed Interval cards keep expanded reading behavior even when LBL is checked', async () => {
+  it('Incremental Read (FIXED_PROGRESSIVE_LBL) shows line-by-line reading UI', async () => {
     const mockBuilder = new testUtils.MockDataBuilder();
     const dueCard1 = 'id_due_fixed_lbl';
 
@@ -215,6 +215,6 @@ describe('PracticeOverlay', () => {
 
     expect(screen.queryByText('Show Answer')).not.toBeInTheDocument();
     expect(screen.getByText('Next')).toBeInTheDocument();
-    expect(screen.queryByText(/Line 1 \//)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Line 1 \//)).toBeInTheDocument();
   });
 });

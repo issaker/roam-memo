@@ -25,6 +25,7 @@ export const saveSettingsToPage = async (dataPageTitle: string, settings: Settin
       rtlEnabled: settings.rtlEnabled.toString(),
       shuffleCards: settings.shuffleCards.toString(),
       forgotReinsertOffset: settings.forgotReinsertOffset.toString(),
+      readReinsertOffset: settings.readReinsertOffset.toString(),
       showBreadcrumbs: settings.showBreadcrumbs.toString(),
       showModeBorders: settings.showModeBorders.toString(),
     };
@@ -129,6 +130,9 @@ export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Setti
               break;
             case 'forgotReinsertOffset':
               loadedSettings.forgotReinsertOffset = Number(value) || 3;
+              break;
+            case 'readReinsertOffset':
+              loadedSettings.readReinsertOffset = Number(value) || 3;
               break;
             case 'showBreadcrumbs':
               loadedSettings.showBreadcrumbs = value === 'true';

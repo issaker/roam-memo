@@ -76,6 +76,8 @@ interface Props {
   rtlEnabled: boolean;
   setRenderMode: (tag: string, mode: RenderMode) => void;
   forgotReinsertOffset: number;
+  readReinsertOffset: number;
+  fetchPracticeData: () => void;
   dataPageTitle: string;
   showBreadcrumbs: boolean;
   showModeBorders: boolean;
@@ -96,6 +98,8 @@ const PracticeOverlay = ({
   rtlEnabled,
   setRenderMode,
   forgotReinsertOffset,
+  readReinsertOffset,
+  fetchPracticeData,
   dataPageTitle,
   showBreadcrumbs,
   showModeBorders,
@@ -191,6 +195,8 @@ const PracticeOverlay = ({
 
   const isReading = isReadingMode(reviewMode) && hasBlockChildrenUids;
 
+  const isLineByLineUI = isLineByLine || isReading;
+
   const parseLineByLineProgress = (progressStr?: string): LineByLineProgressMap => {
     if (!progressStr) return {};
     try {
@@ -211,7 +217,7 @@ const PracticeOverlay = ({
   const [lineByLineCurrentChildIndex, setLineByLineCurrentChildIndex] = React.useState(0);
 
   React.useEffect(() => {
-    if (!isLineByLine || !childUidsList.length) {
+    if (!isLineByLineUI || !childUidsList.length) {
       setLineByLineRevealedCount(0);
       setLineByLineCurrentChildIndex(0);
       return;
@@ -225,11 +231,15 @@ const PracticeOverlay = ({
       if (!childData) { firstDueIndex = i; break; }
       if (new Date(childData.nextDueDate) <= now) { firstDueIndex = i; break; }
     }
-    setLineByLineRevealedCount(firstDueIndex);
     setLineByLineCurrentChildIndex(firstDueIndex);
-  }, [isLineByLine, currentCardRefUid, childUidsList, lineByLineProgress]);
+    if (isReading) {
+      setLineByLineRevealedCount(firstDueIndex + 1);
+    } else {
+      setLineByLineRevealedCount(firstDueIndex);
+    }
+  }, [isLineByLineUI, isReading, currentCardRefUid, childUidsList, lineByLineProgress]);
 
-  const lineByLineIsCardComplete = isLineByLine && lineByLineCurrentChildIndex >= childUidsList.length;
+  const lineByLineIsCardComplete = isLineByLineUI && lineByLineCurrentChildIndex >= childUidsList.length;
 
   const onLineByLineGrade = React.useCallback(
     async (grade: number) => {
@@ -269,6 +279,16 @@ const PracticeOverlay = ({
           dataPageTitle,
           progress: updatedProgress,
         });
+
+        if (readReinsertOffset > 0 && currentCardRefUid) {
+          const readInsertIndex = currentIndex + 1 + readReinsertOffset;
+          setCardQueue((prev) => {
+            const newQueue = [...prev];
+            const targetIndex = Math.min(readInsertIndex, newQueue.length);
+            newQueue.splice(targetIndex, 0, currentCardRefUid);
+            return newQueue;
+          });
+        }
 
         setCurrentIndex((prev) => prev + 1);
         setLineByLineCurrentChildIndex(lineByLineCurrentChildIndex + 1);
@@ -329,6 +349,8 @@ const PracticeOverlay = ({
       setCurrentIndex,
       isReading,
       currentCardData?.lineByLineProgress,
+      readReinsertOffset,
+      currentIndex,
     ]
   );
 
@@ -344,6 +366,7 @@ const PracticeOverlay = ({
     rtlEnabled: false,
     shuffleCards: false,
     forgotReinsertOffset: 3,
+    readReinsertOffset: 3,
     showBreadcrumbs: false,
     showModeBorders: true,
   });
@@ -366,7 +389,7 @@ const PracticeOverlay = ({
     loadSettings();
   }, []);
 
-  // Auto-save settings: debounce 500ms after any localSettings change
+  // Auto-save settings: debounce 300ms after any localSettings change
   const autoSaveTimerRef = React.useRef<NodeJS.Timeout | null>(null);
   const isInitialLoadRef = React.useRef(true);
 
@@ -388,7 +411,7 @@ const PracticeOverlay = ({
         });
       }
       window.dispatchEvent(new Event('roamMemoSettingsChanged'));
-    }, 500);
+    }, 300);
 
     return () => {
       if (autoSaveTimerRef.current) {
@@ -399,14 +422,18 @@ const PracticeOverlay = ({
 
   // Reset showAnswers state
   React.useEffect(() => {
-    if (isLineByLine || isFixedMode(reviewMode)) {
+    if (isReading) {
+      setShowAnswers(true);
+    } else if (isLineByLine) {
+      setShowAnswers(false);
+    } else if (isFixedMode(reviewMode)) {
       setShowAnswers(true);
     } else if (hasBlockChildren || hasCloze) {
       setShowAnswers(false);
     } else {
       setShowAnswers(true);
     }
-  }, [hasBlockChildren, hasCloze, isLineByLine, reviewMode, currentCardRefUid]);
+  }, [hasBlockChildren, hasCloze, isLineByLine, isReading, reviewMode, currentCardRefUid]);
 
   const onTagChange = async (tag) => {
     setCurrentIndex(0);
@@ -443,7 +470,7 @@ const PracticeOverlay = ({
     (gradeData) => {
       if (isDone) return;
 
-      if (isLineByLine && !lineByLineIsCardComplete) {
+      if (isLineByLineUI && !lineByLineIsCardComplete) {
         onLineByLineGrade(gradeData.grade);
         return;
       }
@@ -478,7 +505,7 @@ const PracticeOverlay = ({
       intervalMultiplier,
       currentCardRefUid,
       forgotReinsertOffset,
-      isLineByLine,
+      isLineByLineUI,
       lineByLineIsCardComplete,
       onLineByLineGrade,
     ]
@@ -584,7 +611,9 @@ const PracticeOverlay = ({
       dataPageTitle,
       reviewMode: newReviewMode,
     });
-  }, [currentCardRefUid, dataPageTitle, cardMeta, applyOptimisticCardMeta]);
+
+    fetchPracticeData();
+  }, [currentCardRefUid, dataPageTitle, cardMeta, applyOptimisticCardMeta, fetchPracticeData]);
 
   if (!todaySelectedTag) {
     return null;
@@ -603,9 +632,9 @@ const PracticeOverlay = ({
         currentIndex,
         renderMode,
         setRenderMode,
-        isLineByLine,
-        lineByLineCurrentIndex: isLineByLine ? lineByLineCurrentChildIndex + 1 : 0,
-        lineByLineTotal: isLineByLine ? childUidsList.length : 0,
+        isLineByLine: isLineByLineUI,
+        lineByLineCurrentIndex: isLineByLineUI ? lineByLineCurrentChildIndex + 1 : 0,
+        lineByLineTotal: isLineByLineUI ? childUidsList.length : 0,
         cardMeta,
       }}
     >
@@ -618,7 +647,7 @@ const PracticeOverlay = ({
         isOpen={isOpen}
         onClose={onCloseCallback}
         className="pb-0"
-        canEscapeKeyClose={false}
+        canEscapeKeyClose={true}
       >
         <Header
           className="bp3-dialog-header outline-none focus:outline-none focus-visible:outline-none"
@@ -633,8 +662,8 @@ const PracticeOverlay = ({
           isCramming={isCramming}
           onSettingsClick={() => setShowSettings(true)}
           reviewMode={reviewMode}
-          isLineByLine={isLineByLine}
-          lineByLineCurrentIndex={isLineByLine ? lineByLineCurrentChildIndex + 1 : 0}
+          isLineByLine={isLineByLineUI}
+          lineByLineCurrentIndex={isLineByLineUI ? lineByLineCurrentChildIndex + 1 : 0}
           lineByLineTotal={childUidsList.length}
         />
 
@@ -644,7 +673,7 @@ const PracticeOverlay = ({
         >
           {currentCardRefUid ? (
             <>
-              {isLineByLine && !lineByLineIsCardComplete ? (
+              {isLineByLineUI && !lineByLineIsCardComplete ? (
                 <>
                   <CardBlock
                     refUid={currentCardRefUid}
@@ -730,8 +759,8 @@ const PracticeOverlay = ({
           onPracticeClick={onPracticeClick}
           onSkipClick={onSkipClick}
           onPrevClick={onPrevClick}
-          setShowAnswers={isLineByLine && !lineByLineIsCardComplete ? onLineByLineShowAnswer : setShowAnswers}
-          showAnswers={isLineByLine ? (lineByLineRevealedCount > lineByLineCurrentChildIndex) : showAnswers}
+          setShowAnswers={isLineByLineUI && !lineByLineIsCardComplete ? onLineByLineShowAnswer : setShowAnswers}
+          showAnswers={isLineByLineUI ? (lineByLineRevealedCount > lineByLineCurrentChildIndex) : showAnswers}
           isDone={isDone || lineByLineIsCardComplete}
           hasCards={hasCards}
           onCloseCallback={onCloseCallback}
@@ -794,38 +823,6 @@ const PracticeOverlay = ({
           </div>
 
           <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                className="bp3-checkbox"
-                checked={localSettings.rtlEnabled}
-                onChange={(e) => setLocalSettings({ ...localSettings, rtlEnabled: e.target.checked })}
-                style={{ marginRight: '8px' }}
-              />
-              <span>Right-to-Left (RTL) Enabled</span>
-            </label>
-            <p style={{ fontSize: '12px', color: colors.textMuted, margin: '5px 0 0 0' }}>
-              Enable RTL for languages like Arabic, Hebrew, etc.
-            </p>
-          </div>
-
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                className="bp3-checkbox"
-                checked={localSettings.shuffleCards}
-                onChange={(e) => setLocalSettings({ ...localSettings, shuffleCards: e.target.checked })}
-                style={{ marginRight: '8px' }}
-              />
-              <span>Shuffle Cards</span>
-            </label>
-            <p style={{ fontSize: '12px', color: colors.textMuted, margin: '5px 0 0 0' }}>
-              OFF: Due cards sorted by urgency (most overdue → hardest → least mature). New cards in reverse creation order. ON: All cards randomly shuffled.
-            </p>
-          </div>
-
-          <div style={{ marginBottom: '20px' }}>
             <h5 style={{ margin: '0 0 10px 0' }}>Reinsert &quot;Forgot&quot; Cards After N Cards</h5>
             <p style={{ fontSize: '12px', color: colors.textMuted, margin: '0 0 5px 0' }}>
               When you mark a card as &quot;Forgot&quot;, it will be reinserted into the current review session N cards later. Set to 0 to disable.
@@ -835,6 +832,21 @@ const PracticeOverlay = ({
               className="bp3-input"
               value={localSettings.forgotReinsertOffset}
               onChange={(e) => setLocalSettings({ ...localSettings, forgotReinsertOffset: Number(e.target.value) })}
+              placeholder="3"
+              style={{ width: '100%' }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <h5 style={{ margin: '0 0 10px 0' }}>Reinsert &quot;Incremental Read&quot; Cards After N Cards</h5>
+            <p style={{ fontSize: '12px', color: colors.textMuted, margin: '0 0 5px 0' }}>
+              When you click &quot;Next&quot; on an Incremental Read card, it will be reinserted into the current review session N cards later. Set to 0 to disable.
+            </p>
+            <input
+              type="number"
+              className="bp3-input"
+              value={localSettings.readReinsertOffset}
+              onChange={(e) => setLocalSettings({ ...localSettings, readReinsertOffset: Number(e.target.value) })}
               placeholder="3"
               style={{ width: '100%' }}
             />
@@ -880,6 +892,40 @@ const PracticeOverlay = ({
               Migrate card data to the current architecture: rename cardType→reviewMode in meta, add missing reviewMode, and remove redundant reviewMode from session records. Safe to run multiple times.
             </p>
             <MigrateLegacyDataPanel dataPageTitle={dataPageTitle} />
+          </div>
+
+          <HistoryCleanupSection dataPageTitle={dataPageTitle} />
+
+          <div style={{ marginBottom: '20px', borderTop: '1px solid #394b59', paddingTop: '15px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                className="bp3-checkbox"
+                checked={localSettings.rtlEnabled}
+                onChange={(e) => setLocalSettings({ ...localSettings, rtlEnabled: e.target.checked })}
+                style={{ marginRight: '8px' }}
+              />
+              <span>Right-to-Left (RTL) Enabled</span>
+            </label>
+            <p style={{ fontSize: '12px', color: colors.textMuted, margin: '5px 0 0 0' }}>
+              Enable RTL for languages like Arabic, Hebrew, etc.
+            </p>
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                className="bp3-checkbox"
+                checked={localSettings.shuffleCards}
+                onChange={(e) => setLocalSettings({ ...localSettings, shuffleCards: e.target.checked })}
+                style={{ marginRight: '8px' }}
+              />
+              <span>Shuffle Cards</span>
+            </label>
+            <p style={{ fontSize: '12px', color: colors.textMuted, margin: '5px 0 0 0' }}>
+              OFF: Due cards sorted by urgency (most overdue → hardest → least mature). New cards in reverse creation order. ON: All cards randomly shuffled.
+            </p>
           </div>
         </div>
       </Blueprint.Dialog>
@@ -1357,6 +1403,168 @@ const Header = ({
         ></button>
       </div>
     </HeaderWrapper>
+  );
+};
+
+const BATCH_SIZE = 20;
+const BATCH_DELAY_MS = 2000;
+const CARD_DELAY_MS = 100;
+const cleanupSleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const HistoryCleanupSection = ({ dataPageTitle }: { dataPageTitle: string }) => {
+  const [keepCount, setKeepCount] = React.useState(3);
+  const [status, setStatus] = React.useState<'idle' | 'running' | 'done' | 'error'>('idle');
+  const [progress, setProgress] = React.useState({ total: 0, cleaned: 0, deleted: 0, phase: '' });
+  const [errorDetail, setErrorDetail] = React.useState('');
+
+  const runCleanup = async () => {
+    if (keepCount < 0) return;
+    setStatus('running');
+    setProgress({ total: 0, cleaned: 0, deleted: 0, phase: 'Scanning...' });
+    setErrorDetail('');
+
+    try {
+      const query = `[
+        :find (pull ?pluginPageChildren [
+          :block/string
+          :block/children
+          :block/order
+          :block/uid
+          {:block/children [:block/uid :block/string :block/order {:block/children ...}]}])
+        :in $ ?pageTitle ?dataBlockName
+        :where
+        [?page :node/title ?pageTitle]
+        [?page :block/children ?pluginPageChildren]
+        [?pluginPageChildren :block/string ?dataBlockName]
+      ]`;
+
+      const queryResultsData = await window.roamAlphaAPI.q(query, dataPageTitle, 'data');
+      const dataChildren = queryResultsData.map((arr) => arr[0])[0]?.children || [];
+
+      const total = dataChildren.length;
+      setProgress({ total, cleaned: 0, deleted: 0, phase: 'Scanning cards...' });
+
+      let cleaned = 0;
+      let totalDeleted = 0;
+      let errors = 0;
+
+      for (let i = 0; i < dataChildren.length; i++) {
+        const cardBlock = dataChildren[i];
+        if (!cardBlock?.children) continue;
+
+        const dateBlocks = cardBlock.children.filter((child) => {
+          if (!child?.string) return false;
+          const dateStr = stringUtils.getStringBetween(child.string, '[[', ']]');
+          return !!stringUtils.parseRoamDateString(dateStr);
+        });
+
+        if (dateBlocks.length <= keepCount) {
+          cleaned++;
+          setProgress({ total, cleaned, deleted: totalDeleted, phase: `Scanning (${i + 1}/${total})` });
+          continue;
+        }
+
+        const sortedDateBlocks = [...dateBlocks].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+        const blocksToDelete = sortedDateBlocks.slice(keepCount);
+
+        for (const block of blocksToDelete) {
+          try {
+            await window.roamAlphaAPI.deleteBlock({ block: { uid: block.uid } });
+            totalDeleted++;
+          } catch (err) {
+            console.error(`[Memo] History cleanup error deleting block ${block.uid}:`, err);
+            errors++;
+          }
+        }
+
+        cleaned++;
+
+        setProgress({ total, cleaned, deleted: totalDeleted, phase: `Cleaning (${cleaned}/${total})` });
+
+        if ((i + 1) % BATCH_SIZE === 0) {
+          await cleanupSleep(BATCH_DELAY_MS);
+        } else {
+          await cleanupSleep(CARD_DELAY_MS);
+        }
+      }
+
+      setProgress({ total, cleaned, deleted: totalDeleted, phase: 'Done' });
+      if (errors > 0) {
+        setErrorDetail(`${errors} blocks had errors — check console for details.`);
+      }
+      setStatus('done');
+    } catch (error) {
+      console.error('[Memo] History cleanup error:', error);
+      setStatus('error');
+    }
+  };
+
+  return (
+    <div style={{ marginBottom: '20px', borderTop: '1px solid #394b59', paddingTop: '15px' }}>
+      <span style={{ fontSize: '14px', fontWeight: 600 }}>Clean Up History Data</span>
+      <p style={{ fontSize: '12px', color: colors.textMuted, margin: '5px 0 10px 0' }}>
+        Keep only the N most recent date session blocks per card. Older blocks beyond the specified count will be deleted. This action cannot be undone.
+      </p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+        <span style={{ fontSize: '12px' }}>Keep count:</span>
+        <input
+          type="number"
+          className="bp3-input"
+          value={keepCount}
+          onChange={(e) => setKeepCount(Math.max(0, Number(e.target.value)))}
+          min={0}
+          style={{ width: '80px' }}
+        />
+      </div>
+      {status === 'idle' && (
+        <button
+          className="bp3-button bp3-intent-warning"
+          onClick={runCleanup}
+          style={{ fontSize: '12px' }}
+        >
+          Start Cleanup
+        </button>
+      )}
+      {status === 'running' && (
+        <div style={{ fontSize: '12px', color: colors.textMuted }}>
+          <div>{progress.phase}</div>
+          <div>
+            {progress.cleaned}/{progress.total} cards processed, {progress.deleted} blocks deleted
+          </div>
+        </div>
+      )}
+      {status === 'done' && (
+        <div>
+          <div style={{ fontSize: '12px', color: '#0d8050' }}>
+            Cleanup complete! {progress.cleaned} cards processed, {progress.deleted} expired blocks deleted.
+          </div>
+          {errorDetail && (
+            <div style={{ fontSize: '12px', color: '#d29922', marginTop: '4px' }}>{errorDetail}</div>
+          )}
+          <button
+            className="bp3-button"
+            onClick={() => { setStatus('idle'); setProgress({ total: 0, cleaned: 0, deleted: 0, phase: '' }); }}
+            style={{ fontSize: '12px', marginTop: '8px' }}
+          >
+            Run Again
+          </button>
+        </div>
+      )}
+      {status === 'error' && (
+        <div>
+          <div style={{ fontSize: '12px', color: '#c23030' }}>
+            Cleanup failed. Check the console for details.
+          </div>
+          <button
+            className="bp3-button"
+            onClick={() => { setStatus('idle'); setProgress({ total: 0, cleaned: 0, deleted: 0, phase: '' }); }}
+            style={{ fontSize: '12px', marginTop: '8px' }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+    </div>
   );
 };
 

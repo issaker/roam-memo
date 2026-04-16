@@ -250,3 +250,61 @@ export const colors = {
   - 将 meta 块中的 reviewMode、nextDueDate、lineByLineProgress 写入最新 session block
   - 删除 meta 块
   - 将 `lineByLineReview:: Y` 转换为对应的 LBL reviewMode
+
+## 2026-04-15 (v3) 更新摘要
+
+### ESC 快捷键关闭 Memo 窗口
+- 使用 Blueprint.js 原生 `canEscapeKeyClose={true}` 替代自定义 hotkey
+- Blueprint 的 Dialog 组件内部维护 overlay 栈，按 ESC 时只会关闭栈顶的那个
+- 设置对话框打开时 ESC 关闭设置对话框，关闭后 ESC 关闭主窗口
+
+### Incremental Read 插队功能
+- 为 Incremental Read 模式添加与 "Forgot" 功能相同的本次会话插队机制
+- 每次点击 "Next" 按钮时，当前卡片自动插队到后续卡片序列中
+- 新增 `readReinsertOffset` 设置项（默认值 3），功能逻辑与 `forgotReinsertOffset` 一致
+- 当值为 0 时表示本次会话不执行插队操作
+- **Bug1 修复**：在 `onLineByLineGrade` 的 reading 分支中添加了 reinsertion 逻辑，确保 Incremental Read 模式下点击 Next 后卡片正确插队
+- `Settings` 类型新增 `readReinsertOffset: number` 字段
+- `SETTING_TYPES` 新增 `readReinsertOffset: 'number'` 类型映射
+- `queries/settings.ts` 新增 `readReinsertOffset` 的保存和加载逻辑
+
+### 事件驱动刷新（替代轮询）
+- `onSelectReviewMode` 在 `updateCardType` 持久化后调用 `fetchPracticeData()` 刷新数据
+- 数据流：用户切换模式 → applyOptimisticCardMeta (即时 UI) → updateCardType (持久化) → fetchPracticeData (刷新)
+- `PracticeOverlay` 新增 `fetchPracticeData` prop，由 `app.tsx` 传入
+- 无论是翻页回来还是插队卡片重新出现，practiceData 中都已经是最新的模式数据
+
+### Settings 自动保存优化
+- 自动保存 debounce 间隔从 500ms 调整为 300ms
+
+### Settings 布局调整
+- 将 "Right-to-Left (RTL) Enabled" 和 "Shuffle Cards" 两项移至设置页面最末尾
+- 设置项顺序：Tag Pages → Data Page Title → Daily Limit → Forgot Reinsert → Read Reinsert → Show Breadcrumbs → Show Mode Borders → Data Migration → History Cleanup → RTL → Shuffle Cards
+
+### 历史数据清理功能
+- 新增 `HistoryCleanupSection` 组件，位于 Memo Settings 对话框中
+- 用户可自定义保留的历史数据数量（默认值 3），系统仅保留每张卡片最近的 N 个日期 session block
+- 实现"Start Cleanup"按钮，点击后执行清理操作，删除超过指定数量的过期日期 block
+- 清理过程显示进度提示（已处理卡片数/总数，已删除 block 数），完成后提供操作结果反馈
+- 采用批量处理策略（每 20 张卡片暂停 2 秒），避免 API 限流
+- 清理操作不可撤销，界面有明确提示
+- 所有 UI 文本使用英文
+
+### 修复重复 reviewMode:: 字段
+- `upsertLatestSessionField` 的 Datalog pull 查询增加一层子 block 拉取深度
+- 修复前：日期 block 的子 block（字段 block）未被拉取，导致 `latestDateBlock.children` 为 `undefined`，每次都创建新字段
+- 修复后：查询能正确找到已存在的字段 block 并执行更新（`updateBlock`），而非重复创建
+
+### 修复 FIXED_PROGRESSIVE_LBL 未进入逐行阅读模式
+- 引入 `isLineByLineUI = isLineByLine || isReading`，表示"需要逐行 UI 展示"
+- 所有 UI 渲染和逻辑条件统一使用 `isLineByLineUI`
+- Incremental Read 模式差异化行为：
+  - `lineByLineRevealedCount` 初始化为 `firstDueIndex + 1`（自动揭示第一个子 block）
+  - `showAnswers` 初始为 `true`（直接显示 "Next" 按钮）
+
+### Footer aria-label 英文化
+- 将 `aria-label="上一页"` 改为 `aria-label="Previous"`
+- 将 `aria-label="下一页"` 改为 `aria-label="Next"`
+
+### 新增样式变量
+- 本次未新增任何样式变量，所有 UI 复用现有 `colors` 和 `intentColors` 体系

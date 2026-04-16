@@ -294,7 +294,7 @@ const GradingControlsWrapper = ({
     <div className="flex items-center flex-wrap justify-evenly gap-3 w-full">
       <button
         type="button"
-        aria-label="上一页"
+        aria-label="Previous"
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -315,7 +315,7 @@ const GradingControlsWrapper = ({
       </button>
       <button
         type="button"
-        aria-label="下一页"
+        aria-label="Next"
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();

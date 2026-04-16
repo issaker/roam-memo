@@ -59,6 +59,10 @@ Enable card shuffling in settings to randomize the order of new and due cards du
 
 After finishing due cards, continue reviewing all cards in the deck without affecting scheduling. Useful for exam prep.
 
+### History Data Cleanup
+
+Clean up old session history data from the data page. Configure how many recent date session blocks to keep per card (default: 3). Older session blocks beyond the specified count will be deleted. This helps reduce data page size over time.
+
 ### Breadcrumbs
 
 Show the block's page hierarchy as breadcrumbs for context. Toggle with `b` key. Visibility preference is persisted across sessions.
@@ -83,6 +87,7 @@ The dialog border color also dynamically matches the mode badge color, reinforci
 | Skip            | `s` or `→` |
 | Previous card   | `←`        |
 | Breadcrumbs     | `b`        |
+| Close memo      | `esc`      |
 | Perfect / Next  | `space`    |
 | Forgot          | `f`        |
 | Hard            | `h`        |
@@ -144,6 +149,8 @@ A line-by-line reading mode designed for long-form content. Based on the **Incre
 3. Click "Next" to mark it as read and advance to the next card
 4. Next time the card appears, the next unread child is shown
 5. After all children are read, the cycle restarts from the beginning
+
+**Reinsertion:** When you click "Next" on an Incremental Read card, the card is automatically reinserted into the review queue N cards later (configurable via "Reinsert 'Incremental Read' Cards After N Cards" setting, default: 3). Set to 0 to disable reinsertion.
 
 ### Dynamic Review Mode Switching
 

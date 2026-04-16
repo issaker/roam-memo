@@ -66,7 +66,7 @@ const upsertLatestSessionField = async ({
   value: string;
 }) => {
   const cardChildren = await window.roamAlphaAPI.q(
-    `[:find (pull ?card [:block/children :block/uid {:block/children [:block/uid :block/string :block/order]}])
+    `[:find (pull ?card [:block/children :block/uid {:block/children [:block/uid :block/string :block/order {:block/children [:block/uid :block/string :block/order]}]}])
          :in $ ?cardUid
          :where [?card :block/uid ?cardUid]]`,
     cardDataBlockUid

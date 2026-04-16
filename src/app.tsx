@@ -41,6 +41,7 @@ const App = () => {
     rtlEnabled,
     shuffleCards,
     forgotReinsertOffset,
+    readReinsertOffset,
     showBreadcrumbs,
     showModeBorders,
   } = useSettings();
@@ -160,6 +161,8 @@ const App = () => {
             rtlEnabled={rtlEnabled}
             today={today}
             forgotReinsertOffset={forgotReinsertOffset}
+            readReinsertOffset={readReinsertOffset}
+            fetchPracticeData={fetchPracticeData}
             dataPageTitle={dataPageTitle}
             showBreadcrumbs={showBreadcrumbs}
             showModeBorders={showModeBorders}
