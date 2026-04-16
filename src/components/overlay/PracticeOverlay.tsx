@@ -344,7 +344,6 @@ const PracticeOverlay = ({
         setCurrentIndex((prev) => prev + 1);
         setLineByLineCurrentChildIndex(lineByLineCurrentChildIndex + 1);
         setLineByLineRevealedCount(lineByLineCurrentChildIndex + 1);
-        setShowAnswers(true);
         return;
       }
 
