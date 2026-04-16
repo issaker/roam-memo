@@ -149,16 +149,21 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
 
 /**
  * Update lineByLineProgress in the latest session block.
- * Also updates nextDueDate to the earliest child due date.
+ * Also updates nextDueDate:
+ *   - If there are unread children (progress entries < totalChildren),
+ *     sets nextDueDate to today so the card stays "due" in subsequent sessions.
+ *   - Otherwise, sets nextDueDate to the earliest child due date.
  */
 export const updateLineByLineProgress = async ({
   refUid,
   dataPageTitle,
   progress,
+  totalChildren,
 }: {
   refUid: string;
   dataPageTitle: string;
   progress: LineByLineProgressMap;
+  totalChildren?: number;
 }) => {
   await getOrCreatePage(dataPageTitle);
   const dataBlockUid = await getOrCreateBlockOnPage(dataPageTitle, 'data', -1, {
@@ -176,19 +181,31 @@ export const updateLineByLineProgress = async ({
     value: progressString,
   });
 
-  const earliestDueDate = Object.values(progress).reduce((earliest, child) => {
-    if (!child?.nextDueDate) return earliest;
-    const d = new Date(child.nextDueDate);
-    return !earliest || d < earliest ? d : earliest;
-  }, null as Date | null);
+  const reviewedCount = Object.keys(progress).length;
+  const hasUnreadChildren = totalChildren !== undefined && reviewedCount < totalChildren;
 
-  if (earliestDueDate) {
-    const dueDateString = `[[${stringUtils.dateToRoamDateString(earliestDueDate)}]]`;
+  if (hasUnreadChildren) {
+    const todayString = `[[${stringUtils.dateToRoamDateString(new Date())}]]`;
     await upsertLatestSessionField({
       cardDataBlockUid,
       key: 'nextDueDate',
-      value: dueDateString,
+      value: todayString,
     });
+  } else {
+    const earliestDueDate = Object.values(progress).reduce((earliest, child) => {
+      if (!child?.nextDueDate) return earliest;
+      const d = new Date(child.nextDueDate);
+      return !earliest || d < earliest ? d : earliest;
+    }, null as Date | null);
+
+    if (earliestDueDate) {
+      const dueDateString = `[[${stringUtils.dateToRoamDateString(earliestDueDate)}]]`;
+      await upsertLatestSessionField({
+        cardDataBlockUid,
+        key: 'nextDueDate',
+        value: dueDateString,
+      });
+    }
   }
 };
 
@@ -204,7 +221,6 @@ export const updateCardType = async ({
   refUid: string;
   dataPageTitle: string;
   reviewMode: ReviewModes;
-  lineByLineReview?: 'Y' | 'N';
 }) => {
   await getOrCreatePage(dataPageTitle);
   const dataBlockUid = await getOrCreateBlockOnPage(dataPageTitle, 'data', -1, {

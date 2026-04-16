@@ -35,6 +35,10 @@ const App = () => {
   const [isCramming, setIsCramming] = React.useState(false);
 
   const {
+    settings,
+    updateSetting,
+  } = useSettings();
+  const {
     tagsListString,
     dataPageTitle,
     dailyLimit,
@@ -45,7 +49,7 @@ const App = () => {
     readReinsertOffset,
     showBreadcrumbs,
     showModeBorders,
-  } = useSettings();
+  } = settings;
   const { selectedTag, setSelectedTag, tagsList } = useTags({ tagsListString });
 
   const { fetchCacheData, saveCacheData, data: cachedData } = useCachedData({ dataPageTitle });
@@ -114,10 +118,6 @@ const App = () => {
     setSelectedTag(tag);
   };
 
-  const handleReviewMoreClick = async () => {
-    refreshData();
-  };
-
   useCollapseReferenceList({ dataPageTitle });
 
   const [tagsOnEnter, setTagsOnEnter] = React.useState<string[]>([]);
@@ -172,7 +172,6 @@ const App = () => {
             handlePracticeClick={handlePracticeClick}
             onCloseCallback={onClosePracticeOverlayCallback}
             handleMemoTagChange={handleMemoTagChange}
-            handleReviewMoreClick={handleReviewMoreClick}
             tagsList={tagsList}
             selectedTag={selectedTag}
             isCramming={isCramming}
@@ -186,6 +185,10 @@ const App = () => {
             historyCleanupKeepCount={historyCleanupKeepCount}
             showBreadcrumbs={showBreadcrumbs}
             showModeBorders={showModeBorders}
+            tagsListString={tagsListString}
+            dailyLimit={dailyLimit}
+            shuffleCards={shuffleCards}
+            updateSetting={updateSetting}
           />
         )}
       </>

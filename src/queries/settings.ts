@@ -4,8 +4,26 @@ import { defaultSettings, Settings } from '~/hooks/useSettings';
 const SETTINGS_BLOCK_NAME = 'settings';
 
 /**
- * Save settings to the roam/memo page
+ * Settings Page Persistence — Roam Data Page Read/Write
+ *
+ * This module handles reading and writing settings as blocks on the Roam data
+ * page (default: roam/memo). It is a LOW-LEVEL persistence layer called by
+ * useSettings; it should NOT be called directly from UI components.
+ *
+ * Role in the settings architecture:
+ *   - The Roam data page is the BACKUP store for settings (not the primary)
+ *   - Primary store is extensionAPI.settings (see useSettings.ts for details)
+ *   - This module is only called in two scenarios:
+ *     1. Startup: loadSettingsFromPage() restores settings when extensionAPI
+ *        is empty (roam/js cold start after page reload)
+ *     2. Debounced sync: saveSettingsToPage() writes settings to the page
+ *        after a 5-second debounce (triggered by useSettings.schedulePageSync)
+ *
+ * Write strategy: delete-then-create (not update-in-place) for each setting
+ * block, because setting blocks are simple key:: value strings and the
+ * delete+create pattern avoids UID tracking complexity.
  */
+/** Save all settings to the data page (delete-then-create per key) */
 export const saveSettingsToPage = async (dataPageTitle: string, settings: Settings) => {
   try {
     // Ensure the data page exists
@@ -63,9 +81,7 @@ export const saveSettingsToPage = async (dataPageTitle: string, settings: Settin
   }
 };
 
-/**
- * Load settings from the roam/memo page
- */
+/** Load settings from the data page (used only at roam/js cold start) */
 export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Settings | null> => {
   try {
     // Get the page UID

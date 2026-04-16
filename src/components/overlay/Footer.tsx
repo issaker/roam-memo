@@ -7,7 +7,7 @@ import * as asyncUtils from '~/utils/async';
 import { generatePracticeData } from '~/practice';
 import Tooltip from '~/components/Tooltip';
 import ButtonTags from '~/components/ButtonTags';
-import { ReviewModes, isFixedMode, isProgressiveLBLMode } from '~/models/session';
+import { ReviewModes, isFixedMode, isIncrementalReadMode } from '~/models/session';
 import { MainContext } from '~/components/overlay/PracticeOverlay';
 import { getIntentColor, colors } from '~/theme';
 
@@ -288,7 +288,7 @@ const GradingControlsWrapper = ({
   const { reviewMode, onSelectReviewMode, cardMeta } = React.useContext(MainContext);
 
   const isFixedModeActive = isFixedMode(reviewMode);
-  const isProgressiveLBLActive = isProgressiveLBLMode(reviewMode);
+  const isIncrementalReadActive = isIncrementalReadMode(reviewMode);
   return (
     <div className="flex items-center flex-wrap justify-evenly gap-3 w-full">
       <button
@@ -333,8 +333,8 @@ const GradingControlsWrapper = ({
       >
         ▶
       </button>
-      {isProgressiveLBLActive ? (
-        <ReadingModeControls
+      {isIncrementalReadActive ? (
+        <IncrementalReadControls
           activeButtonKey={activeButtonKey}
           intervalPractice={intervalPractice}
           intervalEstimates={intervalEstimates}
@@ -363,14 +363,14 @@ const GradingControlsWrapper = ({
 };
 
 /**
- * ReadingModeControls
+ * IncrementalReadControls
  *
  * Simplified grading UI for Incremental Read mode (FIXED_PROGRESSIVE_LBL).
  * Displays a "Read" indicator with the next interval and a "Next" button
  * that advances to the next card. No grading buttons — the per-child
  * Progressive interval is calculated automatically in onLineByLineGrade.
  */
-const ReadingModeControls = ({
+const IncrementalReadControls = ({
   activeButtonKey,
   intervalPractice,
   intervalEstimates,

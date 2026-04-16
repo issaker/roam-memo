@@ -5,15 +5,15 @@
  *
  * Architecture:
  * - Receives practice data, settings, and callbacks as props from App
- * - Uses useCurrentCardData for real-time card data with polling
+ * - useCurrentCardData derives card state from the session history (no polling)
  * - MainContext provides shared state (reviewMode, intervalMultiplier, etc.) to child components
  * - Footer handles grading buttons and keyboard shortcuts
  * - CardBlock renders the actual Roam block content
  *
  * Settings flow:
- * - showBreadcrumbs, showModeBorders come from useSettings via App props (single source of truth)
- * - localSettings is used ONLY for the settings dialog form state (roam/js mode)
- * - Dialog saves sync to both page and extensionAPI, then dispatches roamMemoSettingsChanged event
+ * - All settings come from useSettings via App props (single source of truth)
+ * - updateSetting is used to change settings, which handles extensionAPI + debounced page sync
+ * - Settings dialog uses formSettings for responsive form state, commits via updateSetting
  */
 import * as React from 'react';
 import * as Blueprint from '@blueprintjs/core';
@@ -27,7 +27,7 @@ import Lottie from 'react-lottie';
 import doneAnimationData from '~/lotties/done.json';
 import Tooltip from '~/components/Tooltip';
 import mediaQueries from '~/utils/mediaQueries';
-import { saveSettingsToPage, loadSettingsFromPage } from '~/queries/settings';
+import { Settings } from '~/hooks/useSettings';
 
 import CardBlock from '~/components/overlay/CardBlock';
 import Footer from '~/components/overlay/Footer';
@@ -37,8 +37,8 @@ import {
   ReviewModes,
   Session,
   isFixedMode,
-  isSM2LBLMode,
-  isProgressiveLBLMode,
+  isLBLReviewMode,
+  isIncrementalReadMode,
   DEFAULT_REVIEW_MODE,
   LineByLineProgressMap,
 } from '~/models/session';
@@ -79,7 +79,6 @@ interface Props {
   today: Today;
   handlePracticeClick: (props: handlePracticeProps) => void;
   handleMemoTagChange: (tag: string) => void;
-  handleReviewMoreClick: () => void;
   isCramming: boolean;
   setIsCramming: (isCramming: boolean) => void;
   rtlEnabled: boolean;
@@ -91,6 +90,10 @@ interface Props {
   historyCleanupKeepCount: number;
   showBreadcrumbs: boolean;
   showModeBorders: boolean;
+  tagsListString: string;
+  dailyLimit: number;
+  shuffleCards: boolean;
+  updateSetting: (key: keyof Settings, value: any) => void;
 }
 
 /**
@@ -116,7 +119,6 @@ const PracticeOverlay = ({
   today,
   handlePracticeClick,
   handleMemoTagChange,
-  handleReviewMoreClick,
   isCramming,
   setIsCramming,
   rtlEnabled,
@@ -128,6 +130,10 @@ const PracticeOverlay = ({
   historyCleanupKeepCount,
   showBreadcrumbs,
   showModeBorders,
+  tagsListString,
+  dailyLimit,
+  shuffleCards,
+  updateSetting,
 }: Props) => {
   const todaySelectedTag = today.tags[selectedTag];
 
@@ -141,7 +147,6 @@ const PracticeOverlay = ({
   const [sessionOverrides, setSessionOverrides] = React.useState<Record<string, Session>>({});
 
   const isFirst = currentIndex === 0;
-  const completedTodayCount = todaySelectedTag?.completed;
 
   const currentCardRefUid = cardQueue[currentIndex] as string | undefined;
   const sessions = React.useMemo(() => {
@@ -162,7 +167,6 @@ const PracticeOverlay = ({
     useCurrentCardData({
       currentCardRefUid,
       sessions,
-      dataPageTitle,
     });
 
   const totalCardsCount = (todaySelectedTag?.new || 0) + (todaySelectedTag?.due || 0);
@@ -188,7 +192,7 @@ const PracticeOverlay = ({
   // Reset interval state when navigating to a different card.
   // Uses latestSession (derived immediately from sessions via useMemo) instead
   // of currentCardData, because currentCardData is updated asynchronously by
-  // useCurrentCardData's Effect 1 and is stale during the first render after
+  // useCurrentCardData's effect and is stale during the first render after
   // a card change. Using stale currentCardData would copy the PREVIOUS card's
   // intervalMultiplier into the new card, and the cardChanged guard would
   // prevent correction on the subsequent render.
@@ -230,11 +234,11 @@ const PracticeOverlay = ({
   const shouldShowAnswerFirst =
     renderMode === RenderMode.AnswerFirst && hasBlockChildrenUids && !showAnswers;
 
-  const isSM2LBL = isSM2LBLMode(reviewMode) && hasBlockChildrenUids;
+  const isLBLReview = isLBLReviewMode(reviewMode) && hasBlockChildrenUids;
 
-  const isProgressiveLBL = isProgressiveLBLMode(reviewMode) && hasBlockChildrenUids;
+  const isIncrementalRead = isIncrementalReadMode(reviewMode) && hasBlockChildrenUids;
 
-  const isLineByLineUI = isSM2LBL || isProgressiveLBL;
+  const isLineByLineUI = isLBLReview || isIncrementalRead;
 
   const parseLineByLineProgress = (progressStr?: string): LineByLineProgressMap => {
     if (!progressStr) return {};
@@ -277,12 +281,12 @@ const PracticeOverlay = ({
       }
     }
     setLineByLineCurrentChildIndex(firstDueIndex);
-    if (isProgressiveLBL) {
+    if (isIncrementalRead) {
       setLineByLineRevealedCount(firstDueIndex + 1);
     } else {
       setLineByLineRevealedCount(firstDueIndex);
     }
-  }, [isLineByLineUI, isProgressiveLBL, currentCardRefUid, childUidsList, lineByLineProgress]);
+  }, [isLineByLineUI, isIncrementalRead, currentCardRefUid, childUidsList, lineByLineProgress]);
 
   const lineByLineIsCardComplete =
     isLineByLineUI && lineByLineCurrentChildIndex >= childUidsList.length;
@@ -293,18 +297,18 @@ const PracticeOverlay = ({
 
       const childUid = childUidsList[lineByLineCurrentChildIndex];
 
-      if (isProgressiveLBL) {
+      if (isIncrementalRead) {
         const existingData = lineByLineProgress[childUid];
         const progReps = existingData?.progressiveRepetitions || 0;
         const nextInterval = progressiveInterval(progReps);
 
         const now = new Date();
-        const nextDueDate = dateUtils.addDays(now, nextInterval);
+        const childNextDueDate = dateUtils.addDays(now, nextInterval);
 
         const updatedProgress: LineByLineProgressMap = {
           ...lineByLineProgress,
           [childUid]: {
-            nextDueDate: nextDueDate.toISOString(),
+            nextDueDate: childNextDueDate.toISOString(),
             interval: nextInterval,
             repetitions: (existingData?.repetitions || 0) + 1,
             eFactor: existingData?.eFactor || 2.5,
@@ -312,10 +316,13 @@ const PracticeOverlay = ({
           },
         };
 
+        const hasUnreadChildren = Object.keys(updatedProgress).length < childUidsList.length;
+
         await updateLineByLineProgress({
           refUid: currentCardRefUid,
           dataPageTitle,
           progress: updatedProgress,
+          totalChildren: childUidsList.length,
         });
 
         setSessionOverrides((prev) => ({
@@ -325,7 +332,7 @@ const PracticeOverlay = ({
             reviewMode,
             dateCreated: now,
             lineByLineProgress: JSON.stringify(updatedProgress),
-            nextDueDate,
+            nextDueDate: hasUnreadChildren ? now : childNextDueDate,
           },
         }));
 
@@ -362,22 +369,25 @@ const PracticeOverlay = ({
       const sm2Result = supermemo(sm2Input, grade);
 
       const now = new Date();
-      const nextDueDate = dateUtils.addDays(now, sm2Result.interval);
+      const childNextDueDate = dateUtils.addDays(now, sm2Result.interval);
 
       const updatedProgress: LineByLineProgressMap = {
         ...lineByLineProgress,
         [childUid]: {
-          nextDueDate: nextDueDate.toISOString(),
+          nextDueDate: childNextDueDate.toISOString(),
           interval: sm2Result.interval,
           repetitions: sm2Result.repetition,
           eFactor: sm2Result.efactor,
         },
       };
 
+      const hasUnreadChildren = Object.keys(updatedProgress).length < childUidsList.length;
+
       await updateLineByLineProgress({
         refUid: currentCardRefUid,
         dataPageTitle,
         progress: updatedProgress,
+        totalChildren: childUidsList.length,
       });
 
       setSessionOverrides((prev) => ({
@@ -387,7 +397,7 @@ const PracticeOverlay = ({
           reviewMode,
           dateCreated: now,
           lineByLineProgress: JSON.stringify(updatedProgress),
-          nextDueDate,
+          nextDueDate: hasUnreadChildren ? now : childNextDueDate,
         },
       }));
 
@@ -413,7 +423,7 @@ const PracticeOverlay = ({
       lineByLineProgress,
       dataPageTitle,
       setCurrentIndex,
-      isProgressiveLBL,
+      isIncrementalRead,
       currentCardData,
       reviewMode,
       readReinsertOffset,
@@ -426,89 +436,55 @@ const PracticeOverlay = ({
     setShowAnswers(true);
   }, []);
 
-  const [localSettings, setLocalSettings] = React.useState({
-    tagsListString: 'memo',
-    dataPageTitle: 'roam/memo',
-    dailyLimit: 0,
+  const [formSettings, setFormSettings] = React.useState({
+    tagsListString,
+    dataPageTitle,
+    dailyLimit,
     historyCleanupKeepCount,
-    rtlEnabled: false,
-    shuffleCards: false,
-    forgotReinsertOffset: 3,
-    readReinsertOffset: 3,
-    showBreadcrumbs: false,
-    showModeBorders: true,
+    rtlEnabled,
+    shuffleCards,
+    forgotReinsertOffset,
+    readReinsertOffset,
+    showBreadcrumbs,
+    showModeBorders,
   });
 
-  // Load settings from page on mount and sync with extensionAPI
   React.useEffect(() => {
-    const loadSettings = async () => {
-      const savedSettings = await loadSettingsFromPage('roam/memo');
-      if (savedSettings) {
-        setLocalSettings(savedSettings);
-
-        // Sync with extensionAPI so useSettings hook can pick them up
-        const canWriteExtensionSettings =
-          typeof window.roamMemo?.extensionAPI?.settings?.set === 'function';
-        if (
-          window.roamMemo &&
-          window.roamMemo.extensionAPI &&
-          window.roamMemo.extensionAPI.settings &&
-          canWriteExtensionSettings
-        ) {
-          Object.entries(savedSettings).forEach(([key, value]) => {
-            window.roamMemo.extensionAPI.settings.set(key, value);
-          });
-        }
-      }
-    };
-    loadSettings();
-  }, []);
-
-  React.useEffect(() => {
-    setLocalSettings((prev) => ({ ...prev, historyCleanupKeepCount }));
-  }, [historyCleanupKeepCount]);
-
-  // Auto-save settings: debounce 300ms after any localSettings change
-  const autoSaveTimerRef = React.useRef<NodeJS.Timeout | null>(null);
-  const isInitialLoadRef = React.useRef(true);
-
-  React.useEffect(() => {
-    if (isInitialLoadRef.current) {
-      isInitialLoadRef.current = false;
-      return;
-    }
-
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current);
-    }
-
-    autoSaveTimerRef.current = setTimeout(async () => {
-      await saveSettingsToPage(localSettings.dataPageTitle, localSettings);
-      if (typeof window.roamMemo?.extensionAPI?.settings?.set === 'function') {
-        Object.entries(localSettings).forEach(([key, value]) => {
-          window.roamMemo.extensionAPI.settings.set(key, value);
-        });
-      }
-      window.dispatchEvent(new Event('roamMemoSettingsChanged'));
-    }, 300);
-
-    return () => {
-      if (autoSaveTimerRef.current) {
-        clearTimeout(autoSaveTimerRef.current);
-      }
-    };
-  }, [localSettings]);
+    setFormSettings({
+      tagsListString,
+      dataPageTitle,
+      dailyLimit,
+      historyCleanupKeepCount,
+      rtlEnabled,
+      shuffleCards,
+      forgotReinsertOffset,
+      readReinsertOffset,
+      showBreadcrumbs,
+      showModeBorders,
+    });
+  }, [
+    tagsListString,
+    dataPageTitle,
+    dailyLimit,
+    historyCleanupKeepCount,
+    rtlEnabled,
+    shuffleCards,
+    forgotReinsertOffset,
+    readReinsertOffset,
+    showBreadcrumbs,
+    showModeBorders,
+  ]);
 
   // Reset showAnswers state when card changes or mode updates
   // Uses latestSession?.reviewMode to avoid stale cardMeta during card transitions
   React.useEffect(() => {
     const effectiveReviewMode = latestSession?.reviewMode || reviewMode;
-    const effectiveIsProgressiveLBL = isProgressiveLBLMode(effectiveReviewMode) && hasBlockChildrenUids;
-    const effectiveIsSM2LBL = isSM2LBLMode(effectiveReviewMode) && hasBlockChildrenUids;
+    const effectiveIsIncrementalRead = isIncrementalReadMode(effectiveReviewMode) && hasBlockChildrenUids;
+    const effectiveIsLBLReview = isLBLReviewMode(effectiveReviewMode) && hasBlockChildrenUids;
 
-    if (effectiveIsProgressiveLBL) {
+    if (effectiveIsIncrementalRead) {
       setShowAnswers(true);
-    } else if (effectiveIsSM2LBL) {
+    } else if (effectiveIsLBLReview) {
       setShowAnswers(false);
     } else if (isFixedMode(effectiveReviewMode)) {
       setShowAnswers(true);
@@ -648,13 +624,8 @@ const PracticeOverlay = ({
   };
 
   const toggleBreadcrumbs = React.useCallback(() => {
-    const newState = !showBreadcrumbs;
-    setLocalSettings((prev) => ({ ...prev, showBreadcrumbs: newState }));
-    if (window.roamMemo?.extensionAPI?.settings) {
-      window.roamMemo.extensionAPI.settings.set('showBreadcrumbs', newState);
-      window.dispatchEvent(new Event('roamMemoSettingsChanged'));
-    }
-  }, [showBreadcrumbs]);
+    updateSetting('showBreadcrumbs', !showBreadcrumbs);
+  }, [showBreadcrumbs, updateSetting]);
 
   const hotkeys = React.useMemo(
     () => [
@@ -859,26 +830,16 @@ const PracticeOverlay = ({
           ) : (
             <div data-testid="practice-overlay-done-state" className="flex items-center flex-col">
               <Lottie options={lottieAnimationOption} style={lottieStyle} />
-              {/* @TODOZ: Add support for review more*/}
-              {/* eslint-disable-next-line no-constant-condition */}
-              {false ? (
-                <div>
-                  Reviewed {todaySelectedTag.completed}{' '}
-                  {stringUtils.pluralize(completedTodayCount, 'card', 'cards')} today.{' '}
-                  <a onClick={handleReviewMoreClick}>Review more</a>
-                </div>
-              ) : (
-                <div>
-                  You&apos;re all caught up! 🌟{' '}
-                  {todaySelectedTag.completed > 0
-                    ? `Reviewed ${todaySelectedTag.completed} ${stringUtils.pluralize(
-                        todaySelectedTag.completed,
-                        'card',
-                        'cards'
-                      )} today.`
-                    : ''}
-                </div>
-              )}
+              <div>
+                You&apos;re all caught up! 🌟{' '}
+                {todaySelectedTag.completed > 0
+                  ? `Reviewed ${todaySelectedTag.completed} ${stringUtils.pluralize(
+                      todaySelectedTag.completed,
+                      'card',
+                      'cards'
+                    )} today.`
+                  : ''}
+              </div>
             </div>
           )}
         </DialogBody>
@@ -920,10 +881,12 @@ const PracticeOverlay = ({
             <input
               type="text"
               className="bp3-input"
-              value={localSettings.tagsListString}
-              onChange={(e) =>
-                setLocalSettings({ ...localSettings, tagsListString: e.target.value })
-              }
+              value={formSettings.tagsListString}
+              onChange={(e) => {
+                const value = e.target.value;
+                setFormSettings((prev) => ({ ...prev, tagsListString: value }));
+                updateSetting('tagsListString', value);
+              }}
               placeholder="memo"
               style={{ width: '100%' }}
             />
@@ -937,10 +900,12 @@ const PracticeOverlay = ({
             <input
               type="text"
               className="bp3-input"
-              value={localSettings.dataPageTitle}
-              onChange={(e) =>
-                setLocalSettings({ ...localSettings, dataPageTitle: e.target.value })
-              }
+              value={formSettings.dataPageTitle}
+              onChange={(e) => {
+                const value = e.target.value;
+                setFormSettings((prev) => ({ ...prev, dataPageTitle: value }));
+                updateSetting('dataPageTitle', value);
+              }}
               placeholder="roam/memo"
               style={{ width: '100%' }}
             />
@@ -954,10 +919,12 @@ const PracticeOverlay = ({
             <input
               type="number"
               className="bp3-input"
-              value={localSettings.dailyLimit}
-              onChange={(e) =>
-                setLocalSettings({ ...localSettings, dailyLimit: Number(e.target.value) })
-              }
+              value={formSettings.dailyLimit}
+              onChange={(e) => {
+                const value = Number(e.target.value);
+                setFormSettings((prev) => ({ ...prev, dailyLimit: value }));
+                updateSetting('dailyLimit', value);
+              }}
               placeholder="0"
               style={{ width: '100%' }}
             />
@@ -974,10 +941,12 @@ const PracticeOverlay = ({
             <input
               type="number"
               className="bp3-input"
-              value={localSettings.forgotReinsertOffset}
-              onChange={(e) =>
-                setLocalSettings({ ...localSettings, forgotReinsertOffset: Number(e.target.value) })
-              }
+              value={formSettings.forgotReinsertOffset}
+              onChange={(e) => {
+                const value = Number(e.target.value);
+                setFormSettings((prev) => ({ ...prev, forgotReinsertOffset: value }));
+                updateSetting('forgotReinsertOffset', value);
+              }}
               placeholder="3"
               style={{ width: '100%' }}
             />
@@ -994,10 +963,12 @@ const PracticeOverlay = ({
             <input
               type="number"
               className="bp3-input"
-              value={localSettings.readReinsertOffset}
-              onChange={(e) =>
-                setLocalSettings({ ...localSettings, readReinsertOffset: Number(e.target.value) })
-              }
+              value={formSettings.readReinsertOffset}
+              onChange={(e) => {
+                const value = Number(e.target.value);
+                setFormSettings((prev) => ({ ...prev, readReinsertOffset: value }));
+                updateSetting('readReinsertOffset', value);
+              }}
               placeholder="3"
               style={{ width: '100%' }}
             />
@@ -1008,10 +979,12 @@ const PracticeOverlay = ({
               <input
                 type="checkbox"
                 className="bp3-checkbox"
-                checked={localSettings.showModeBorders}
-                onChange={(e) =>
-                  setLocalSettings({ ...localSettings, showModeBorders: e.target.checked })
-                }
+                checked={formSettings.showModeBorders}
+                onChange={(e) => {
+                  const value = e.target.checked;
+                  setFormSettings((prev) => ({ ...prev, showModeBorders: value }));
+                  updateSetting('showModeBorders', value);
+                }}
                 style={{ marginRight: '8px' }}
               />
               <span>Show Review Mode Borders</span>
@@ -1033,10 +1006,11 @@ const PracticeOverlay = ({
 
           <HistoryCleanupSection
             dataPageTitle={dataPageTitle}
-            keepCount={localSettings.historyCleanupKeepCount}
-            onKeepCountChange={(nextKeepCount) =>
-              setLocalSettings((prev) => ({ ...prev, historyCleanupKeepCount: nextKeepCount }))
-            }
+            keepCount={formSettings.historyCleanupKeepCount}
+            onKeepCountChange={(nextKeepCount) => {
+              setFormSettings((prev) => ({ ...prev, historyCleanupKeepCount: nextKeepCount }));
+              updateSetting('historyCleanupKeepCount', nextKeepCount);
+            }}
           />
 
           <div style={{ marginBottom: '20px', borderTop: '1px solid #394b59', paddingTop: '15px' }}>
@@ -1044,10 +1018,12 @@ const PracticeOverlay = ({
               <input
                 type="checkbox"
                 className="bp3-checkbox"
-                checked={localSettings.rtlEnabled}
-                onChange={(e) =>
-                  setLocalSettings({ ...localSettings, rtlEnabled: e.target.checked })
-                }
+                checked={formSettings.rtlEnabled}
+                onChange={(e) => {
+                  const value = e.target.checked;
+                  setFormSettings((prev) => ({ ...prev, rtlEnabled: value }));
+                  updateSetting('rtlEnabled', value);
+                }}
                 style={{ marginRight: '8px' }}
               />
               <span>Right-to-Left (RTL) Enabled</span>
@@ -1062,10 +1038,12 @@ const PracticeOverlay = ({
               <input
                 type="checkbox"
                 className="bp3-checkbox"
-                checked={localSettings.shuffleCards}
-                onChange={(e) =>
-                  setLocalSettings({ ...localSettings, shuffleCards: e.target.checked })
-                }
+                checked={formSettings.shuffleCards}
+                onChange={(e) => {
+                  const value = e.target.checked;
+                  setFormSettings((prev) => ({ ...prev, shuffleCards: value }));
+                  updateSetting('shuffleCards', value);
+                }}
                 style={{ marginRight: '8px' }}
               />
               <span>Shuffle Cards</span>
@@ -1097,7 +1075,7 @@ const Dialog = styled(Blueprint.Dialog)<{
     ${({ $reviewMode }) =>
       $reviewMode === ReviewModes.SpacedInterval || $reviewMode === ReviewModes.SpacedIntervalLBL
         ? colors.modeSpaced
-        : isFixedMode($reviewMode) || isProgressiveLBLMode($reviewMode)
+        : isFixedMode($reviewMode) || isIncrementalReadMode($reviewMode)
         ? colors.modeFixed
         : colors.borderSubtle};
   border-color: ${({ $showModeBorders, $reviewMode }) =>
@@ -1105,7 +1083,7 @@ const Dialog = styled(Blueprint.Dialog)<{
       ? colors.borderSubtle
       : $reviewMode === ReviewModes.SpacedInterval || $reviewMode === ReviewModes.SpacedIntervalLBL
       ? colors.modeSpaced
-      : isFixedMode($reviewMode) || isProgressiveLBLMode($reviewMode)
+      : isFixedMode($reviewMode) || isIncrementalReadMode($reviewMode)
       ? colors.modeFixed
       : colors.borderSubtle};
 
@@ -1124,7 +1102,7 @@ const Dialog = styled(Blueprint.Dialog)<{
     height: 100dvh;
     margin: 0;
     border-radius: 0;
-    /* 使用 safe-area-inset-bottom 自动适配浏览器底部工具栏 */
+    /* Adapt to browser bottom toolbar using safe-area-inset-bottom */
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 `;
@@ -1431,7 +1409,7 @@ const ModeBadge = ({ reviewMode }) => {
       </Blueprint.Tag>
     );
   }
-  if (isProgressiveLBLMode(reviewMode)) {
+  if (isIncrementalReadMode(reviewMode)) {
     return (
       <Blueprint.Tag intent="warning" minimal>
         Read

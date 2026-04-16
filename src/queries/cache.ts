@@ -6,7 +6,7 @@ import {
   getOrCreateBlockOnPage,
   getOrCreateChildBlock,
   getOrCreatePage,
-} from '~/queries';
+} from '~/queries/utils';
 
 export const saveCacheData = async ({ dataPageTitle, data, selectedTag }) => {
   await getOrCreatePage(dataPageTitle);

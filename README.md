@@ -215,6 +215,57 @@ A specialized card-level review mode for cards with multiple child blocks (outli
 - Mastered lines display with reduced opacity and a subtle left border
 - The current active line has a green left border highlight
 
+## Settings Architecture
+
+Settings use a **single-source-of-truth** design with `extensionAPI.settings` as the primary store and the Roam data page as a persistent backup.
+
+### Storage Layers
+
+| Layer | Role | Persistence | When Written |
+|-------|------|-------------|-------------|
+| `extensionAPI.settings` | **Primary** | Roam Depot: persistent · roam/js: in-memory | Immediately on every change |
+| `inMemorySettings` (extension.tsx) | Compatibility overlay | Memory only (roam/js) | Overlaid on every `set()` |
+| Roam data page (`roam/memo`) | **Backup** | Persistent (blocks) | Debounced 5s after last change |
+
+### Data Flow
+
+```
+Startup (roam/js cold start):
+  Page blocks → loadSettingsFromPage() → extensionAPI.settings → React state
+
+Startup (warm start / Roam Depot):
+  extensionAPI.settings → React state (page is NOT read)
+
+Setting change (any source):
+  updateSetting() → extensionAPI.settings (immediate)
+                  → React state (immediate)
+                  → schedulePageSync() → saveSettingsToPage() (5s debounce)
+
+Cross-component sync:
+  extensionAPI.settings.set() → 'roamMemoSettingsChanged' event → useSettings re-reads
+```
+
+### Key Design Decisions
+
+1. **extensionAPI first**: Every setting change writes to `extensionAPI.settings` before anything else. This ensures the primary store is always current, even if the page write fails.
+
+2. **Page as backup, not source**: The Roam data page is only read at startup when `extensionAPI.settings` is empty (roam/js cold start after page reload). It is never used to overwrite newer in-memory values.
+
+3. **5-second debounced page sync**: Page writes are expensive (~20 block operations per sync). Debouncing coalesces rapid changes (e.g. typing in a text field) into a single write, significantly reducing "pending remote changes" in Roam's sync indicator.
+
+4. **No direct page writes from UI**: Components use `updateSetting()` (passed via props from `useSettings`), never call `saveSettingsToPage()` or `extensionAPI.settings.set()` directly.
+
+5. **Unmount flush**: If the user closes the overlay while a debounced page sync is pending, the sync is flushed immediately to prevent data loss.
+
+### Settings in roam/js Mode
+
+When loaded via `{{[[roam/js]]}}`, the plugin wraps `extensionAPI.settings` with an in-memory overlay (see `extension.tsx`). This overlay:
+
+- Provides working `getAll/set/get` methods even without Roam Depot's extensionAPI
+- Dispatches `roamMemoSettingsChanged` events on every `set()` for cross-component sync
+- Falls through to the original extensionAPI methods when available (Roam Depot mode)
+- Is memory-only: settings are lost on page reload, which is why the data page backup exists
+
 ## Data Architecture
 
 All practice data is stored on a Roam page (default: `roam/memo`). Each card's data follows a **unified session-block architecture** — all fields are stored in session records, with no separate meta block.
@@ -343,30 +394,6 @@ Session Queue (one-time read)
 
 **Fallback:** When cardMeta is not yet loaded, reviewMode falls back to the session queue's reviewMode, then to DEFAULT_REVIEW_MODE.
 
-## 2026-04-16 Update Summary
-
-- **Incremental Read:** Reinserted reading cards now continue from the correct next child line within the same review session
-- **Last-line guard:** Incremental Read cards stop reinsert-on-next once the current child is already the last child block
-- **Latest snapshot recovery:** Sparse historical sessions are normalized into a full latest-session snapshot during reads
-- **Full field inheritance:** Newly saved session blocks continue to carry forward unrelated mode state fields, including shared `lineByLineProgress`
-- **Mode isolation:** SM2 and Fixed/Progressive scheduling fields remain independent and do not overwrite each other
-- **ReviewMode persistence fix:** When switching a card to `SPACED_INTERVAL`, grading now persists the resolved UI mode instead of stale pre-switch session mode, preventing accidental fallback to `FIXED_PROGRESSIVE` when navigating back
-- **Loop safety fix:** Daily-limit round-robin selection now includes a no-progress guard to prevent potential infinite loops when no additional cards are selectable
-- **Block-interaction stability:** Enter/leave tag diff logic now uses refs to avoid stale callback state in long-lived DOM listeners
-- **Date baseline consistency:** Fixed/Progressive `nextDueDate` calculations now use the same `dateCreated` reference baseline as SM2
-- **Debounce safety:** `debounce()` now calls `func(...args)` directly instead of relying on unstable `this` binding
-- **Naming consistency:** `SidePannelWidget` / `SidePandelWidget` references are normalized to `SidePanelWidget`
-- **History cleanup policy:** Cleanup stays manual for safety/performance; keep-count is now persisted via `historyCleanupKeepCount`
-- **Type-safety cleanup:** Removed all in-repo `@ts-ignore` / `@ts-expect-error` from `src/` by replacing suppressions with explicit component and utility typing
-- **Blueprint integration hardening:** `Tooltip` and `Select` wrappers now use explicit typed adapters (`placement → position`, `Select.ofType<T>()`) instead of unsafe casts
-- **Legacy import typing:** `legacyRoamSr` now imports and types `practice()` correctly, preserving dry-run migration behavior without error suppression
-- **Strict utility guards:** Numeric/date checks now use explicit `Number.isNaN()` / `Date#getTime()` validation, reducing implicit coercion ambiguity
-- **Show Breadcrumbs settings removal:** Removed "Show Breadcrumbs" toggle from Memo Settings dialog; the status bar eye-icon toggle and `B` keyboard shortcut remain as the sole control, with persistence via Data Page settings
-- **Breadcrumbs toggle persistence fix:** The status bar breadcrumbs toggle now updates `localSettings` state, ensuring the auto-save effect correctly persists the preference to both the Data Page and `extensionAPI.settings`
-- **Cross-card showAnswers leak fix:** Removed `setShowAnswers(true)` from Incremental Read's `onLineByLineGrade` handler — the `showAnswers` reset effect now correctly determines answer visibility for the next card based on its own mode, preventing Spaced Interval cards from auto-expanding after an Incremental Read "Next" click
-- **Stale cardMeta guard in showAnswers reset:** The `showAnswers` reset effect now uses `latestSession?.reviewMode` (immediately available via useMemo) instead of the potentially stale `cardMeta`-derived `reviewMode`, preventing incorrect answer visibility during card transitions
-- **hasCloze cross-card state leak fix:** Added a `useEffect` to reset `hasCloze` to its safe default when `currentCardRefUid` changes, preventing the previous card's cloze status from influencing the new card's `showAnswers` calculation
-
 ## Development
 
 ### Build
@@ -415,7 +442,7 @@ src/
 ├── extension.tsx          # Plugin entry point (onload/onunload)
 ├── app.tsx                # Root React component, orchestrates review workflow
 ├── practice.ts            # SM2 algorithm + Fixed Interval algorithm
-├── constants.ts           # Shared constants (session key routing)
+├── constants.ts           # Shared constants
 ├── models/
 │   ├── session.ts         # Session & CardMeta data models, review mode definitions
 │   └── practice.ts        # Today's review status model
@@ -424,11 +451,11 @@ src/
 │   ├── today.ts           # Today's review calculation (due/new/completed)
 │   ├── save.ts            # Write practice data to Roam session blocks
 │   ├── cache.ts           # Per-tag cache (renderMode, etc.)
-│   ├── settings.ts        # Settings persistence to Roam page
+│   ├── settings.ts        # Settings page persistence (low-level, called by useSettings only)
 │   ├── utils.ts           # Roam API query helpers
 │   └── legacyRoamSr.ts    # Roam-SR data migration
 ├── hooks/
-│   ├── useSettings.ts     # Settings management with dual-mode support
+│   ├── useSettings.ts     # Settings single-source-of-truth (extensionAPI primary, page backup)
 │   ├── usePracticeData.tsx # Practice data fetching with ref-based caching
 │   ├── useCurrentCardData.tsx # Active card data with latest-session resolution
 │   ├── useBlockInfo.tsx   # Block content + breadcrumbs
@@ -451,8 +478,9 @@ src/
 │   ├── dom.ts             # DOM simulation (mouse click events)
 │   ├── async.ts           # Sleep + debounce
 │   ├── mediaQueries.ts    # Responsive breakpoints
-│   └── zIndexFix.ts       # CSS z-index fix injection
-└── theme.ts               # CSS variable definitions for light/dark themes
+│   ├── zIndexFix.ts       # CSS z-index fix injection
+│   └── testUtils.ts       # Test helpers (MockDataBuilder, mock API)
+└── theme.ts               # Theme color definitions (intent colors, mode indicators)
 ```
 
 ## Bug Reports & Feature Requests

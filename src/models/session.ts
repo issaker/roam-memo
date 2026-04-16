@@ -16,9 +16,9 @@
 
 export enum ReviewModes {
   SpacedInterval = 'SPACED_INTERVAL',
-  SpacedIntervalLBL = 'SPACED_INTERVAL_LBL',
+  SpacedIntervalLBL = 'SPACED_INTERVAL_LBL',       // LBL Review (逐行复习)
   FixedProgressive = 'FIXED_PROGRESSIVE',
-  FixedProgressiveLBL = 'FIXED_PROGRESSIVE_LBL',
+  FixedProgressiveLBL = 'FIXED_PROGRESSIVE_LBL',   // Incremental Read (渐进阅读)
   FixedDays = 'FIXED_DAYS',
   FixedWeeks = 'FIXED_WEEKS',
   FixedMonths = 'FIXED_MONTHS',
@@ -36,11 +36,14 @@ export const isFixedMode = (mode: ReviewModes | undefined): boolean =>
 export const isSpacedMode = (mode: ReviewModes | undefined): boolean =>
   mode === ReviewModes.SpacedInterval || mode === ReviewModes.SpacedIntervalLBL;
 
-export const isSM2LBLMode = (mode: ReviewModes | undefined): boolean =>
+export const isLBLReviewMode = (mode: ReviewModes | undefined): boolean =>
   mode === ReviewModes.SpacedIntervalLBL;
 
-export const isProgressiveLBLMode = (mode: ReviewModes | undefined): boolean =>
+export const isIncrementalReadMode = (mode: ReviewModes | undefined): boolean =>
   mode === ReviewModes.FixedProgressiveLBL;
+
+export const isSM2LBLMode = isLBLReviewMode;
+export const isProgressiveLBLMode = isIncrementalReadMode;
 
 export const DEFAULT_REVIEW_MODE = ReviewModes.FixedProgressive;
 

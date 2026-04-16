@@ -5,9 +5,21 @@
  * - onload: Creates sidebar widget, renders React app, injects CSS fixes
  * - onunload: Cleans up DOM and styles
  *
- * Settings Compatibility:
- * When loaded via roam/js (not Roam Depot), extensionAPI lacks settings.panel.
- * We wrap all settings methods with in-memory fallback to ensure both modes work.
+ * Settings Compatibility Layer:
+ * When loaded via roam/js (not Roam Depot), extensionAPI lacks settings methods
+ * and settings.panel. We wrap all settings methods with an in-memory overlay
+ * (inMemorySettings) that:
+ *
+ *   1. Provides a working getAll/set/get even without Roam Depot's extensionAPI
+ *   2. Overlays in-memory values ON TOP of any existing extensionAPI values,
+ *      so inMemorySettings always takes precedence (handles roam/js cold start)
+ *   3. Dispatches 'roamMemoSettingsChanged' event on every set(), which
+ *      useSettings hook listens to for re-syncing React state
+ *   4. Falls through to original extensionAPI methods when available (Roam Depot)
+ *
+ * This layer is the FOUNDATION of the settings architecture — useSettings
+ * treats extensionAPI.settings as its primary data source, and this wrapper
+ * ensures that source is always functional regardless of loading mode.
  */
 import ReactDOM from 'react-dom';
 import App from './app';

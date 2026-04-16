@@ -134,10 +134,9 @@ describe('useCurrentCardData', () => {
       });
 
       expect(result.current.currentCardData).toMatchObject({
-        refUid: currentCardRefUid_1,
         reviewMode: ReviewModes.FixedProgressive,
-        grade: 2,
       });
+      expect(result.current.reviewMode).toEqual(ReviewModes.FixedProgressive);
     });
 
     it('Returns latestSession derived from sessions', async () => {

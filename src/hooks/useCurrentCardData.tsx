@@ -24,7 +24,6 @@ export default function useCurrentCardData({
 }: {
   currentCardRefUid: string | undefined;
   sessions: Session[];
-  dataPageTitle?: string;
 }) {
   const latestSession = sessions[sessions.length - 1] as Session | undefined;
   const [currentCardData, setCurrentCardData] = React.useState<Session | undefined>(latestSession);
