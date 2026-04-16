@@ -354,6 +354,13 @@ Session Queue (one-time read)
 - **Loop safety fix:** Daily-limit round-robin selection now includes a no-progress guard to prevent potential infinite loops when no additional cards are selectable
 - **Block-interaction stability:** Enter/leave tag diff logic now uses refs to avoid stale callback state in long-lived DOM listeners
 - **Date baseline consistency:** Fixed/Progressive `nextDueDate` calculations now use the same `dateCreated` reference baseline as SM2
+- **Debounce safety:** `debounce()` now calls `func(...args)` directly instead of relying on unstable `this` binding
+- **Naming consistency:** `SidePannelWidget` / `SidePandelWidget` references are normalized to `SidePanelWidget`
+- **History cleanup policy:** Cleanup stays manual for safety/performance; keep-count is now persisted via `historyCleanupKeepCount`
+- **Type-safety cleanup:** Removed all in-repo `@ts-ignore` / `@ts-expect-error` from `src/` by replacing suppressions with explicit component and utility typing
+- **Blueprint integration hardening:** `Tooltip` and `Select` wrappers now use explicit typed adapters (`placement → position`, `Select.ofType<T>()`) instead of unsafe casts
+- **Legacy import typing:** `legacyRoamSr` now imports and types `practice()` correctly, preserving dry-run migration behavior without error suppression
+- **Strict utility guards:** Numeric/date checks now use explicit `Number.isNaN()` / `Date#getTime()` validation, reducing implicit coercion ambiguity
 
 ## Development
 

@@ -27,9 +27,6 @@ export const pluralize = (value: number, singular: string, plural: string) => {
 export const isNumeric = (str) => {
   if (typeof str != 'string') return false;
 
-  return (
-    // @ts-expect-error we expect data to not be number
-    !isNaN(str) &&
-    !isNaN(parseFloat(str))
-  );
+  const numericValue = Number(str);
+  return !Number.isNaN(numericValue) && !Number.isNaN(parseFloat(str));
 };

@@ -19,7 +19,7 @@ interface SidePanelWidgetProps {
   onClickCallback: () => void;
   today: Today;
 }
-const SidePandelWidget = ({ onClickCallback, today }: SidePanelWidgetProps) => {
+const SidePanelWidget = ({ onClickCallback, today }: SidePanelWidgetProps) => {
   const allDoneToday = today.combinedToday.status === CompletionStatus.Finished;
   const combinedCounts = today.combinedToday;
 
@@ -39,7 +39,6 @@ const SidePandelWidget = ({ onClickCallback, today }: SidePanelWidgetProps) => {
       </div>
       <div className="ml-2">
         {combinedCounts.due > 0 && (
-          // @ts-ignore
           <Tooltip content="Due" placement="top">
             <Tag active minimal intent="primary" className="text-center" data-testid="due-tag">
               {combinedCounts.due}
@@ -47,7 +46,6 @@ const SidePandelWidget = ({ onClickCallback, today }: SidePanelWidgetProps) => {
           </Tooltip>
         )}
         {combinedCounts.new > 0 && (
-          // @ts-ignore
           <Tooltip content="New" placement="top">
             <Tag active minimal intent="success" className="text-center ml-2" data-testid="new-tag">
               {combinedCounts.new}
@@ -59,4 +57,4 @@ const SidePandelWidget = ({ onClickCallback, today }: SidePanelWidgetProps) => {
   );
 };
 
-export default SidePandelWidget;
+export default SidePanelWidget;

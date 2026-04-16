@@ -88,6 +88,7 @@ interface Props {
   readReinsertOffset: number;
   fetchPracticeData: () => void;
   dataPageTitle: string;
+  historyCleanupKeepCount: number;
   showBreadcrumbs: boolean;
   showModeBorders: boolean;
 }
@@ -124,6 +125,7 @@ const PracticeOverlay = ({
   readReinsertOffset,
   fetchPracticeData,
   dataPageTitle,
+  historyCleanupKeepCount,
   showBreadcrumbs,
   showModeBorders,
 }: Props) => {
@@ -424,6 +426,7 @@ const PracticeOverlay = ({
     tagsListString: 'memo',
     dataPageTitle: 'roam/memo',
     dailyLimit: 0,
+    historyCleanupKeepCount,
     rtlEnabled: false,
     shuffleCards: false,
     forgotReinsertOffset: 3,
@@ -440,10 +443,13 @@ const PracticeOverlay = ({
         setLocalSettings(savedSettings);
 
         // Sync with extensionAPI so useSettings hook can pick them up
+        const canWriteExtensionSettings =
+          typeof window.roamMemo?.extensionAPI?.settings?.set === 'function';
         if (
           window.roamMemo &&
           window.roamMemo.extensionAPI &&
-          window.roamMemo.extensionAPI.settings
+          window.roamMemo.extensionAPI.settings &&
+          canWriteExtensionSettings
         ) {
           Object.entries(savedSettings).forEach(([key, value]) => {
             window.roamMemo.extensionAPI.settings.set(key, value);
@@ -453,6 +459,10 @@ const PracticeOverlay = ({
     };
     loadSettings();
   }, []);
+
+  React.useEffect(() => {
+    setLocalSettings((prev) => ({ ...prev, historyCleanupKeepCount }));
+  }, [historyCleanupKeepCount]);
 
   // Auto-save settings: debounce 300ms after any localSettings change
   const autoSaveTimerRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -470,7 +480,7 @@ const PracticeOverlay = ({
 
     autoSaveTimerRef.current = setTimeout(async () => {
       await saveSettingsToPage(localSettings.dataPageTitle, localSettings);
-      if (window.roamMemo?.extensionAPI?.settings) {
+      if (typeof window.roamMemo?.extensionAPI?.settings?.set === 'function') {
         Object.entries(localSettings).forEach(([key, value]) => {
           window.roamMemo.extensionAPI.settings.set(key, value);
         });
@@ -748,7 +758,6 @@ const PracticeOverlay = ({
       }}
     >
       <style>{mobileOverlayStyles(isEditing)}</style>
-      {/* @ts-ignore */}
       <Dialog
         $isEditing={isEditing}
         $reviewMode={reviewMode}
@@ -1032,7 +1041,13 @@ const PracticeOverlay = ({
             <MigrateLegacyDataPanel dataPageTitle={dataPageTitle} />
           </div>
 
-          <HistoryCleanupSection dataPageTitle={dataPageTitle} />
+          <HistoryCleanupSection
+            dataPageTitle={dataPageTitle}
+            keepCount={localSettings.historyCleanupKeepCount}
+            onKeepCountChange={(nextKeepCount) =>
+              setLocalSettings((prev) => ({ ...prev, historyCleanupKeepCount: nextKeepCount }))
+            }
+          />
 
           <div style={{ marginBottom: '20px', borderTop: '1px solid #394b59', paddingTop: '15px' }}>
             <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
@@ -1217,8 +1232,7 @@ const HeaderWrapper = styled.div`
 
 const TagSelector = ({ tagsList, selectedTag, onTagChange }) => {
   return (
-    // @ts-ignore
-    <BlueprintSelect.Select
+    <TagSelect
       items={tagsList}
       activeItem={selectedTag}
       filterable={false}
@@ -1244,9 +1258,10 @@ const TagSelector = ({ tagsList, selectedTag, onTagChange }) => {
         minimal
         data-testid="tag-selector-cta"
       />
-    </BlueprintSelect.Select>
+    </TagSelect>
   );
 };
+const TagSelect = BlueprintSelect.Select.ofType<string>();
 
 const TagSelectorItemWrapper = styled.div<{ active: boolean }>`
   display: flex;
@@ -1505,7 +1520,6 @@ const Header = ({
         )}
         {!isDone && (
           <div onClick={toggleBreadcrumbs} className="px-1 cursor-pointer">
-            {/* @ts-ignore */}
             <Tooltip
               content={<BreadcrumbTooltipContent showBreadcrumbs={showBreadcrumbs} />}
               placement="left"
@@ -1554,8 +1568,15 @@ const BATCH_DELAY_MS = 2000;
 const CARD_DELAY_MS = 100;
 const cleanupSleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const HistoryCleanupSection = ({ dataPageTitle }: { dataPageTitle: string }) => {
-  const [keepCount, setKeepCount] = React.useState(3);
+const HistoryCleanupSection = ({
+  dataPageTitle,
+  keepCount,
+  onKeepCountChange,
+}: {
+  dataPageTitle: string;
+  keepCount: number;
+  onKeepCountChange: (nextKeepCount: number) => void;
+}) => {
   const [status, setStatus] = React.useState<'idle' | 'running' | 'done' | 'error'>('idle');
   const [progress, setProgress] = React.useState({ total: 0, cleaned: 0, deleted: 0, phase: '' });
   const [errorDetail, setErrorDetail] = React.useState('');
@@ -1657,7 +1678,8 @@ const HistoryCleanupSection = ({ dataPageTitle }: { dataPageTitle: string }) => 
       <span style={{ fontSize: '14px', fontWeight: 600 }}>Clean Up History Data</span>
       <p style={{ fontSize: '12px', color: colors.textMuted, margin: '5px 0 10px 0' }}>
         Keep only the N most recent date session blocks per card. Older blocks beyond the specified
-        count will be deleted. This action cannot be undone.
+        count will be deleted. This action cannot be undone. Cleanup remains manual by design to
+        avoid automatic heavy writes during normal review sessions.
       </p>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
         <span style={{ fontSize: '12px' }}>Keep count:</span>
@@ -1665,7 +1687,7 @@ const HistoryCleanupSection = ({ dataPageTitle }: { dataPageTitle: string }) => 
           type="number"
           className="bp3-input"
           value={keepCount}
-          onChange={(e) => setKeepCount(Math.max(0, Number(e.target.value)))}
+          onChange={(e) => onKeepCountChange(Math.max(0, Number(e.target.value)))}
           min={0}
           style={{ width: '80px' }}
         />

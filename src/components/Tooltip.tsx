@@ -1,11 +1,15 @@
-import { Tooltip as BluePrintTooltip } from '@blueprintjs/core';
+import * as React from 'react';
+import { Position, Tooltip as BluePrintTooltip } from '@blueprintjs/core';
 import styled from '@emotion/styled';
+
+type TooltipPlacement = 'top' | 'bottom' | 'left' | 'right';
+
 interface Props {
   className?: string;
   wrapperClassName?: string;
-  children: JSX.Element;
+  children: React.ReactElement;
   content: string | JSX.Element;
-  placement: string;
+  placement: TooltipPlacement;
 }
 
 const Wrapper = ({ className, wrapperClassName, ...restProps }: Props) => {
@@ -18,9 +22,24 @@ const Wrapper = ({ className, wrapperClassName, ...restProps }: Props) => {
     return <>{restProps.children}</>;
   }
   
+  const position =
+    restProps.placement === 'top'
+      ? Position.TOP
+      : restProps.placement === 'bottom'
+      ? Position.BOTTOM
+      : restProps.placement === 'left'
+      ? Position.LEFT
+      : Position.RIGHT;
+
   return (
-    // @ts-ignore
-    <BluePrintTooltip className={wrapperClassName} popoverClassName={className} {...restProps} />
+    <BluePrintTooltip
+      className={wrapperClassName}
+      popoverClassName={className}
+      content={restProps.content}
+      position={position}
+    >
+      {restProps.children}
+    </BluePrintTooltip>
   );
 };
 

@@ -1,6 +1,7 @@
 import { CompleteRecords, ReviewModes } from '~/models/session';
 import { generateNewSession } from '~/queries/utils';
 import { getStringBetween, parseRoamDateString } from '~/utils/string';
+import practice, { PracticeProps } from '~/practice';
 
 const oldRoamSrGradeMap = {
   ['r/1']: {
@@ -123,28 +124,23 @@ export const generateRecordsFromRoamSrData = async (
 ) => {
   const mergedRecords = getMergedOldAndExistingRecords(oldReviewRecords, existingPracticeData);
   const results: CompleteRecords = {};
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  for (const [_, resultsArr] of Object.entries(mergedRecords)) {
-    //@ts-ignore
+  for (const resultsArr of Object.values(mergedRecords) as Array<
+    Array<{
+      refUid: string;
+      grade: number;
+      dateCreated: Date;
+      isRoamSrOldPracticeRecord?: boolean;
+    }>
+  >) {
     for (const result of resultsArr) {
       const { refUid, dateCreated, grade, isRoamSrOldPracticeRecord } = result;
 
-      let practiceInputData: {
-        refUid: string;
-        grade: number;
-        dataPageTitle: string;
-        dateCreated: Date;
-        eFactor?: number;
-        repetitions?: number;
-        interval?: number;
-        reviewMode?: ReviewModes;
-        intervalMultiplier?: number;
-        progressiveRepetitions?: number;
-      } = {
+      let practiceInputData: PracticeProps = {
         refUid,
         grade,
         dataPageTitle,
         dateCreated,
+        reviewMode: ReviewModes.FixedProgressive,
         eFactor: undefined,
         repetitions: undefined,
         interval: undefined,
@@ -152,15 +148,23 @@ export const generateRecordsFromRoamSrData = async (
 
       if (results[refUid]) {
         const lastPracticeResult = results[refUid][results[refUid].length - 1];
-        const { eFactor, repetitions, interval } = lastPracticeResult;
-        practiceInputData = { ...practiceInputData, eFactor, repetitions, interval };
+        const { eFactor, repetitions, interval, reviewMode, intervalMultiplier, progressiveRepetitions } =
+          lastPracticeResult;
+        practiceInputData = {
+          ...practiceInputData,
+          eFactor,
+          repetitions,
+          interval,
+          reviewMode,
+          intervalMultiplier,
+          progressiveRepetitions,
+        };
       } else {
-        const newCardData = generateNewSession({ dateCreated });
-        practiceInputData = { ...practiceInputData, ...newCardData };
+        const newCardData = generateNewSession({ isNew: false });
+        practiceInputData = { ...practiceInputData, ...newCardData, dateCreated };
       }
 
       const practiceResult = {
-        // @ts-expect-error
         ...(await practice(practiceInputData, true)),
         grade,
         dateCreated,

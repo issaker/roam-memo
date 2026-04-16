@@ -1,4 +1,4 @@
-import { savePracticeData } from '~/queries';
+import { savePracticeData } from '~/queries/save';
 import * as dateUtils from '~/utils/date';
 import { ReviewModes, isFixedMode, Session } from '~/models/session';
 

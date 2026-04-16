@@ -13,7 +13,7 @@
 import * as React from 'react';
 import * as Blueprint from '@blueprintjs/core';
 import PracticeOverlay from '~/components/overlay/PracticeOverlay';
-import SidePannelWidget from '~/components/SidePanelWidget';
+import SidePanelWidget from '~/components/SidePanelWidget';
 import practice from '~/practice';
 import usePracticeData from '~/hooks/usePracticeData';
 import useTags from '~/hooks/useTags';
@@ -38,6 +38,7 @@ const App = () => {
     tagsListString,
     dataPageTitle,
     dailyLimit,
+    historyCleanupKeepCount,
     rtlEnabled,
     shuffleCards,
     forgotReinsertOffset,
@@ -162,7 +163,7 @@ const App = () => {
   return (
     <Blueprint.HotkeysProvider>
       <>
-        <SidePannelWidget onClickCallback={onShowPracticeOverlay} today={today} />
+        <SidePanelWidget onClickCallback={onShowPracticeOverlay} today={today} />
         {showPracticeOverlay && (
           <PracticeOverlay
             setRenderMode={setRenderMode}
@@ -182,6 +183,7 @@ const App = () => {
             readReinsertOffset={readReinsertOffset}
             fetchPracticeData={fetchPracticeData}
             dataPageTitle={dataPageTitle}
+            historyCleanupKeepCount={historyCleanupKeepCount}
             showBreadcrumbs={showBreadcrumbs}
             showModeBorders={showModeBorders}
           />

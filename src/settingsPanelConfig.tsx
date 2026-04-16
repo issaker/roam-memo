@@ -68,6 +68,24 @@ const settingsPanelConfig = ({ settings, setSettings }) => {
         },
       },
       {
+        id: 'historyCleanupKeepCount',
+        name: 'History Cleanup Keep Count',
+        description:
+          'When running "Clean Up History Data", keep only the N most recent session blocks per card.',
+        action: {
+          type: 'input',
+          placeholder: defaultSettings.historyCleanupKeepCount,
+          onChange: (e) => {
+            const value = e.target.value.trim();
+            const isNumber = !isNaN(Number(value));
+            processChange({
+              key: 'historyCleanupKeepCount',
+              value: isNumber ? Math.max(0, Number(value)) : 3,
+            });
+          },
+        },
+      },
+      {
         id: 'forgotReinsertOffset',
         name: 'Reinsert "Forgot" Cards After N Cards',
         description:

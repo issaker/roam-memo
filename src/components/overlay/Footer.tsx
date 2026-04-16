@@ -1,6 +1,6 @@
 import * as React from 'react';
 import * as Blueprint from '@blueprintjs/core';
-import type { IconName } from '@blueprintjs/core';
+import type { IconName, Intent } from '@blueprintjs/core';
 import * as BlueprintSelect from '@blueprintjs/select';
 import styled from '@emotion/styled';
 import * as asyncUtils from '~/utils/async';
@@ -234,7 +234,6 @@ const Footer = ({
 };
 
 const AnswerHiddenControls = ({ activateButtonFn, showAnswerFn, activeButtonKey }) => (
-  // @ts-ignore
   <ControlButton
     className="text-base font-medium py-1"
     intent="none"
@@ -355,7 +354,6 @@ const GradingControlsWrapper = ({
           intervalEstimates={intervalEstimates}
         />
       )}
-      {/* @ts-ignore */}
       <ReviewModeSelector
         cardMeta={cardMeta}
         onSelectReviewMode={onSelectReviewMode}
@@ -652,7 +650,9 @@ const FooterActionsWrapper = styled.div`
   }
 `;
 
-const ControlButtonWrapper = styled(Blueprint.Button)<{ intent?: string }>`
+const ControlButtonWrapper = styled(Blueprint.Button, {
+  shouldForwardProp: (prop) => prop !== '$intentTone',
+})<{ $intentTone?: string }>`
   && {
     background: ${colors.overlayLight} !important;
     background-color: ${colors.overlayLight} !important;
@@ -660,10 +660,10 @@ const ControlButtonWrapper = styled(Blueprint.Button)<{ intent?: string }>`
     box-shadow: inset 0 0 0 1px ${colors.borderSubtle} !important;
   }
 
-  color: ${(props) => getIntentColor(props.intent)};
+  color: ${(props) => getIntentColor(props.$intentTone)};
 
   & .bp3-button-text {
-    color: ${(props) => getIntentColor(props.intent)};
+    color: ${(props) => getIntentColor(props.$intentTone)};
   }
 
   &&:hover {
@@ -673,11 +673,21 @@ const ControlButtonWrapper = styled(Blueprint.Button)<{ intent?: string }>`
   }
 `;
 
-const ControlButton = ({ tooltipText, wrapperClassName = '', ...props }) => {
+type ControlButtonIntent = Intent | 'default' | 'none';
+
+interface ControlButtonProps extends Omit<Blueprint.IButtonProps, 'intent'> {
+  tooltipText?: string;
+  wrapperClassName?: string;
+  intent?: ControlButtonIntent;
+  children?: React.ReactNode;
+}
+
+const ControlButton = ({ tooltipText, wrapperClassName = '', intent, ...props }: ControlButtonProps) => {
+  const buttonIntent = intent === 'default' || intent === 'none' ? undefined : intent;
+
   return (
-    // @ts-ignore
-    <Tooltip content={tooltipText} placement="top" wrapperClassName={wrapperClassName}>
-      <ControlButtonWrapper {...props} />
+    <Tooltip content={tooltipText || ''} placement="top" wrapperClassName={wrapperClassName}>
+      <ControlButtonWrapper {...props} intent={buttonIntent} $intentTone={intent} />
     </Tooltip>
   );
 };
@@ -699,6 +709,7 @@ const REVIEW_MODE_OPTIONS: ReviewModeOption[] = [
   { reviewMode: ReviewModes.FixedMonths, label: 'Months', icon: 'calendar', group: 'Fixed' },
   { reviewMode: ReviewModes.FixedYears, label: 'Years', icon: 'calendar', group: 'Fixed' },
 ];
+const ReviewModeSelect = BlueprintSelect.Select.ofType<ReviewModeOption>();
 
 const getActiveOption = (cardMeta: import('~/models/session').CardMeta | undefined): ReviewModeOption => {
   const rm = cardMeta?.reviewMode;
@@ -747,8 +758,7 @@ const ReviewModeSelector = ({
   const activeOption = getActiveOption(cardMeta);
 
   return (
-    // @ts-ignore
-    <BlueprintSelect.Select
+    <ReviewModeSelect
       items={REVIEW_MODE_OPTIONS}
       activeItem={activeOption}
       filterable={false}
@@ -782,7 +792,7 @@ const ReviewModeSelector = ({
       >
         {activeOption.label}
       </Blueprint.Button>
-    </BlueprintSelect.Select>
+    </ReviewModeSelect>
   );
 };
 

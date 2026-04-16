@@ -22,6 +22,7 @@ export const saveSettingsToPage = async (dataPageTitle: string, settings: Settin
       tagsListString: settings.tagsListString,
       dataPageTitle: settings.dataPageTitle,
       dailyLimit: settings.dailyLimit.toString(),
+      historyCleanupKeepCount: settings.historyCleanupKeepCount.toString(),
       rtlEnabled: settings.rtlEnabled.toString(),
       shuffleCards: settings.shuffleCards.toString(),
       forgotReinsertOffset: settings.forgotReinsertOffset.toString(),
@@ -121,6 +122,9 @@ export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Setti
               break;
             case 'dailyLimit':
               loadedSettings.dailyLimit = Number(value) || 0;
+              break;
+            case 'historyCleanupKeepCount':
+              loadedSettings.historyCleanupKeepCount = Number(value) || 3;
               break;
             case 'rtlEnabled':
               loadedSettings.rtlEnabled = value === 'true';

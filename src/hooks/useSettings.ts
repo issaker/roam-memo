@@ -15,6 +15,7 @@ export type Settings = {
   tagsListString: string;
   dataPageTitle: string;
   dailyLimit: number;
+  historyCleanupKeepCount: number;
   rtlEnabled: boolean;
   shuffleCards: boolean;
   forgotReinsertOffset: number;
@@ -27,6 +28,7 @@ export const defaultSettings: Settings = {
   tagsListString: 'memo',
   dataPageTitle: 'roam/memo',
   dailyLimit: 0,
+  historyCleanupKeepCount: 3,
   rtlEnabled: false,
   shuffleCards: false,
   forgotReinsertOffset: 3,
@@ -37,6 +39,7 @@ export const defaultSettings: Settings = {
 
 const SETTING_TYPES = {
   dailyLimit: 'number',
+  historyCleanupKeepCount: 'number',
   rtlEnabled: 'boolean',
   shuffleCards: 'boolean',
   forgotReinsertOffset: 'number',
@@ -88,6 +91,12 @@ const useSettings = () => {
     }
     if (!('showModeBorders' in allSettings)) {
       window.roamMemo.extensionAPI.settings.set('showModeBorders', defaultSettings.showModeBorders);
+    }
+    if (!('historyCleanupKeepCount' in allSettings)) {
+      window.roamMemo.extensionAPI.settings.set(
+        'historyCleanupKeepCount',
+        defaultSettings.historyCleanupKeepCount
+      );
     }
 
     const filteredSettings = coerceAllSettings(allSettings);

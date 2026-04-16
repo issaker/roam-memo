@@ -56,5 +56,4 @@ export const isSameDay = (d1: Date, d2: Date) => {
 };
 
 export const isDate = (date: unknown) =>
-  // @ts-expect-error we expect data to not be number
-  date && Object.prototype.toString.call(date) === '[object Date]' && !isNaN(date);
+  date instanceof Date && !Number.isNaN(date.getTime());
