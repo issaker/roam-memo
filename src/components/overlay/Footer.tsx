@@ -7,7 +7,7 @@ import * as asyncUtils from '~/utils/async';
 import { generatePracticeData } from '~/practice';
 import Tooltip from '~/components/Tooltip';
 import ButtonTags from '~/components/ButtonTags';
-import { ReviewModes, isFixedMode, isReadingMode } from '~/models/session';
+import { ReviewModes, isFixedMode, isProgressiveLBLMode } from '~/models/session';
 import { MainContext } from '~/components/overlay/PracticeOverlay';
 import { getIntentColor, colors } from '~/theme';
 
@@ -288,7 +288,7 @@ const GradingControlsWrapper = ({
   const { reviewMode, onSelectReviewMode, cardMeta } = React.useContext(MainContext);
 
   const isFixedModeActive = isFixedMode(reviewMode);
-  const isReadingModeActive = isReadingMode(reviewMode);
+  const isProgressiveLBLActive = isProgressiveLBLMode(reviewMode);
   return (
     <div className="flex items-center flex-wrap justify-evenly gap-3 w-full">
       <button
@@ -333,7 +333,7 @@ const GradingControlsWrapper = ({
       >
         ▶
       </button>
-      {isReadingModeActive ? (
+      {isProgressiveLBLActive ? (
         <ReadingModeControls
           activeButtonKey={activeButtonKey}
           intervalPractice={intervalPractice}

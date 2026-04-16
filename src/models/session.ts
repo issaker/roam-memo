@@ -36,10 +36,10 @@ export const isFixedMode = (mode: ReviewModes | undefined): boolean =>
 export const isSpacedMode = (mode: ReviewModes | undefined): boolean =>
   mode === ReviewModes.SpacedInterval || mode === ReviewModes.SpacedIntervalLBL;
 
-export const isLineByLineMode = (mode: ReviewModes | undefined): boolean =>
+export const isSM2LBLMode = (mode: ReviewModes | undefined): boolean =>
   mode === ReviewModes.SpacedIntervalLBL;
 
-export const isReadingMode = (mode: ReviewModes | undefined): boolean =>
+export const isProgressiveLBLMode = (mode: ReviewModes | undefined): boolean =>
   mode === ReviewModes.FixedProgressiveLBL;
 
 export const DEFAULT_REVIEW_MODE = ReviewModes.FixedProgressive;

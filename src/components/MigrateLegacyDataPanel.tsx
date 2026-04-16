@@ -10,14 +10,19 @@
  * Phase 4: Clean up redundant session-level reviewMode blocks
  */
 import * as React from 'react';
-import { ReviewModes, isLineByLineMode } from '~/models/session';
+import { ReviewModes, isSM2LBLMode } from '~/models/session';
 import { updateCardType } from '~/queries';
 import { getPluginPageData, inferReviewModeFromFields } from '~/queries/data';
 
 const CARD_META_BLOCK_NAME = 'meta';
 const getStringBetween = (string, from, to) =>
   string.substring(string.indexOf(from) + from.length, string.lastIndexOf(to));
-const parseConfigString = (configString) => configString.split('::').map((s) => s.trim());
+const parseConfigString = (configString: string): [string, string] => {
+  const parts = configString.split('::');
+  const key = parts[0].trim();
+  const value = parts.slice(1).join('::').trim();
+  return [key, value];
+};
 
 const BATCH_SIZE = 20;
 const BATCH_DELAY_MS = 2000;
@@ -266,7 +271,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
 
         const resolvedMode = inferReviewModeFromFields(latestSession);
         const isLineByLine =
-          (latestSession as any)?.lineByLineReview === 'Y' || isLineByLineMode(resolvedMode);
+          (latestSession as any)?.lineByLineReview === 'Y' || isSM2LBLMode(resolvedMode);
         const finalMode =
           isLineByLine && resolvedMode === ReviewModes.SpacedInterval
             ? ReviewModes.SpacedIntervalLBL

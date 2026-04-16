@@ -17,7 +17,12 @@ export const parseRoamDateString = (roamDateString: string): Date =>
 export const dateToRoamDateString = (jsDateObject) =>
   window.roamAlphaAPI.util.dateToPageTitle(jsDateObject);
 
-export const parseConfigString = (configString) => configString.split('::').map((s) => s.trim());
+export const parseConfigString = (configString: string): [string, string] => {
+  const parts = configString.split('::');
+  const key = parts[0].trim();
+  const value = parts.slice(1).join('::').trim();
+  return [key, value];
+};
 
 export const pluralize = (value: number, singular: string, plural: string) => {
   if (value === 1) return singular;

@@ -235,7 +235,6 @@ export const generateNewSession = ({
   return {
     dateCreated: dateCreated || new Date(),
     intervalMultiplier: 2,
-    repetitions: 0,
     progressiveRepetitions: 0,
     isNew,
     reviewMode,

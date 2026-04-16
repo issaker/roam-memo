@@ -37,8 +37,8 @@ import {
   ReviewModes,
   Session,
   isFixedMode,
-  isLineByLineMode,
-  isReadingMode,
+  isSM2LBLMode,
+  isProgressiveLBLMode,
   DEFAULT_REVIEW_MODE,
   LineByLineProgressMap,
 } from '~/models/session';
@@ -225,11 +225,11 @@ const PracticeOverlay = ({
   const shouldShowAnswerFirst =
     renderMode === RenderMode.AnswerFirst && hasBlockChildrenUids && !showAnswers;
 
-  const isLineByLine = isLineByLineMode(reviewMode) && hasBlockChildrenUids;
+  const isSM2LBL = isSM2LBLMode(reviewMode) && hasBlockChildrenUids;
 
-  const isReading = isReadingMode(reviewMode) && hasBlockChildrenUids;
+  const isProgressiveLBL = isProgressiveLBLMode(reviewMode) && hasBlockChildrenUids;
 
-  const isLineByLineUI = isLineByLine || isReading;
+  const isLineByLineUI = isSM2LBL || isProgressiveLBL;
 
   const parseLineByLineProgress = (progressStr?: string): LineByLineProgressMap => {
     if (!progressStr) return {};
@@ -272,12 +272,12 @@ const PracticeOverlay = ({
       }
     }
     setLineByLineCurrentChildIndex(firstDueIndex);
-    if (isReading) {
+    if (isProgressiveLBL) {
       setLineByLineRevealedCount(firstDueIndex + 1);
     } else {
       setLineByLineRevealedCount(firstDueIndex);
     }
-  }, [isLineByLineUI, isReading, currentCardRefUid, childUidsList, lineByLineProgress]);
+  }, [isLineByLineUI, isProgressiveLBL, currentCardRefUid, childUidsList, lineByLineProgress]);
 
   const lineByLineIsCardComplete =
     isLineByLineUI && lineByLineCurrentChildIndex >= childUidsList.length;
@@ -288,7 +288,7 @@ const PracticeOverlay = ({
 
       const childUid = childUidsList[lineByLineCurrentChildIndex];
 
-      if (isReading) {
+      if (isProgressiveLBL) {
         const existingData = lineByLineProgress[childUid];
         const progReps = existingData?.progressiveRepetitions || 0;
         const nextInterval = progressiveInterval(progReps);
@@ -409,7 +409,7 @@ const PracticeOverlay = ({
       lineByLineProgress,
       dataPageTitle,
       setCurrentIndex,
-      isReading,
+      isProgressiveLBL,
       currentCardData,
       reviewMode,
       readReinsertOffset,
@@ -497,9 +497,9 @@ const PracticeOverlay = ({
 
   // Reset showAnswers state
   React.useEffect(() => {
-    if (isReading) {
+    if (isProgressiveLBL) {
       setShowAnswers(true);
-    } else if (isLineByLine) {
+    } else if (isSM2LBL) {
       setShowAnswers(false);
     } else if (isFixedMode(reviewMode)) {
       setShowAnswers(true);
@@ -508,7 +508,7 @@ const PracticeOverlay = ({
     } else {
       setShowAnswers(true);
     }
-  }, [hasBlockChildren, hasCloze, isLineByLine, isReading, reviewMode, currentCardRefUid]);
+  }, [hasBlockChildren, hasCloze, isSM2LBL, isProgressiveLBL, reviewMode, currentCardRefUid]);
 
   const onTagChange = async (tag) => {
     setCurrentIndex(0);
@@ -1107,7 +1107,7 @@ const Dialog = styled(Blueprint.Dialog)<{
     ${({ $reviewMode }) =>
       $reviewMode === ReviewModes.SpacedInterval || $reviewMode === ReviewModes.SpacedIntervalLBL
         ? colors.modeSpaced
-        : isFixedMode($reviewMode) || isReadingMode($reviewMode)
+        : isFixedMode($reviewMode) || isProgressiveLBLMode($reviewMode)
         ? colors.modeFixed
         : colors.borderSubtle};
   border-color: ${({ $showModeBorders, $reviewMode }) =>
@@ -1115,7 +1115,7 @@ const Dialog = styled(Blueprint.Dialog)<{
       ? colors.borderSubtle
       : $reviewMode === ReviewModes.SpacedInterval || $reviewMode === ReviewModes.SpacedIntervalLBL
       ? colors.modeSpaced
-      : isFixedMode($reviewMode) || isReadingMode($reviewMode)
+      : isFixedMode($reviewMode) || isProgressiveLBLMode($reviewMode)
       ? colors.modeFixed
       : colors.borderSubtle};
 
@@ -1441,7 +1441,7 @@ const ModeBadge = ({ reviewMode }) => {
       </Blueprint.Tag>
     );
   }
-  if (isReadingMode(reviewMode)) {
+  if (isProgressiveLBLMode(reviewMode)) {
     return (
       <Blueprint.Tag intent="warning" minimal>
         Read
