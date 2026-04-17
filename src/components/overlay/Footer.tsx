@@ -699,11 +699,12 @@ interface ReviewModeOption {
   group: string;
 }
 
+// Mode selector order: Progressive first (default for new cards), then reading modes, spaced modes, fixed intervals
 const REVIEW_MODE_OPTIONS: ReviewModeOption[] = [
-  { reviewMode: ReviewModes.SpacedInterval, label: 'Spaced Interval', icon: 'history', group: 'Spaced' },
-  { reviewMode: ReviewModes.SpacedIntervalLBL, label: 'LBL Spaced', icon: 'list', group: 'Spaced' },
   { reviewMode: ReviewModes.FixedProgressive, label: 'Progressive', icon: 'trending-up', group: 'Fixed' },
   { reviewMode: ReviewModes.FixedProgressiveLBL, label: 'Incremental Read', icon: 'book', group: 'Reading' },
+  { reviewMode: ReviewModes.SpacedInterval, label: 'Spaced Interval', icon: 'history', group: 'Spaced' },
+  { reviewMode: ReviewModes.SpacedIntervalLBL, label: 'LBL Spaced', icon: 'list', group: 'Spaced' },
   { reviewMode: ReviewModes.FixedDays, label: 'Days', icon: 'calendar', group: 'Fixed' },
   { reviewMode: ReviewModes.FixedWeeks, label: 'Weeks', icon: 'calendar', group: 'Fixed' },
   { reviewMode: ReviewModes.FixedMonths, label: 'Months', icon: 'calendar', group: 'Fixed' },
@@ -714,9 +715,9 @@ const ReviewModeSelect = BlueprintSelect.Select.ofType<ReviewModeOption>();
 const getActiveOption = (cardMeta: import('~/models/session').CardMeta | undefined): ReviewModeOption => {
   const rm = cardMeta?.reviewMode;
   if (rm) {
-    return REVIEW_MODE_OPTIONS.find(o => o.reviewMode === rm) || REVIEW_MODE_OPTIONS[2];
+    return REVIEW_MODE_OPTIONS.find(o => o.reviewMode === rm) || REVIEW_MODE_OPTIONS[0];
   }
-  return REVIEW_MODE_OPTIONS[2];
+  return REVIEW_MODE_OPTIONS[0];
 };
 
 const ReviewModeSelectorItemWrapper = styled.div<{ active: boolean }>`

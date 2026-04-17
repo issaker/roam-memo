@@ -171,6 +171,13 @@ A line-by-line reading mode designed for long-form content. Based on the **Incre
 
 Each card's `reviewMode` is stored in the **latest session block** on the Data Page. Changes take effect immediately on card navigation — no session restart required.
 
+**Mode selector order** (bottom-right dropdown):
+1. Progressive — default for new cards
+2. Incremental Read
+3. Spaced Interval
+4. LBL Spaced
+5. Days / Weeks / Months / Years
+
 ### Urgency-Based Due Card Sorting
 
 Due cards are sorted by **memory urgency** using a three-level priority system, ensuring the most at-risk cards are always reviewed first:
