@@ -6,6 +6,10 @@ import {
   Session,
 } from '~/models/session';
 
+/**
+ * SM2 算法实现。
+ * 字段命名遵循 {owner}_{purpose} 规范：sm2_interval, sm2_repetitions, sm2_eFactor, sm2_grade。
+ */
 export const supermemo = (
   item: { sm2_interval: number; sm2_repetitions: number; sm2_eFactor: number },
   sm2_grade: number
@@ -39,6 +43,9 @@ export const supermemo = (
   return { sm2_interval: nextInterval, sm2_repetitions: nextRepetition, sm2_eFactor: nextEfactor };
 };
 
+/**
+ * Progressive 算法间隔曲线：2 → 6 → 12 → 24 → 48 → 96 天
+ */
 export const progressiveInterval = (progressive_repetitions: number): number => {
   if (progressive_repetitions <= 0) return 2;
   if (progressive_repetitions === 1) return 6;
@@ -47,6 +54,16 @@ export const progressiveInterval = (progressive_repetitions: number): number => 
 
 type PracticeDataResult = Session & { nextDueDateFromNow?: string };
 
+/**
+ * 核心调度函数：根据算法和交互模式计算下一次复习数据。
+ *
+ * Mode Independence Principle（模式独立原则）：
+ * 每个算法只操作自己的字段，其他算法的字段原样传递，确保切换算法不丢失数据。
+ * - SM2 路径：计算 sm2_grade, sm2_interval, sm2_repetitions, sm2_eFactor
+ * - Progressive 路径：计算 progressive_repetitions, progressive_interval
+ * - Fixed 路径：计算 fixed_multiplier
+ * - 所有路径：原样传递其他算法的字段 + lbl_progress + algorithm + interaction
+ */
 export const generatePracticeData = ({
   dateCreated,
   algorithm,

@@ -293,6 +293,7 @@ const GradingControlsWrapper = ({
   const { algorithm, interaction, onSelectAlgorithm, onSelectInteraction } = usePracticeSession();
 
   const isFixedModeActive = isFixedMode(algorithm);
+  // LBL + Fixed 算法 = 自动翻页模式（原 Incremental Read），显示 Next 按钮
   const isLblNextActive = isLineByLineUI(interaction) && isFixedMode(algorithm);
   return (
     <div className="flex items-center flex-wrap justify-evenly gap-3 w-full">

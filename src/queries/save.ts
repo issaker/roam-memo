@@ -105,8 +105,12 @@ const upsertLatestSessionField = async ({
 
 /**
  * Save a single practice session result to the data page.
- * All fields (including algorithm, interaction, nextDueDate, lineByLineProgress)
+ * All fields (including algorithm, interaction, nextDueDate, lbl_progress)
  * are written to the session block.
+ *
+ * 同日 Session Block 去重逻辑：
+ * 如果当天已有 session block，则更新其标题（emoji 可能变化）并删除旧子字段后重新写入，
+ * 而不是创建新的日期 block。这避免了同一卡片在同一天产生多个重复的 session block。
  */
 export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...data }) => {
   await getOrCreatePage(dataPageTitle);
@@ -165,6 +169,7 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
 
   for (const key of Object.keys(data)) {
     if (data[key] === undefined) continue;
+    // algorithm 和 interaction 在循环后显式写入，确保它们总是位于 session block 末尾
     if (key === 'algorithm') continue;
     if (key === 'interaction') continue;
 

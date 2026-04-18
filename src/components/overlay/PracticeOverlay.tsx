@@ -197,8 +197,10 @@ const PracticeOverlay = ({
   const shouldShowAnswerFirst =
     renderMode === RenderMode.AnswerFirst && hasBlockChildrenUids && !showAnswers;
 
+  // LBL 模式判断：interaction 为 LBL 且卡片有子 block
   const isLBLReview = isLBLReviewMode(interaction) && hasBlockChildrenUids;
 
+  // LBL 活跃状态（用于传递给 useLineByLineReview）
   const isLineByLineActive = isLBLReview;
 
   const childUidsList = React.useMemo(() => blockInfo.childrenUids || [], [blockInfo.childrenUids]);

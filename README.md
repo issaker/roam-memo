@@ -112,7 +112,6 @@ The header bar displays color-coded badges derived from the card's **Scheduling 
 | Badge | Interaction Style | Description |
 | ----- | ----------------- | ----------- |
 | **LBL** | `LBL` | Line-by-Line review |
-| **Read** | `READ` | Incremental Read |
 
 The dialog border color also dynamically matches the algorithm group color, reinforcing the visual cue across the entire window. Can be toggled via the "Show Review Mode Borders" setting.
 
@@ -143,12 +142,12 @@ Type "Memo: Start Review Session" in the command palette (`Cmd+P` / `Ctrl+P`).
 
 ## Architecture: SchedulingAlgorithm × InteractionStyle
 
-The review system uses a **two-dimensional orthogonal architecture**: each card is configured by independently choosing a **Scheduling Algorithm** (how intervals are calculated) and an **Interaction Style** (how the card is presented during review). These two dimensions are fully independent — any algorithm can pair with any interaction style, producing 18 possible combinations without requiring new enum values.
+The review system uses a **two-dimensional orthogonal architecture**: each card is configured by independently choosing a **Scheduling Algorithm** (how intervals are calculated) and an **Interaction Style** (how the card is presented during review). These two dimensions are fully independent — any algorithm can pair with any interaction style, producing 12 possible combinations without requiring new enum values.
 
 | Dimension | Purpose | Values |
 |-----------|---------|--------|
 | **Scheduling Algorithm** | Controls interval calculation | `SM2`, `PROGRESSIVE`, `FIXED_DAYS`, `FIXED_WEEKS`, `FIXED_MONTHS`, `FIXED_YEARS` |
-| **Interaction Style** | Controls card presentation | `NORMAL`, `LBL`, `READ` |
+| **Interaction Style** | Controls card presentation | `NORMAL`, `LBL` |
 
 All definitions are in `src/models/session.ts`.
 
@@ -157,7 +156,7 @@ All definitions are in `src/models/session.ts`.
 | Algorithm | Group | Label | Description |
 |-----------|-------|-------|-------------|
 | `SM2` | Spaced | SM2 | Modified SuperMemo 2 — adaptive intervals based on grading |
-| `PROGRESSIVE` | Spaced | Progressive | Exponential curve (2→6→12→24→48→96 days) |
+| `PROGRESSIVE` | Fixed | Progressive | Exponential curve (2→6→12→24→48→96 days) |
 | `FIXED_DAYS` | Fixed | Fixed Days | Fixed day interval |
 | `FIXED_WEEKS` | Fixed | Fixed Weeks | Fixed week interval |
 | `FIXED_MONTHS` | Fixed | Fixed Months | Fixed month interval |
@@ -171,7 +170,8 @@ Adding a new algorithm only requires registering it in the enum and `ALGORITHM_M
 |-------|-------|------|-------------|
 | `NORMAL` | Normal | `layers` | Standard card review — show question, reveal answer |
 | `LBL` | Line by Line | `list` | Per-child Q&A with independent scheduling |
-| `READ` | Incremental Read | `book` | Per-child sequential reading with Progressive intervals |
+
+> **Note:** `READ` (Incremental Read) has been removed. Its functionality is now covered by `LBL + Progressive/Fixed` — the algorithm determines whether LBL shows grading buttons (SM2) or a "Next" button (Progressive/Fixed).
 
 ### Algorithm Details
 
@@ -190,7 +190,7 @@ A relaxed approach for content you want to revisit regularly with automatic inte
 
 - Schedule: 2 → 6 → 12 → 24 → 48 → 96 days...
 - Calculation: `progressiveInterval(n)` — standalone exponential curve independent of SM2
-- Fully independent: only modifies `progressiveRepetitions`, never pollutes SM2 fields
+- Fully independent: only modifies `progressive_repetitions`, never pollutes SM2 fields
 
 > **Tip:** New cards default to the Progressive algorithm for a gentler learning experience. Switch to SM2 anytime for more granular control.
 
@@ -202,31 +202,32 @@ Manual fixed intervals for predictable review schedules. The interval multiplier
 
 #### Line by Line (LBL)
 
-Each child block is treated as an independent Q&A item with its own scheduling data.
+Each child block is treated as an independent Q&A item. The behavior depends on the algorithm:
 
+**LBL + SM2** (Memory Training):
 1. The parent block (question) is shown with all children hidden
 2. Click "Show Answer" to reveal one child block at a time in outline order
 3. Grade each child using the standard SM2 buttons (Forgot/Hard/Good/Perfect)
 4. Each child block keeps its own independent SM2 data
 5. Review starts from the top and skips to the first due child
 6. After the last due child is graded, the session advances to the next card
+7. If "Forgot" is clicked, the card is reinserted into the queue N cards later
+
+**LBL + Progressive/Fixed** (Incremental Reading):
+1. The first unread child block is automatically revealed
+2. Click "Next" to advance — the card is reinserted into the queue N cards later
+3. Next time the card appears, the next unread child is shown
+4. After all children are read, the card is marked complete for today
 
 **Visual indicators:** L2/5 tag shows line progress; mastered lines display with reduced opacity; active line has a green left border.
 
-#### Incremental Read (READ)
+#### Incremental Read (removed)
 
-A line-by-line reading mode for long-form content based on **Incremental Reading** methodology.
+The `READ` interaction style has been removed. Its functionality is now covered by `LBL + Progressive/Fixed`. The algorithm determines the LBL behavior:
+- **LBL + SM2**: SM2 grading buttons per child line
+- **LBL + Progressive/Fixed**: "Next" button with automatic reinsertion
 
-| Aspect | LBL | Incremental Read |
-|--------|-----|------------------|
-| Purpose | Memory reinforcement | Reading comprehension |
-| Per session | Review all due children | Read one child, then next card |
-| Grading | SM2 buttons | "Next" button only |
-| Scheduling | SM2 per child | Progressive per child |
-
-**Workflow:** Select Incremental Read → first unread child is revealed → click "Next" → next time the card appears, the next unread child is shown → after all children are read, cycle restarts.
-
-**Reinsertion:** Clicking "Next" reinserts the card into the review queue N cards later (configurable via "Reinsert 'Incremental Read' Cards After N Cards" setting, default: 3). Set to 0 to disable. Reinsertion only happens when there is still another unread or due child line; the last child does not reinsert.
+This simplification eliminates a redundant interaction type that was functionally identical to `LBL + Progressive`.
 
 ### Dynamic Switching
 
@@ -254,6 +255,28 @@ The new approach uses a **one-time data migration** that converts `reviewMode::`
 - **Secures** the data format — the source of truth is always the new fields
 - **Eliminates** the permanent compatibility tax from the codebase
 
+### Why merge READ into LBL?
+
+The `READ` (Incremental Read) interaction style was functionally identical to `LBL + Progressive`. Having a separate interaction type for this combination was confusing because:
+
+- The algorithm already determines the UI behavior (SM2 → grading buttons, Progressive/Fixed → Next button)
+- Users had to understand two separate concepts (interaction + algorithm) when only the algorithm mattered for LBL behavior
+- It created 18 possible combinations (3 interactions × 6 algorithms) when only 12 were meaningful
+
+By removing `READ`, the system is simpler: LBL behavior is determined by the algorithm. This reduces the combination space to 12 (2 interactions × 6 algorithms) with zero semantic loss.
+
+### Why rename fields with the `{owner}_{purpose}` convention?
+
+The old field names (`repetitions`, `interval`, `eFactor`, `grade`) were ambiguous — they didn't indicate which algorithm owned them. This made debugging difficult and increased the risk of cross-algorithm field pollution.
+
+The new naming convention (`sm2_repetitions`, `sm2_interval`, `progressive_repetitions`, etc.) makes field ownership explicit, making it immediately clear which algorithm a field belongs to and reducing the chance of bugs where one algorithm accidentally modifies another's fields.
+
+### Why update same-day session blocks instead of creating new ones?
+
+Previously, `savePracticeData` always created a new session block for each practice invocation. When a card was reinserted (via Forgot or LBL Next) and graded again on the same day, this produced duplicate `[[Date]]` blocks, leading to data bloat and potential snapshot merge errors.
+
+The new behavior checks if a session block for today already exists. If it does, the existing block is updated in-place (title and fields). If not, a new block is created. This ensures each card has at most one session block per day.
+
 ### Why add LBL forgot reinsertion?
 
 Previously, when a user clicked "Forgot" on an LBL child line, the card would simply record the grade and move on. This was inconsistent with how normal cards behave — a "Forgot" normal card is reinserted into the review queue for another attempt within the same session. LBL forgot reinsertion brings LBL cards in line with this behavior, ensuring a consistent review experience across all interaction styles.
@@ -277,6 +300,13 @@ The migration converts your data from the old format to the new format:
 - **Missing reviewMode**: Cards without a mode are inferred from their existing data fields
 - **Meta block merge**: Orphaned meta block fields are merged into the latest session block
 - **`lineByLineReview:: Y` → LBL interaction**: The old LBL flag is converted to the new interaction style
+- **`interaction:: READ` → `interaction:: LBL`**: The removed READ interaction is mapped to LBL
+- **Field renaming**: Old field names are converted to the new `{owner}_{purpose}` naming convention:
+  - `repetitions` → `sm2_repetitions`, `interval` → `sm2_interval`, `eFactor` → `sm2_eFactor`, `grade` → `sm2_grade`
+  - `progressiveRepetitions` → `progressive_repetitions`, `intervalMultiplier` → `progressive_interval` or `fixed_multiplier`
+  - `lineByLineProgress` → `lbl_progress`
+- **Duplicate field cleanup**: Removes duplicate `algorithm::` and `interaction::` blocks within session blocks
+- **Obsolete field deletion**: Removes `intervalMultiplierType::` blocks
 
 The migration is **safe to run multiple times** — already-migrated cards are skipped.
 
@@ -289,8 +319,8 @@ Due cards are sorted by **memory urgency** using a three-level priority system:
 | Priority | Sort Key      | Direction     | Rationale                                                |
 | -------- | ------------- | ------------- | -------------------------------------------------------- |
 | 1st      | `nextDueDate` | Earlier first | More overdue → lower retrieval strength → higher urgency |
-| 2nd      | `eFactor`     | Lower first   | Lower eFactor → faster forgetting rate → higher urgency  |
-| 3rd      | `repetitions` | Fewer first   | Fewer reps → less stable memory → higher urgency         |
+| 2nd      | `sm2_eFactor`     | Lower first   | Lower eFactor → faster forgetting rate → higher urgency  |
+| 3rd      | `sm2_repetitions` | Fewer first   | Fewer reps → less stable memory → higher urgency         |
 
 When `shuffleCards` is enabled, this sort is overridden by random shuffling.
 
@@ -328,13 +358,13 @@ The latest session block is the single source of truth for the card's current st
 │   ├── algorithm:: SM2
 │   ├── interaction:: LBL
 │   ├── nextDueDate:: [[April 15th, 2026]]
-│   ├── lineByLineProgress:: {"childUid": {...}}
-│   ├── grade:: 5
-│   ├── eFactor:: 2.5
-│   ├── repetitions:: 3
-│   ├── interval:: 6
-│   ├── progressiveRepetitions:: 2
-│   └── intervalMultiplier:: 6
+│   ├── lbl_progress:: {"childUid": {...}}
+│   ├── sm2_grade:: 5
+│   ├── sm2_eFactor:: 2.5
+│   ├── sm2_repetitions:: 3
+│   ├── sm2_interval:: 6
+│   ├── progressive_repetitions:: 2
+│   └── progressive_interval:: 6
 └── [[April 13th, 2026]] 🔴    ← Older session
     └── ...
 ```
@@ -344,35 +374,36 @@ The latest session block is the single source of truth for the card's current st
 - `algorithm` and `interaction` are the primary fields for scheduling configuration
 - `nextDueDate` is stored in each session block alongside algorithm-specific fields
 - Each algorithm only modifies its OWN fields; all other fields are inherited unchanged from the previous session
+- Field naming follows the `{owner}_{purpose}` convention: `sm2_*`, `progressive_*`, `fixed_*`, `lbl_*`
 
 ### Algorithm Independence & Full Field Inheritance
 
 | Algorithm | Calculated Fields | Inherited Fields (unchanged) |
 |-----------|-------------------|------------------------------|
-| SM2 | `grade`, `interval`, `repetitions`, `eFactor` | `progressiveRepetitions`, `intervalMultiplier` |
-| Progressive | `progressiveRepetitions`, `intervalMultiplier` | `interval`, `repetitions`, `eFactor` |
-| Fixed Days/Weeks/Months/Years | `intervalMultiplier` | `interval`, `repetitions`, `eFactor`, `progressiveRepetitions` |
+| SM2 | `sm2_grade`, `sm2_interval`, `sm2_repetitions`, `sm2_eFactor` | `progressive_repetitions`, `progressive_interval`, `fixed_multiplier` |
+| Progressive | `progressive_repetitions`, `progressive_interval` | `sm2_interval`, `sm2_repetitions`, `sm2_eFactor`, `fixed_multiplier` |
+| Fixed Days/Weeks/Months/Years | `fixed_multiplier` | `sm2_interval`, `sm2_repetitions`, `sm2_eFactor`, `progressive_repetitions`, `progressive_interval` |
 
 Switching algorithms never loses data — each algorithm preserves all fields from other algorithms.
 
-### lineByLineProgress Data Format
+### lbl_progress Data Format
 
-The `lineByLineProgress` field stores per-child scheduling data as JSON:
+The `lbl_progress` field stores per-child scheduling data as JSON:
 
 ```json
 {
   "childUid1": {
     "nextDueDate": "2026-04-16T00:00:00.000Z",
-    "interval": 2,
-    "repetitions": 1,
-    "eFactor": 2.5,
-    "progressiveRepetitions": 1
+    "sm2_interval": 2,
+    "sm2_repetitions": 1,
+    "sm2_eFactor": 2.5,
+    "progressive_repetitions": 1
   }
 }
 ```
 
-- **LBL interaction** uses SM2 fields (`interval`, `repetitions`, `eFactor`) per child
-- **Incremental Read interaction** uses `progressiveRepetitions` per child
+- **LBL + SM2** uses SM2 fields (`sm2_interval`, `sm2_repetitions`, `sm2_eFactor`) per child
+- **LBL + Progressive/Fixed** uses `progressive_repetitions` per child
 
 ### Full Data Page Structure
 
@@ -384,8 +415,8 @@ roam/memo (page)
 │   │   │   ├── algorithm:: SM2
 │   │   │   ├── interaction:: NORMAL
 │   │   │   ├── nextDueDate:: [[Date]]
-│   │   │   ├── grade:: 5
-│   │   │   └── eFactor:: 2.5
+│   │   │   ├── sm2_grade:: 5
+│   │   │   └── sm2_eFactor:: 2.5
 │   │   └── [[Date]] 🔴
 │   │       └── ...
 │   └── ((cardUid2))
@@ -438,12 +469,11 @@ src/
 │   ├── cache.ts           # Per-tag cache
 │   ├── settings.ts        # Settings page persistence
 │   ├── utils.ts           # Roam API query helpers
-│   └── legacyRoamSr.ts    # Roam-SR data migration
 ├── hooks/
 │   ├── useSettings.ts     # Settings single-source-of-truth
 │   ├── usePracticeData.tsx # Practice data fetching with ref-based caching
 │   ├── useCurrentCardData.tsx # Active card data with latest-session resolution
-│   ├── useLineByLineReview.ts # LBL & Incremental Read interaction logic
+│   ├── useLineByLineReview.ts # LBL interaction logic (behavior determined by algorithm)
 │   ├── useBlockInfo.tsx   # Block content + breadcrumbs
 │   ├── useCloze.tsx       # Cloze deletion ({text} masking)
 │   ├── useCachedData.ts   # Per-tag cache management

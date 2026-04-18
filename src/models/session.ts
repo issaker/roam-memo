@@ -84,6 +84,11 @@ export enum SchedulingAlgorithm {
   FIXED_YEARS = 'FIXED_YEARS',
 }
 
+/**
+ * 交互模式枚举。
+ * 仅 NORMAL 和 LBL 两种：LBL 的具体行为由算法决定（SM2→打分，Fixed→Next 翻页）。
+ * 已移除 READ（Incremental Read），因为 READ 本质上就是 LBL + Progressive，功能重复。
+ */
 export enum InteractionStyle {
   NORMAL = 'NORMAL',
   LBL = 'LBL',
@@ -149,6 +154,10 @@ export const isLBLReviewMode = (interaction?: InteractionStyle): boolean =>
 export const isLineByLineUI = (interaction?: InteractionStyle): boolean =>
   interaction === InteractionStyle.LBL;
 
+/**
+ * 解析算法和交互配置。无效值回退到默认（SM2 + NORMAL）。
+ * 不再做 READ→LBL 的运行时兼容映射，由 Data Migration 负责数据转换。
+ */
 export const resolveReviewConfig = (
   rawAlgorithm?: string,
   rawInteraction?: string

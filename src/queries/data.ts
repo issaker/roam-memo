@@ -129,6 +129,18 @@ export const getSelectedTagPageBlocksIds = async (selectedTag): Promise<string[]
   return filteredChildren.map((arr) => arr.uid);
 };
 
+/**
+ * Session 快照合并键列表。
+ * 字段命名遵循 {owner}_{purpose} 规范：
+ * - sm2_*: SM2 算法专属字段
+ * - progressive_*: Progressive 算法专属字段
+ * - fixed_*: Fixed 间隔算法专属字段
+ * - lbl_*: LBL 交互模式专属字段
+ * - 无前缀: 通用/配置字段
+ *
+ * 已移除的废弃字段：intervalMultiplierType（幽灵字段，无实际用途）
+ * 已移除的旧字段名兼容映射：由 Data Migration 负责转换，运行时不再兼容
+ */
 const SESSION_SNAPSHOT_KEYS = [
   'algorithm',
   'interaction',

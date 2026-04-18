@@ -1,9 +1,24 @@
+/**
+ * LBL (Line by Line) 逐行复习 Hook。
+ *
+ * LBL 的行为完全由算法决定：
+ * - LBL + SM2: 每行子 block 用 SM2 打分（Forgot/Hard/Good/Perfect），Forgot 触发插队
+ * - LBL + Progressive/Fixed: 每行子 block 只显示 Next 按钮，点击后插队 N 张再读下一行
+ *
+ * 关键修复：
+ * - sessionOverrides 必须同时包含 algorithm 和 interaction，否则插队后卡片模式丢失
+ * - isLblNext 由 isFixedAlgorithm(algorithm) 判断，不再依赖 InteractionStyle.READ
+ */
 import * as React from 'react';
 import { LineByLineProgressMap, SchedulingAlgorithm, InteractionStyle, isFixedAlgorithm } from '~/models/session';
 import { updateLineByLineProgress } from '~/queries';
 import { progressiveInterval, supermemo } from '~/practice';
 import * as dateUtils from '~/utils/date';
 
+/**
+ * 判断 LBL + Fixed 算法下是否应插队。
+ * 条件：readReinsertOffset > 0 且当前子 block 不是最后一个（最后一个无需插队）。
+ */
 export const shouldReinsertReadCard = ({
   currentChildIndex,
   totalChildren,
@@ -69,6 +84,8 @@ export default function useLineByLineReview({
   setCardQueue,
   lineByLineProgressStr,
 }: UseLineByLineReviewInput): UseLineByLineReviewOutput {
+  // LBL + Fixed 算法（Progressive/Fixed_*）= 自动翻页模式（原 Incremental Read 行为）
+  // LBL + SM2 = 打分模式
   const isLblNext = isFixedAlgorithm(algorithm);
   const lineByLineProgress = React.useMemo(
     () => parseLineByLineProgress(lineByLineProgressStr),
