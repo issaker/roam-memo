@@ -38,6 +38,7 @@ export type Session = {
   progressive_interval?: number;
   fixed_multiplier?: number;
   lbl_progress?: string;
+  baseSessionData?: Session;
 } & SessionCommon;
 
 export interface CardMeta {

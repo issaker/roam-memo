@@ -109,6 +109,18 @@ const PracticeOverlay = ({
   const [currentIndex, setCurrentIndex] = React.useState(0);
   const [sessionOverrides, setSessionOverrides] = React.useState<Record<string, Session>>({});
 
+  const baseSessionDataMap = React.useRef<Record<string, Session>>({});
+
+  React.useEffect(() => {
+    const map: Record<string, Session> = {};
+    for (const [uid, session] of Object.entries(practiceData)) {
+      if ((session as Session).baseSessionData) {
+        map[uid] = (session as Session).baseSessionData!;
+      }
+    }
+    baseSessionDataMap.current = map;
+  }, [practiceData]);
+
   const isFirst = currentIndex === 0;
 
   const currentCardRefUid = cardQueue[currentIndex] as string | undefined;
@@ -180,6 +192,14 @@ const PracticeOverlay = ({
   const [showAnswers, setShowAnswers] = React.useState(false);
   const [hasCloze, setHasCloze] = React.useState(true);
   const [showSettings, setShowSettings] = React.useState(false);
+  const [showOverwriteReminder, setShowOverwriteReminder] = React.useState(false);
+
+  React.useEffect(() => {
+    if (showOverwriteReminder) {
+      const timer = setTimeout(() => setShowOverwriteReminder(false), 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [showOverwriteReminder]);
 
   // Reset hasCloze on card change to prevent stale state from previous card
   React.useEffect(() => {
@@ -282,13 +302,23 @@ const PracticeOverlay = ({
         return;
       }
 
+      const baseData = currentCardRefUid && baseSessionDataMap.current[currentCardRefUid]
+        ? { ...generateNewSession(), ...baseSessionDataMap.current[currentCardRefUid] }
+        : (currentCardRefUid ? practiceData[currentCardRefUid] : currentCardData) || currentCardData;
+
       const practiceProps = {
-        ...currentCardData,
+        ...baseData,
         ...gradeData,
         fixed_multiplier: intervalMultiplier,
         algorithm,
         interaction,
       };
+
+      const isReScoring = currentCardData?.dateCreated
+        && dateUtils.isSameDay(currentCardData.dateCreated, new Date());
+      if (isReScoring) {
+        setShowOverwriteReminder(true);
+      }
 
       if (!isCramming && currentCardRefUid) {
         const now = new Date();
@@ -300,7 +330,7 @@ const PracticeOverlay = ({
         setSessionOverrides((prev) => ({
           ...prev,
           [currentCardRefUid]: {
-            ...currentCardData,
+            ...baseData,
             ...optimisticSession,
             dateCreated: now,
           },
@@ -327,6 +357,7 @@ const PracticeOverlay = ({
     [
       handlePracticeClick,
       isDone,
+      practiceData,
       currentCardData,
       algorithm,
       interaction,
@@ -656,6 +687,9 @@ const PracticeOverlay = ({
             </div>
           )}
         </DialogBody>
+        {showOverwriteReminder && (
+          <OverwriteReminder>今日已评分，此次打分将覆盖今日数据</OverwriteReminder>
+        )}
         <Footer
           refUid={currentCardRefUid}
           onPracticeClick={onPracticeClick}
@@ -787,6 +821,28 @@ const mobileOverlayStyles = () => `
 const DialogBody = styled.div`
   overflow-x: hidden; // because of tweaks we do in ContentWrapper container overflows
   min-height: 200px;
+`;
+
+const OverwriteReminder = styled.div`
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0, 0, 0, 0.75);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  z-index: 100;
+  animation: fadeInOut 2.5s ease-in-out;
+  pointer-events: none;
+
+  @keyframes fadeInOut {
+    0% { opacity: 0; }
+    15% { opacity: 1; }
+    75% { opacity: 1; }
+    100% { opacity: 0; }
+  }
 `;
 
 export default PracticeOverlay;

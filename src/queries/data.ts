@@ -35,6 +35,7 @@
  */
 import { getStringBetween, parseConfigString, parseRoamDateString } from '~/utils/string';
 import * as stringUtils from '~/utils/string';
+import * as dateUtils from '~/utils/date';
 import {
   Records,
   RecordUid,
@@ -277,6 +278,30 @@ const parseLatestSession = (sessionChildren, uid) => {
   const config = resolveReviewConfig(rawRecord.algorithm, rawRecord.interaction);
   rawRecord.algorithm = config.algorithm;
   rawRecord.interaction = config.interaction;
+
+  const now = new Date();
+  if (dateUtils.isSameDay(rawRecord.dateCreated, now) && sortedSessionChildren.length > 1) {
+    for (let i = 1; i < sortedSessionChildren.length; i++) {
+      const prevChild = sortedSessionChildren[i];
+      if (!prevChild?.string) continue;
+      const prevDateStr = getStringBetween(prevChild.string, '[[', ']]');
+      const prevDate = parseRoamDateString(prevDateStr);
+      if (prevDate && !dateUtils.isSameDay(prevDate, now)) {
+        const prevRecord: Record<string, any> = {
+          refUid: uid,
+          dateCreated: prevDate,
+        };
+        if (prevChild.children) {
+          parseFieldValuesFromChildren(prevRecord, prevChild.children);
+        }
+        const prevConfig = resolveReviewConfig(prevRecord.algorithm, prevRecord.interaction);
+        prevRecord.algorithm = prevConfig.algorithm;
+        prevRecord.interaction = prevConfig.interaction;
+        rawRecord.baseSessionData = prevRecord;
+        break;
+      }
+    }
+  }
 
   return rawRecord;
 };
