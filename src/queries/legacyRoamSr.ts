@@ -1,4 +1,4 @@
-import { CompleteRecords, ReviewModes } from '~/models/session';
+import { CompleteRecords, SchedulingAlgorithm, InteractionStyle } from '~/models/session';
 import { generateNewSession } from '~/queries/utils';
 import { getStringBetween, parseRoamDateString } from '~/utils/string';
 import practice, { PracticeProps } from '~/practice';
@@ -140,7 +140,8 @@ export const generateRecordsFromRoamSrData = async (
         grade,
         dataPageTitle,
         dateCreated,
-        reviewMode: ReviewModes.FixedProgressive,
+        algorithm: SchedulingAlgorithm.PROGRESSIVE,
+        interaction: InteractionStyle.NORMAL,
         eFactor: undefined,
         repetitions: undefined,
         interval: undefined,
@@ -148,14 +149,14 @@ export const generateRecordsFromRoamSrData = async (
 
       if (results[refUid]) {
         const lastPracticeResult = results[refUid][results[refUid].length - 1];
-        const { eFactor, repetitions, interval, reviewMode, intervalMultiplier, progressiveRepetitions } =
+        const { eFactor, repetitions, interval, algorithm, intervalMultiplier, progressiveRepetitions } =
           lastPracticeResult;
         practiceInputData = {
           ...practiceInputData,
           eFactor,
           repetitions,
           interval,
-          reviewMode,
+          algorithm,
           intervalMultiplier,
           progressiveRepetitions,
         };

@@ -10,7 +10,13 @@
  * - createChildBlock: Creates a child block under a parent
  * - generateNewSession: Creates default session data for new cards
  */
-import { NewSession, ReviewModes, isSpacedMode, DEFAULT_REVIEW_MODE } from '~/models/session';
+import {
+  NewSession,
+  SchedulingAlgorithm,
+  InteractionStyle,
+  isSpacedAlgorithm,
+  isSpacedMode,
+} from '~/models/session';
 
 export const parentChainInfoQuery = `[
   :find (pull ?parentIds [
@@ -217,26 +223,40 @@ export const getOrCreateChildBlock = async (parent_uid, block, order, blockProps
 };
 
 export const generateNewSession = ({
-  reviewMode = DEFAULT_REVIEW_MODE,
+  algorithm,
+  interaction,
   dateCreated = undefined,
   isNew = true,
+}: {
+  algorithm?: SchedulingAlgorithm;
+  interaction?: InteractionStyle;
+  dateCreated?: Date;
+  isNew?: boolean;
 } = {}): NewSession => {
-  if (isSpacedMode(reviewMode)) {
+  const effectiveAlgorithm = algorithm ?? SchedulingAlgorithm.SM2;
+  const effectiveInteraction = interaction ?? InteractionStyle.NORMAL;
+  const isSpaced = isSpacedAlgorithm(effectiveAlgorithm);
+
+  const baseSession: Omit<NewSession, 'isNew'> = {
+    dateCreated: dateCreated || new Date(),
+    algorithm: effectiveAlgorithm,
+    interaction: effectiveInteraction,
+  };
+
+  if (isSpaced) {
     return {
-      dateCreated: dateCreated || new Date(),
+      ...baseSession,
       eFactor: 2.5,
       interval: 0,
       repetitions: 0,
       isNew,
-      reviewMode,
     };
   }
 
   return {
-    dateCreated: dateCreated || new Date(),
+    ...baseSession,
     intervalMultiplier: 2,
     progressiveRepetitions: 0,
     isNew,
-    reviewMode,
   };
 };

@@ -4,6 +4,26 @@ A spaced repetition plugin for [Roam Research](https://roamresearch.com), using 
 
 ![Demo Preview](https://user-images.githubusercontent.com/1279335/189250105-656e6ba3-7703-46e6-bc71-ee8c5f3e39ab.gif)
 
+## Table of Contents
+
+- [What is Spaced Repetition](#what-is-spaced-repetition)
+- [Installation](#installation)
+- [Getting Started](#getting-started)
+- [Features](#features)
+- [Architecture: SchedulingAlgorithm × InteractionStyle](#architecture-schedulingalgorithm--interactionstyle)
+  - [Scheduling Algorithms](#scheduling-algorithms)
+  - [Interaction Styles](#interaction-styles)
+  - [Algorithm Details](#algorithm-details)
+  - [Interaction Style Details](#interaction-style-details)
+  - [Dynamic Switching](#dynamic-switching)
+- [Design Decisions](#design-decisions)
+- [Data Migration](#data-migration)
+- [Urgency-Based Due Card Sorting](#urgency-based-due-card-sorting)
+- [Settings Architecture](#settings-architecture)
+- [Data Architecture](#data-architecture)
+- [Development](#development)
+- [Bug Reports & Feature Requests](#bug-reports--feature-requests)
+
 ## What is Spaced Repetition
 
 Spaced repetition reviews information based on how well you remember it, focusing more on difficult cards and less on easy ones. This is one of the most effective methods for long-term memorization.
@@ -69,15 +89,23 @@ Show the block's page hierarchy as breadcrumbs for context. Toggle with `b` key.
 
 ### Mode Indicator Badge
 
-The header bar displays a color-coded mode badge to the left of the status tags (New / Past Due / etc.), providing instant visual identification of the current card's review mode:
+The header bar displays color-coded badges derived from the card's **Scheduling Algorithm** and **Interaction Style**, providing instant visual identification of the current review configuration.
 
-| Mode Badge | Review Mode           | Color  | Aligned With           |
-| ---------- | --------------------- | ------ | ---------------------- |
-| **Spaced** | Spaced Interval Mode  | Green  | Same as "New" tag      |
-| **Fixed**  | Fixed Interval Mode   | Orange | Same as "Past Due" tag |
-| **Read**   | Incremental Read Mode | Orange | Same as "Past Due" tag |
+**Algorithm badge** (left of status tags):
 
-The dialog border color also dynamically matches the mode badge color, reinforcing the visual cue across the entire window. Can be toggled via the "Show Review Mode Borders" setting.
+| Badge | Group | Algorithms | Color |
+| ----- | ----- | ---------- | ----- |
+| **Spaced** | Spaced | `SM2`, `PROGRESSIVE` | Green |
+| **Fixed** | Fixed | `FIXED_DAYS/WEEKS/MONTHS/YEARS` | Orange |
+
+**Interaction badge** (shown when not Normal):
+
+| Badge | Interaction Style | Description |
+| ----- | ----------------- | ----------- |
+| **LBL** | `LBL` | Line-by-Line review |
+| **Read** | `READ` | Incremental Read |
+
+The dialog border color also dynamically matches the algorithm group color, reinforcing the visual cue across the entire window. Can be toggled via the "Show Review Mode Borders" setting.
 
 ### Keyboard Shortcuts
 
@@ -104,83 +132,150 @@ Type "Memo: Start Review Session" in the command palette (`Cmd+P` / `Ctrl+P`).
 - Memo does not send practice/session payloads to any external server.
 - The legacy Roam-SR remote bulk import path has been removed to protect user privacy.
 
-## Review Modes
+## Architecture: SchedulingAlgorithm × InteractionStyle
 
-### Spaced Interval Mode (Memory Training)
+The review system uses a **two-dimensional orthogonal architecture**: each card is configured by independently choosing a **Scheduling Algorithm** (how intervals are calculated) and an **Interaction Style** (how the card is presented during review). These two dimensions are fully independent — any algorithm can pair with any interaction style, producing 18 possible combinations without requiring new enum values.
+
+| Dimension | Purpose | Values |
+|-----------|---------|--------|
+| **Scheduling Algorithm** | Controls interval calculation | `SM2`, `PROGRESSIVE`, `FIXED_DAYS`, `FIXED_WEEKS`, `FIXED_MONTHS`, `FIXED_YEARS` |
+| **Interaction Style** | Controls card presentation | `NORMAL`, `LBL`, `READ` |
+
+All definitions are in `src/models/session.ts`.
+
+### Scheduling Algorithms
+
+| Algorithm | Group | Label | Description |
+|-----------|-------|-------|-------------|
+| `SM2` | Spaced | SM2 | Modified SuperMemo 2 — adaptive intervals based on grading |
+| `PROGRESSIVE` | Spaced | Progressive | Exponential curve (2→6→12→24→48→96 days) |
+| `FIXED_DAYS` | Fixed | Fixed Days | Fixed day interval |
+| `FIXED_WEEKS` | Fixed | Fixed Weeks | Fixed week interval |
+| `FIXED_MONTHS` | Fixed | Fixed Months | Fixed month interval |
+| `FIXED_YEARS` | Fixed | Fixed Years | Fixed year interval |
+
+Adding a new algorithm only requires registering it in the enum and `ALGORITHM_META`.
+
+### Interaction Styles
+
+| Style | Label | Icon | Description |
+|-------|-------|------|-------------|
+| `NORMAL` | Normal | `layers` | Standard card review — show question, reveal answer |
+| `LBL` | Line by Line | `list` | Per-child Q&A with independent scheduling |
+| `READ` | Incremental Read | `book` | Per-child sequential reading with Progressive intervals |
+
+### Algorithm Details
+
+#### SM2 Algorithm (Memory Training)
 
 Uses a **modified SM2 algorithm** to optimize long-term memory retention with grading: Forgot / Hard / Good / Perfect.
-
-**Algorithm:**
 
 - **Interval Calculation**: `interval × eFactor × (grade/5)` — grade-based adjustment (Grade 3 → 60%, Grade 4 → 80%, Grade 5 → 100%)
 - **E-Factor Update**: Always updated. Lower grades → more frequent reviews. Minimum eFactor = 1.3.
 - **Reset Behavior**: Grade 0 → review again today (interval=0); Grades 1-2 → review tomorrow (interval=1)
-- **Grade Mapping**: Forgot(0), Hard(2), Good(4), Perfect(5) — grades 1 and 3 are skipped for simplicity
+- **Grade Mapping**: Forgot(0), Hard(2), Good(4), Perfect(5)
 
-### Fixed Interval Mode (Progressive Review)
+#### Progressive Algorithm (Progressive Review)
 
-A relaxed approach for content you want to revisit regularly. Includes **Progressive Mode** with automatic interval growth:
+A relaxed approach for content you want to revisit regularly with automatic interval growth:
 
-- Review schedule: 2 → 6 → 12 → 24 → 48 → 96 days...
-- Calculation: `progressiveInterval(n)` — a standalone exponential curve independent of SM2:
-  - n=0 → 2 days, n=1 → 6 days (hardcoded on-ramps)
-  - n≥2 → `6 × 2^(n-1)` days (exponential growth from 6-day base)
-- Progressive mode is fully independent: its only parameter is `progressiveRepetitions`, which it increments on each review. It does NOT modify SM2 fields (`repetitions`, `interval`, `eFactor`), preventing cross-mode data pollution
-- Also supports manual intervals: Days, Weeks, Months, Years
+- Schedule: 2 → 6 → 12 → 24 → 48 → 96 days...
+- Calculation: `progressiveInterval(n)` — standalone exponential curve independent of SM2
+- Fully independent: only modifies `progressiveRepetitions`, never pollutes SM2 fields
 
-> **Tip:** New cards default to Progressive mode for a gentler learning experience. Switch to Spaced Interval mode anytime for more granular control.
+> **Tip:** New cards default to the Progressive algorithm for a gentler learning experience. Switch to SM2 anytime for more granular control.
 
-### Incremental Read Mode (Progressive Reading)
+#### Fixed Interval Algorithms (Days / Weeks / Months / Years)
 
-A line-by-line reading mode designed for long-form content. Based on the **Incremental Reading** methodology, it breaks reading into digestible chunks with spaced intervals between sections.
+Manual fixed intervals for predictable review schedules. The interval multiplier is configurable per card via the interval editor (`E` key).
 
-**How it differs from LBL Review:**
+### Interaction Style Details
 
-| Aspect          | LBL Review (SPACED_INTERVAL_LBL)       | Incremental Read (FIXED_PROGRESSIVE_LBL) |
-| --------------- | -------------------------------------- | ---------------------------------------- |
-| Purpose         | Memory reinforcement                   | Reading comprehension                    |
-| Per session     | Review all due children                | Read one child, then next card           |
-| Grading         | SM2 buttons (Forgot/Hard/Good/Perfect) | "Next" button only                       |
-| Scheduling      | SM2 per child                          | Progressive per child                    |
-| Next appearance | When any child is due                  | When next child is due                   |
+#### Line by Line (LBL)
 
-**Per-child Progressive intervals:**
+Each child block is treated as an independent Q&A item with its own scheduling data.
 
-- Each child block gets its own independent Progressive interval counter
-- Schedule: 2 → 6 → 12 → 24 → 48 → 96 days per child
-- A 20-child article: all children start at 2-day intervals, not just the first few
-- The card's `nextDueDate` is set to the earliest child due date
+1. The parent block (question) is shown with all children hidden
+2. Click "Show Answer" to reveal one child block at a time in outline order
+3. Grade each child using the standard SM2 buttons (Forgot/Hard/Good/Perfect)
+4. Each child block keeps its own independent SM2 data
+5. Review starts from the top and skips to the first due child
+6. After the last due child is graded, the session advances to the next card
 
-**Workflow:**
+**Visual indicators:** L2/5 tag shows line progress; mastered lines display with reduced opacity; active line has a green left border.
 
-1. Select "Incremental Read" from the mode selector (📖 icon)
-2. The first unread child block is revealed
-3. Click "Next" to mark it as read and advance to the next card
-4. Next time the card appears, the next unread child is shown
-5. After all children are read, the cycle restarts from the beginning
+#### Incremental Read (READ)
 
-**Reinsertion:** When you click "Next" on an Incremental Read card, the card is automatically reinserted into the review queue N cards later (configurable via "Reinsert 'Incremental Read' Cards After N Cards" setting, default: 3). Set to 0 to disable reinsertion.
+A line-by-line reading mode for long-form content based on **Incremental Reading** methodology.
 
-**Queue progression rules:**
+| Aspect | LBL | Incremental Read |
+|--------|-----|------------------|
+| Purpose | Memory reinforcement | Reading comprehension |
+| Per session | Review all due children | Read one child, then next card |
+| Grading | SM2 buttons | "Next" button only |
+| Scheduling | SM2 per child | Progressive per child |
 
-- Reinsertion only happens when there is still another unread or due child line to continue later in the same review session
-- If the current child is already the last child block, clicking "Next" advances normally and does **not** reinsert the card into the current session queue
-- Reinserted cards now resume from the correct next child line inside the same session instead of replaying stale line progress from the session start snapshot
+**Workflow:** Select Incremental Read → first unread child is revealed → click "Next" → next time the card appears, the next unread child is shown → after all children are read, cycle restarts.
 
-### Dynamic Review Mode Switching
+**Reinsertion:** Clicking "Next" reinserts the card into the review queue N cards later (configurable via "Reinsert 'Incremental Read' Cards After N Cards" setting, default: 3). Set to 0 to disable. Reinsertion only happens when there is still another unread or due child line; the last child does not reinsert.
 
-Each card's `reviewMode` is stored in the **latest session block** on the Data Page. Changes take effect immediately on card navigation — no session restart required.
+### Dynamic Switching
 
-**Mode selector order** (bottom-right dropdown):
-1. Progressive — default for new cards
-2. Incremental Read
-3. Spaced Interval
-4. LBL Spaced
-5. Days / Weeks / Months / Years
+Each card's `algorithm` and `interaction` are stored in the **latest session block**. Changes take effect immediately on card navigation — no session restart required. Two independent selectors (bottom-right of the grading area) replace the old single `reviewMode` dropdown.
 
-### Urgency-Based Due Card Sorting
+## Design Decisions
 
-Due cards are sorted by **memory urgency** using a three-level priority system, ensuring the most at-risk cards are always reviewed first:
+### Why migrate from 8 ReviewModes to Algorithm × Interaction?
+
+The original architecture used a combined `ReviewModes` enum with 8 values, where each value encoded both scheduling and interaction behavior (e.g., `SPACED_INTERVAL_LBL` = SM2 + LBL). This design had fundamental limitations:
+
+- **Not orthogonal**: Adding a new algorithm or interaction required defining N new enum values (one per combination)
+- **Not extensible**: Combinations like PROGRESSIVE + LBL or FIXED_DAYS + READ were impossible without new enum entries
+- **Coupled concerns**: Scheduling logic and presentation logic were mixed in a single dimension
+
+The new two-dimensional design (`SchedulingAlgorithm` × `InteractionStyle`) separates these concerns completely. Adding a new algorithm or interaction is independent — they combine automatically.
+
+### Why remove runtime backward compatibility in favor of data migration?
+
+The old system maintained runtime compatibility by reading `reviewMode::` fields and decomposing them into `{ algorithm, interaction }` on every card load. This added complexity to the data loading path and created a permanent compatibility layer that could never be removed.
+
+The new approach uses a **one-time data migration** that converts `reviewMode::` fields to `algorithm::` + `interaction::` at the data level. This:
+
+- **Simplifies** the data loading pipeline — no legacy resolution needed
+- **Secures** the data format — the source of truth is always the new fields
+- **Eliminates** the permanent compatibility tax from the codebase
+
+### Why add LBL forgot reinsertion?
+
+Previously, when a user clicked "Forgot" on an LBL child line, the card would simply record the grade and move on. This was inconsistent with how normal cards behave — a "Forgot" normal card is reinserted into the review queue for another attempt within the same session. LBL forgot reinsertion brings LBL cards in line with this behavior, ensuring a consistent review experience across all interaction styles.
+
+## Data Migration
+
+After upgrading to the new `SchedulingAlgorithm × InteractionStyle` architecture, you should run the Data Migration tool once to convert your existing data.
+
+### How to migrate
+
+1. Open the Memo overlay and click the gear icon to access **Settings**
+2. Navigate to the **Data Migration** section
+3. Click the migration button to start
+
+### What the migration does
+
+The migration converts your data from the old format to the new format:
+
+- **`reviewMode::` → `algorithm::` + `interaction::`**: Each old `reviewMode` value (e.g., `SPACED_INTERVAL_LBL`) is decomposed into its constituent parts (`algorithm:: SM2` + `interaction:: LBL`)
+- **`cardType::` → `reviewMode::`**: Very old `cardType` fields are renamed first
+- **Missing reviewMode**: Cards without a mode are inferred from their existing data fields
+- **Meta block merge**: Orphaned meta block fields are merged into the latest session block
+- **`lineByLineReview:: Y` → LBL interaction**: The old LBL flag is converted to the new interaction style
+
+The migration is **safe to run multiple times** — already-migrated cards are skipped.
+
+> **Important:** Run the migration once after upgrading. All new card data will use the `algorithm::` + `interaction::` format automatically.
+
+## Urgency-Based Due Card Sorting
+
+Due cards are sorted by **memory urgency** using a three-level priority system:
 
 | Priority | Sort Key      | Direction     | Rationale                                                |
 | -------- | ------------- | ------------- | -------------------------------------------------------- |
@@ -188,103 +283,39 @@ Due cards are sorted by **memory urgency** using a three-level priority system, 
 | 2nd      | `eFactor`     | Lower first   | Lower eFactor → faster forgetting rate → higher urgency  |
 | 3rd      | `repetitions` | Fewer first   | Fewer reps → less stable memory → higher urgency         |
 
-**Example:** A card 5 days overdue with eFactor 1.3 and 1 repetition will appear before a card 1 day overdue with eFactor 2.5 and 5 repetitions — because it has the highest risk of being forgotten.
-
 When `shuffleCards` is enabled, this sort is overridden by random shuffling.
-
-### Line-by-Line Review
-
-A specialized card-level review mode for cards with multiple child blocks (outline structure). When enabled, each child block is treated as an independent Q&A item with its own spaced repetition schedule.
-
-**How it works:**
-
-1. Mark a card as line-by-line via the **LBL** checkbox in the header (only visible when a card has child blocks)
-2. The `LBL` switch belongs to the current card itself, not to a global session flag
-3. On review, the parent block (question) is shown with all children hidden
-4. Click "Show Answer" to reveal one child block at a time in outline order
-5. After each child is revealed, grade it using the standard SM2 buttons (Forgot/Hard/Good/Perfect)
-6. Each child block keeps its own independent SM2 data
-7. Every time the card appears, review starts from the top and skips directly to the first child that is still due
-8. After the last due child is graded, the session automatically advances to the next card
-9. The line-by-line interaction only activates in `Spaced Interval Mode`; in `Fixed Interval Mode` the same card remains a fully expanded reading card
-
-**Memory state tracking:**
-
-- Children with `nextDueDate` in the future are considered mastered — shown directly, no "Show Answer" needed
-- Children with no review history or past-due `nextDueDate` require active review
-- The card's main `nextDueDate` is set to the earliest child due date, ensuring the card appears as "due" when any child needs review
-- `lineByLineProgress` and the line-by-line parent `nextDueDate` are stored in the latest session block
-
-**Visual indicators:**
-
-- **LBL checkbox** in the header toggles line-by-line mode for the current card
-- **L2/5** tag shows current line progress (current line / total lines)
-- Mastered lines display with reduced opacity and a subtle left border
-- The current active line has a green left border highlight
 
 ## Settings Architecture
 
 Settings use a **single-source-of-truth** design with `extensionAPI.settings` as the primary store and the Roam data page as a persistent backup.
 
-### Storage Layers
-
 | Layer | Role | Persistence | When Written |
 |-------|------|-------------|-------------|
 | `extensionAPI.settings` | **Primary** | Roam Depot: persistent · roam/js: in-memory | Immediately on every change |
-| `inMemorySettings` (extension.tsx) | Compatibility overlay | Memory only (roam/js) | Overlaid on every `set()` |
 | Roam data page (`roam/memo`) | **Backup** | Persistent (blocks) | Debounced 5s after last change |
 
-### Data Flow
+**Key design decisions:**
 
-```
-Startup (roam/js cold start):
-  Page blocks → loadSettingsFromPage() → extensionAPI.settings → React state
+1. **extensionAPI first**: Every setting change writes to `extensionAPI.settings` before anything else
+2. **Page as backup, not source**: The data page is only read at startup when `extensionAPI.settings` is empty (roam/js cold start)
+3. **5-second debounced page sync**: Coalesces rapid changes into a single write, reducing Roam sync indicator load
+4. **Unmount flush**: Pending debounced syncs are flushed immediately when the overlay closes
 
-Startup (warm start / Roam Depot):
-  extensionAPI.settings → React state (page is NOT read)
-
-Setting change (any source):
-  updateSetting() → extensionAPI.settings (immediate)
-                  → React state (immediate)
-                  → schedulePageSync() → saveSettingsToPage() (5s debounce)
-
-Cross-component sync:
-  extensionAPI.settings.set() → 'roamMemoSettingsChanged' event → useSettings re-reads
-```
-
-### Key Design Decisions
-
-1. **extensionAPI first**: Every setting change writes to `extensionAPI.settings` before anything else. This ensures the primary store is always current, even if the page write fails.
-
-2. **Page as backup, not source**: The Roam data page is only read at startup when `extensionAPI.settings` is empty (roam/js cold start after page reload). It is never used to overwrite newer in-memory values.
-
-3. **5-second debounced page sync**: Page writes are expensive (~20 block operations per sync). Debouncing coalesces rapid changes (e.g. typing in a text field) into a single write, significantly reducing "pending remote changes" in Roam's sync indicator.
-
-4. **No direct page writes from UI**: Components use `updateSetting()` (passed via props from `useSettings`), never call `saveSettingsToPage()` or `extensionAPI.settings.set()` directly.
-
-5. **Unmount flush**: If the user closes the overlay while a debounced page sync is pending, the sync is flushed immediately to prevent data loss.
-
-### Settings in roam/js Mode
-
-When loaded via `{{[[roam/js]]}}`, the plugin wraps `extensionAPI.settings` with an in-memory overlay (see `extension.tsx`). This overlay:
-
-- Provides working `getAll/set/get` methods even without Roam Depot's extensionAPI
-- Dispatches `roamMemoSettingsChanged` events on every `set()` for cross-component sync
-- Falls through to the original extensionAPI methods when available (Roam Depot mode)
-- Is memory-only: settings are lost on page reload, which is why the data page backup exists
+In **roam/js mode**, an in-memory overlay wraps `extensionAPI.settings` to provide working `getAll/set/get` methods. Settings are lost on page reload, which is why the data page backup exists.
 
 ## Data Architecture
 
 All practice data is stored on a Roam page (default: `roam/memo`). Each card's data follows a **unified session-block architecture** — all fields are stored in session records, with no separate meta block.
 
-### Unified Session Block Layout
+### Session Block Layout
 
-All fields (reviewMode, nextDueDate, lineByLineProgress, grade, eFactor, etc.) are stored uniformly in session blocks. The latest session block is the single source of truth for the card's current state:
+The latest session block is the single source of truth for the card's current state:
 
 ```
 ((cardUid))
 ├── [[April 14th, 2026]] 🟢    ← Latest session (SINGLE SOURCE OF TRUTH)
-│   ├── reviewMode:: FIXED_PROGRESSIVE
+│   ├── algorithm:: SM2
+│   ├── interaction:: LBL
 │   ├── nextDueDate:: [[April 15th, 2026]]
 │   ├── lineByLineProgress:: {"childUid": {...}}
 │   ├── grade:: 5
@@ -299,27 +330,23 @@ All fields (reviewMode, nextDueDate, lineByLineProgress, grade, eFactor, etc.) a
 
 **Key principles:**
 
-- `reviewMode` and `nextDueDate` are stored in each session block alongside algorithm-specific fields
-- `lineByLineReview` has been removed — LBL functionality is encoded directly in the `reviewMode` value (e.g. `SPACED_INTERVAL_LBL`, `FIXED_PROGRESSIVE_LBL`)
-- Each mode only modifies its OWN fields; all other fields are inherited unchanged from the previous session (see Mode Independence below)
+- `algorithm` and `interaction` are the primary fields for scheduling configuration
+- `nextDueDate` is stored in each session block alongside algorithm-specific fields
+- Each algorithm only modifies its OWN fields; all other fields are inherited unchanged from the previous session
 
-### Mode Independence & Full Field Inheritance
+### Algorithm Independence & Full Field Inheritance
 
-Each review mode only calculates and updates its own data fields. When saving, all fields from the previous session are fully inherited, ensuring that switching modes never loses data from any mode.
+| Algorithm | Calculated Fields | Inherited Fields (unchanged) |
+|-----------|-------------------|------------------------------|
+| SM2 | `grade`, `interval`, `repetitions`, `eFactor` | `progressiveRepetitions`, `intervalMultiplier` |
+| Progressive | `progressiveRepetitions`, `intervalMultiplier` | `interval`, `repetitions`, `eFactor` |
+| Fixed Days/Weeks/Months/Years | `intervalMultiplier` | `interval`, `repetitions`, `eFactor`, `progressiveRepetitions` |
 
-| Mode                          | Calculated Fields                              | Inherited Fields (unchanged)                                   |
-| ----------------------------- | ---------------------------------------------- | -------------------------------------------------------------- |
-| SM2 (Spaced Interval)         | `grade`, `interval`, `repetitions`, `eFactor`  | `progressiveRepetitions`, `intervalMultiplier`                 |
-| Progressive                   | `progressiveRepetitions`, `intervalMultiplier` | `interval`, `repetitions`, `eFactor`                           |
-| Fixed Days/Weeks/Months/Years | `intervalMultiplier`                           | `interval`, `repetitions`, `eFactor`, `progressiveRepetitions` |
-
-**Example:** If a card has SM2 data (`interval=11, repetitions=3, eFactor=2.26`) and the user switches to Progressive mode, the Progressive session inherits those SM2 fields unchanged. When switching back to SM2, the algorithm uses the preserved SM2 values — Progressive mode never pollutes them.
-
-**Backward compatibility:** Older sparse session histories are now normalized on read. The data layer reconstructs a complete latest-session snapshot by carrying forward the newest known value for each mode-owned state field, so querying the latest session block remains sufficient even for pre-fix data.
+Switching algorithms never loses data — each algorithm preserves all fields from other algorithms.
 
 ### lineByLineProgress Data Format
 
-The `lineByLineProgress` field in the latest session block stores per-child scheduling data as JSON:
+The `lineByLineProgress` field stores per-child scheduling data as JSON:
 
 ```json
 {
@@ -329,20 +356,12 @@ The `lineByLineProgress` field in the latest session block stores per-child sche
     "repetitions": 1,
     "eFactor": 2.5,
     "progressiveRepetitions": 1
-  },
-  "childUid2": {
-    "nextDueDate": "2026-04-20T00:00:00.000Z",
-    "interval": 6,
-    "repetitions": 2,
-    "eFactor": 2.5,
-    "progressiveRepetitions": 2
   }
 }
 ```
 
-- **LBL Review mode** uses SM2 fields (`interval`, `repetitions`, `eFactor`) per child
-- **Incremental Read mode** uses `progressiveRepetitions` per child for Progressive scheduling
-- Both modes share the same data structure; `progressiveRepetitions` is optional and only used by Read mode
+- **LBL interaction** uses SM2 fields (`interval`, `repetitions`, `eFactor`) per child
+- **Incremental Read interaction** uses `progressiveRepetitions` per child
 
 ### Full Data Page Structure
 
@@ -351,9 +370,9 @@ roam/memo (page)
 ├── data (heading block)
 │   ├── ((cardUid1))
 │   │   ├── [[Date]] 🟢
-│   │   │   ├── reviewMode:: SPACED_INTERVAL
+│   │   │   ├── algorithm:: SM2
+│   │   │   ├── interaction:: NORMAL
 │   │   │   ├── nextDueDate:: [[Date]]
-│   │   │   ├── lineByLineProgress:: {"childUid": {...}}
 │   │   │   ├── grade:: 5
 │   │   │   └── eFactor:: 2.5
 │   │   └── [[Date]] 🔴
@@ -368,38 +387,6 @@ roam/memo (page)
     ├── tagsListString:: memo
     └── ...
 ```
-
-## Data Migration
-
-The Data Migration tool (accessible via Settings → Data Migration) performs four tasks:
-
-1. **cardType → reviewMode**: Renames legacy `cardType::` to `reviewMode::` in meta blocks
-2. **Missing reviewMode**: Infers and writes `reviewMode` for cards without one
-3. **Meta block merge**: Moves `reviewMode`, `nextDueDate`, `lineByLineProgress` from the meta block into the latest session block, then deletes the meta block
-4. **lineByLineReview → LBL reviewMode**: Converts `lineByLineReview:: Y` to the corresponding LBL reviewMode (e.g. `SPACED_INTERVAL` → `SPACED_INTERVAL_LBL`)
-
-Safe to run multiple times — already-migrated cards are skipped.
-
-## Real-Time Data Synchronization
-
-The `useCurrentCardData` hook reads card data from the session queue and derives the current reviewMode from the latest session:
-
-```
-Session Queue (one-time read)
-        │
-        ▼
-  Card queue + sessions[]
-  (captured at session start)
-        │
-        ▼
-  latestSession → cardMeta → reviewMode (displayed in UI)
-```
-
-**Data resolution:** The card queue and full session history are read once when the review session starts. The latest session record is the single source of truth for `reviewMode`, `nextDueDate`, and `lineByLineProgress`.
-
-**Optimistic updates:** When the user toggles reviewMode in the UI, `applyOptimisticCardMeta` provides instant feedback before the data is persisted.
-
-**Fallback:** When cardMeta is not yet loaded, reviewMode falls back to the session queue's reviewMode, then to DEFAULT_REVIEW_MODE.
 
 ## Development
 
@@ -422,26 +409,6 @@ npm run test         # Run tests
 
 Roam Research loads the plugin via `<script>` tag. The UMD wrapper needs proper default export handling. Removing this causes `Uncaught SyntaxError: Unexpected token 'export'` and the plugin fails silently.
 
-```javascript
-output: {
-  library: {
-    name: 'RoamMemo',
-    type: 'umd',
-    export: 'default',  // ⚠️ MUST NOT be removed
-  },
-}
-```
-
-### roam/js Loading
-
-This plugin is loaded via `{{[[roam/js]]}}` as described in the Installation section above.
-
-**roam/js Limitations:**
-
-- Settings are persisted to the `roam/memo` page (not Roam Depot's settings panel)
-- Uses `window.roamAlphaAPI` instead of full `extensionAPI`
-- Settings dialog is accessible via gear icon in the practice overlay
-
 ### Project Structure
 
 ```
@@ -451,43 +418,51 @@ src/
 ├── practice.ts            # SM2 algorithm + Fixed Interval algorithm
 ├── constants.ts           # Shared constants
 ├── models/
-│   ├── session.ts         # Session & CardMeta data models, review mode definitions
+│   ├── session.ts         # Session & CardMeta models, SchedulingAlgorithm, InteractionStyle, ALGORITHM_META, INTERACTION_META
 │   └── practice.ts        # Today's review status model
 ├── queries/
-│   ├── data.ts            # Core data layer (read practice data from Roam page)
-│   ├── today.ts           # Today's review calculation (due/new/completed)
+│   ├── data.ts            # Core data layer
+│   ├── today.ts           # Today's review calculation
 │   ├── save.ts            # Write practice data to Roam session blocks
-│   ├── cache.ts           # Per-tag cache (renderMode, etc.)
-│   ├── settings.ts        # Settings page persistence (low-level, called by useSettings only)
+│   ├── cache.ts           # Per-tag cache
+│   ├── settings.ts        # Settings page persistence
 │   ├── utils.ts           # Roam API query helpers
 │   └── legacyRoamSr.ts    # Roam-SR data migration
 ├── hooks/
-│   ├── useSettings.ts     # Settings single-source-of-truth (extensionAPI primary, page backup)
+│   ├── useSettings.ts     # Settings single-source-of-truth
 │   ├── usePracticeData.tsx # Practice data fetching with ref-based caching
 │   ├── useCurrentCardData.tsx # Active card data with latest-session resolution
+│   ├── useLineByLineReview.ts # LBL & Incremental Read interaction logic
 │   ├── useBlockInfo.tsx   # Block content + breadcrumbs
 │   ├── useCloze.tsx       # Cloze deletion ({text} masking)
 │   ├── useCachedData.ts   # Per-tag cache management
 │   ├── useTags.tsx        # Tag list parsing with quoted-tag support
 │   └── ...                # Other UI interaction hooks
+├── contexts/
+│   └── PracticeSessionContext.tsx # Session-level state
 ├── components/
 │   ├── overlay/
 │   │   ├── PracticeOverlay.tsx  # Main review overlay
+│   │   ├── Header.tsx           # Header with algorithm/interaction badges
 │   │   ├── CardBlock.tsx        # Card rendering with answer toggle
-│   │   └── Footer.tsx           # Grading controls + navigation
+│   │   ├── Footer.tsx           # Grading controls + algorithm & interaction selectors
+│   │   ├── LineByLineView.tsx   # Line-by-line child block rendering
+│   │   ├── SettingsDialog.tsx   # Settings dialog with HistoryCleanup integration
+│   │   └── HistoryCleanup.tsx   # History data cleanup UI
+│   ├── SettingsForm.tsx         # Settings form component
 │   ├── SidePanelWidget.tsx      # Sidebar review button + stats
 │   ├── ButtonTags.tsx           # Deck selector buttons
 │   ├── MigrateLegacyDataPanel.tsx # Data migration tool
 │   └── ...                      # Other UI components
 ├── utils/
-│   ├── date.ts            # Date operations (addDays, customFromNow)
-│   ├── string.ts          # String parsing (Roam date format, config strings)
-│   ├── dom.ts             # DOM simulation (mouse click events)
+│   ├── date.ts            # Date operations
+│   ├── string.ts          # String parsing
+│   ├── dom.ts             # DOM simulation
 │   ├── async.ts           # Sleep + debounce
 │   ├── mediaQueries.ts    # Responsive breakpoints
 │   ├── zIndexFix.ts       # CSS z-index fix injection
-│   └── testUtils.ts       # Test helpers (MockDataBuilder, mock API)
-└── theme.ts               # Theme color definitions (intent colors, mode indicators)
+│   └── testUtils.ts       # Test helpers
+└── theme.ts               # Theme color definitions
 ```
 
 ## Bug Reports & Feature Requests

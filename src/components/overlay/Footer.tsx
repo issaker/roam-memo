@@ -7,12 +7,13 @@ import * as asyncUtils from '~/utils/async';
 import { generatePracticeData } from '~/practice';
 import Tooltip from '~/components/Tooltip';
 import ButtonTags from '~/components/ButtonTags';
-import { ReviewModes, isFixedMode, isIncrementalReadMode } from '~/models/session';
+import { isFixedMode, isIncrementalReadMode, SchedulingAlgorithm, InteractionStyle, ALGORITHM_META, INTERACTION_META } from '~/models/session';
 import { MainContext } from '~/components/overlay/PracticeOverlay';
+import { usePracticeSession } from '~/contexts/PracticeSessionContext';
 import { getIntentColor, colors } from '~/theme';
 
 interface IntervalEstimate {
-  reviewMode: string;
+  algorithm: SchedulingAlgorithm;
   grade: number;
   repetitions: number;
   interval: number;
@@ -40,7 +41,8 @@ const Footer = ({
   currentCardData,
   onStartCrammingClick,
 }) => {
-  const { reviewMode, intervalMultiplier } = React.useContext(MainContext);
+  const { intervalMultiplier } = React.useContext(MainContext);
+  const { algorithm: algorithmFromSession, interaction: interactionFromSession } = usePracticeSession();
 
   const [isIntervalEditorOpen, setIsIntervalEditorOpen] = React.useState(false);
 
@@ -107,7 +109,7 @@ const Footer = ({
           if (!showAnswers) {
             activateButtonFn('space-button', showAnswerFn);
           } else {
-            if (isFixedMode(reviewMode)) {
+            if (isFixedMode(algorithmFromSession)) {
               intervalPractice();
             } else {
               gradeFn(5);
@@ -138,46 +140,46 @@ const Footer = ({
         global: true,
         label: 'Grade 0',
         onKeyDown: () => gradeFn(0),
-        disabled: isFixedMode(reviewMode),
+        disabled: isFixedMode(algorithmFromSession),
       },
       {
         combo: 'H',
         global: true,
         label: 'Grade 2',
         onKeyDown: () => gradeFn(2),
-        disabled: isFixedMode(reviewMode),
+        disabled: isFixedMode(algorithmFromSession),
       },
       {
         combo: 'G',
         global: true,
         label: 'Grade 4',
         onKeyDown: () => gradeFn(4),
-        disabled: !isFixedMode(reviewMode),
+        disabled: !isFixedMode(algorithmFromSession),
       },
       {
         combo: 'E',
         global: true,
         label: 'Edit Interval',
         onKeyDown: toggleIntervalEditorOpen,
-        disabled: !isFixedMode(reviewMode),
+        disabled: !isFixedMode(algorithmFromSession),
       },
     ],
-    [skipFn, onPrevClick, reviewMode, showAnswers, showAnswerFn, intervalPractice, gradeFn]
+    [skipFn, onPrevClick, showAnswers, showAnswerFn, intervalPractice, gradeFn]
   );
   const { handleKeyDown, handleKeyUp } = Blueprint.useHotkeys(hotkeys);
 
   const intervalEstimates: IntervalEstimates = React.useMemo(() => {
     if (!currentCardData) return;
 
-    if (!reviewMode) {
-      console.error('Review mode not set');
+    if (!algorithmFromSession) {
+      console.error('Algorithm not set');
       return;
     }
     const grades = [0, 1, 2, 3, 4, 5];
     const { interval, repetitions, eFactor, progressiveRepetitions } = currentCardData;
     const estimates = {};
 
-    const iterateCount = isFixedMode(reviewMode) ? 1 : grades.length;
+    const iterateCount = isFixedMode(algorithmFromSession) ? 1 : grades.length;
     for (let i = 0; i < iterateCount; i++) {
       const grade = grades[i];
       const practiceResultData = generatePracticeData({
@@ -186,14 +188,15 @@ const Footer = ({
         repetitions,
         eFactor,
         dateCreated: new Date(),
-        reviewMode,
+        algorithm: algorithmFromSession,
+        interaction: interactionFromSession || InteractionStyle.NORMAL,
         intervalMultiplier,
         progressiveRepetitions,
       });
       estimates[grade] = practiceResultData;
     }
     return estimates;
-  }, [currentCardData, intervalMultiplier, reviewMode]);
+  }, [currentCardData, intervalMultiplier, algorithmFromSession]);
 
   return (
     <FooterWrapper
@@ -285,10 +288,11 @@ const GradingControlsWrapper = ({
   toggleIntervalEditorOpen,
   onPrevClick,
 }) => {
-  const { reviewMode, onSelectReviewMode, cardMeta } = React.useContext(MainContext);
+  const { cardMeta } = React.useContext(MainContext);
+  const { algorithm, interaction, onSelectAlgorithm, onSelectInteraction } = usePracticeSession();
 
-  const isFixedModeActive = isFixedMode(reviewMode);
-  const isIncrementalReadActive = isIncrementalReadMode(reviewMode);
+  const isFixedModeActive = isFixedMode(algorithm);
+  const isIncrementalReadActive = isIncrementalReadMode(interaction);
   return (
     <div className="flex items-center flex-wrap justify-evenly gap-3 w-full">
       <button
@@ -354,9 +358,13 @@ const GradingControlsWrapper = ({
           intervalEstimates={intervalEstimates}
         />
       )}
-      <ReviewModeSelector
-        cardMeta={cardMeta}
-        onSelectReviewMode={onSelectReviewMode}
+      <AlgorithmSelector
+        algorithm={algorithm}
+        onSelectAlgorithm={onSelectAlgorithm || (() => {})}
+      />
+      <InteractionSelector
+        interaction={interaction}
+        onSelectInteraction={onSelectInteraction || (() => {})}
       />
     </div>
   );
@@ -379,7 +387,6 @@ const IncrementalReadControls = ({
   intervalPractice: () => void;
   intervalEstimates: IntervalEstimates;
 }): JSX.Element => {
-  const { reviewMode } = React.useContext(MainContext);
   if (!intervalEstimates) {
     console.error('Interval estimates not set');
     return <></>;
@@ -446,8 +453,8 @@ const FixedIntervalEditor = () => {
   );
 };
 
-const IntervalString = ({ reviewMode, intervalMultiplier, nextDueDateFromNow }) => {
-  if (reviewMode === ReviewModes.FixedProgressive) {
+const IntervalString = ({ algorithm, intervalMultiplier, nextDueDateFromNow }) => {
+  if (algorithm === SchedulingAlgorithm.PROGRESSIVE) {
     const displayText = nextDueDateFromNow || 'Progressive';
     return (
       <>
@@ -458,14 +465,14 @@ const IntervalString = ({ reviewMode, intervalMultiplier, nextDueDateFromNow }) 
 
   let singularString = '';
   if (intervalMultiplier === 1) {
-    switch (reviewMode) {
-      case ReviewModes.FixedWeeks:
+    switch (algorithm) {
+      case SchedulingAlgorithm.FIXED_WEEKS:
         singularString += 'Weekly';
         break;
-      case ReviewModes.FixedMonths:
+      case SchedulingAlgorithm.FIXED_MONTHS:
         singularString += 'Monthly';
         break;
-      case ReviewModes.FixedYears:
+      case SchedulingAlgorithm.FIXED_YEARS:
         singularString += 'Yearly';
         break;
       default:
@@ -475,10 +482,10 @@ const IntervalString = ({ reviewMode, intervalMultiplier, nextDueDateFromNow }) 
   }
 
   const unitLabel = (() => {
-    switch (reviewMode) {
-      case ReviewModes.FixedWeeks: return 'Weeks';
-      case ReviewModes.FixedMonths: return 'Months';
-      case ReviewModes.FixedYears: return 'Years';
+    switch (algorithm) {
+      case SchedulingAlgorithm.FIXED_WEEKS: return 'Weeks';
+      case SchedulingAlgorithm.FIXED_MONTHS: return 'Months';
+      case SchedulingAlgorithm.FIXED_YEARS: return 'Years';
       default: return 'Days';
     }
   })();
@@ -512,7 +519,8 @@ const FixedIntervalModeControls = ({
   toggleIntervalEditorOpen: () => void;
   intervalEstimates: IntervalEstimates;
 }): JSX.Element => {
-  const { intervalMultiplier, reviewMode } = React.useContext(MainContext);
+  const { intervalMultiplier } = React.useContext(MainContext);
+  const { algorithm } = usePracticeSession();
   const onInteractionhandler = (nextState) => {
     if (!nextState && isIntervalEditorOpen) toggleIntervalEditorOpen();
   };
@@ -535,7 +543,7 @@ const FixedIntervalModeControls = ({
         >
           <span className="ml-2">
             <IntervalString
-              reviewMode={reviewMode}
+              algorithm={algorithm}
               intervalMultiplier={intervalMultiplier}
               nextDueDateFromNow={intervalEstimates[0]?.nextDueDateFromNow}
             />
@@ -692,35 +700,32 @@ const ControlButton = ({ tooltipText, wrapperClassName = '', intent, ...props }:
   );
 };
 
-interface ReviewModeOption {
-  reviewMode: ReviewModes;
+interface AlgorithmOption {
+  value: SchedulingAlgorithm;
   label: string;
-  icon: IconName;
-  group: string;
 }
 
-// Mode selector order: Progressive first (default for new cards), then reading modes, spaced modes, fixed intervals
-const REVIEW_MODE_OPTIONS: ReviewModeOption[] = [
-  { reviewMode: ReviewModes.FixedProgressive, label: 'Progressive', icon: 'trending-up', group: 'Fixed' },
-  { reviewMode: ReviewModes.FixedProgressiveLBL, label: 'Incremental Read', icon: 'book', group: 'Reading' },
-  { reviewMode: ReviewModes.SpacedInterval, label: 'Spaced Interval', icon: 'history', group: 'Spaced' },
-  { reviewMode: ReviewModes.SpacedIntervalLBL, label: 'LBL Spaced', icon: 'list', group: 'Spaced' },
-  { reviewMode: ReviewModes.FixedDays, label: 'Days', icon: 'calendar', group: 'Fixed' },
-  { reviewMode: ReviewModes.FixedWeeks, label: 'Weeks', icon: 'calendar', group: 'Fixed' },
-  { reviewMode: ReviewModes.FixedMonths, label: 'Months', icon: 'calendar', group: 'Fixed' },
-  { reviewMode: ReviewModes.FixedYears, label: 'Years', icon: 'calendar', group: 'Fixed' },
-];
-const ReviewModeSelect = BlueprintSelect.Select.ofType<ReviewModeOption>();
+interface InteractionOption {
+  value: InteractionStyle;
+  label: string;
+  icon: IconName;
+}
 
-const getActiveOption = (cardMeta: import('~/models/session').CardMeta | undefined): ReviewModeOption => {
-  const rm = cardMeta?.reviewMode;
-  if (rm) {
-    return REVIEW_MODE_OPTIONS.find(o => o.reviewMode === rm) || REVIEW_MODE_OPTIONS[0];
-  }
-  return REVIEW_MODE_OPTIONS[0];
-};
+const ALGORITHM_OPTIONS: AlgorithmOption[] = Object.values(SchedulingAlgorithm).map((algo) => ({
+  value: algo,
+  label: ALGORITHM_META[algo].label,
+}));
 
-const ReviewModeSelectorItemWrapper = styled.div<{ active: boolean }>`
+const INTERACTION_OPTIONS: InteractionOption[] = Object.values(InteractionStyle).map((style) => ({
+  value: style,
+  label: INTERACTION_META[style].label,
+  icon: (INTERACTION_META[style].icon as IconName) || 'layers',
+}));
+
+const AlgorithmSelect = BlueprintSelect.Select.ofType<AlgorithmOption>();
+const InteractionSelect = BlueprintSelect.Select.ofType<InteractionOption>();
+
+const SelectorItemWrapper = styled.div<{ active: boolean }>`
   display: flex;
   align-items: center;
   gap: 8px;
@@ -749,51 +754,97 @@ const ReviewModeSelectorItemWrapper = styled.div<{ active: boolean }>`
   }
 `;
 
-const ReviewModeSelector = ({
-  cardMeta,
-  onSelectReviewMode,
+const AlgorithmSelector = ({
+  algorithm,
+  onSelectAlgorithm,
 }: {
-  cardMeta: import('~/models/session').CardMeta | undefined;
-  onSelectReviewMode: (reviewMode: ReviewModes) => void;
+  algorithm: SchedulingAlgorithm | undefined;
+  onSelectAlgorithm: (algorithm: SchedulingAlgorithm) => void;
 }) => {
-  const activeOption = getActiveOption(cardMeta);
+  const activeOption = ALGORITHM_OPTIONS.find((o) => o.value === algorithm) || ALGORITHM_OPTIONS[0];
 
   return (
-    <ReviewModeSelect
-      items={REVIEW_MODE_OPTIONS}
+    <AlgorithmSelect
+      items={ALGORITHM_OPTIONS}
       activeItem={activeOption}
       filterable={false}
-      itemRenderer={(option: ReviewModeOption, { handleClick, modifiers }) => {
-        const isActive = option.reviewMode === activeOption.reviewMode;
+      itemRenderer={(option: AlgorithmOption, { handleClick, modifiers }) => {
+        const isActive = option.value === activeOption.value;
         return (
-          <ReviewModeSelectorItemWrapper
+          <SelectorItemWrapper
             active={modifiers.active}
-            key={option.reviewMode}
+            key={option.value}
             onClick={handleClick}
-            data-testid={`card-type-option-${option.label.toLowerCase().replace(/\s+/g, '-')}`}
+            data-testid={`algorithm-option-${option.label.toLowerCase().replace(/\s+/g, '-')}`}
+          >
+            <span style={{ fontWeight: isActive ? 600 : 400 }}>{option.label}</span>
+            {isActive && <Blueprint.Icon icon="tick" iconSize={12} style={{ marginLeft: 'auto', color: '#0d8050' }} />}
+          </SelectorItemWrapper>
+        );
+      }}
+      onItemSelect={(option: AlgorithmOption) => {
+        onSelectAlgorithm(option.value);
+      }}
+      popoverProps={{ minimal: true }}
+      itemPredicate={(_, _option: AlgorithmOption) => true}
+    >
+      <Blueprint.Button
+        rightIcon="caret-down"
+        minimal
+        data-testid="algorithm-button"
+        style={{ fontSize: '12px' }}
+      >
+        {activeOption.label}
+      </Blueprint.Button>
+    </AlgorithmSelect>
+  );
+};
+
+const InteractionSelector = ({
+  interaction,
+  onSelectInteraction,
+}: {
+  interaction: InteractionStyle | undefined;
+  onSelectInteraction: (interaction: InteractionStyle) => void;
+}) => {
+  const activeOption = INTERACTION_OPTIONS.find((o) => o.value === interaction) || INTERACTION_OPTIONS[0];
+
+  return (
+    <InteractionSelect
+      items={INTERACTION_OPTIONS}
+      activeItem={activeOption}
+      filterable={false}
+      itemRenderer={(option: InteractionOption, { handleClick, modifiers }) => {
+        const isActive = option.value === activeOption.value;
+        return (
+          <SelectorItemWrapper
+            active={modifiers.active}
+            key={option.value}
+            onClick={handleClick}
+            data-testid={`interaction-option-${option.label.toLowerCase().replace(/\s+/g, '-')}`}
           >
             <Blueprint.Icon icon={option.icon} iconSize={14} style={{ opacity: isActive ? 1 : 0.6 }} />
             <span style={{ fontWeight: isActive ? 600 : 400 }}>{option.label}</span>
             {isActive && <Blueprint.Icon icon="tick" iconSize={12} style={{ marginLeft: 'auto', color: '#0d8050' }} />}
-          </ReviewModeSelectorItemWrapper>
+          </SelectorItemWrapper>
         );
       }}
-      onItemSelect={(option: ReviewModeOption) => {
-        onSelectReviewMode(option.reviewMode);
+      onItemSelect={(option: InteractionOption) => {
+        onSelectInteraction(option.value);
       }}
       popoverProps={{ minimal: true }}
-      itemPredicate={(_, _option: ReviewModeOption) => true}
+      itemPredicate={(_, _option: InteractionOption) => true}
     >
       <Blueprint.Button
         icon={activeOption.icon}
         rightIcon="caret-down"
         minimal
-        data-testid="review-mode-button"
+        data-testid="interaction-button"
         style={{ fontSize: '12px' }}
       >
         {activeOption.label}
       </Blueprint.Button>
-    </ReviewModeSelect>
+    </InteractionSelect>
   );
 };
 

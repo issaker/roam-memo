@@ -1,8 +1,9 @@
 import { getDueCardUids } from './today';
-import { CompleteRecords, ReviewModes, Session } from '~/models/session';
+import { CompleteRecords, SchedulingAlgorithm, InteractionStyle, Session } from '~/models/session';
 
 const makeSession = (overrides: Partial<Session> = {}): Session => ({
-  reviewMode: ReviewModes.SpacedInterval,
+  algorithm: SchedulingAlgorithm.SM2,
+  interaction: InteractionStyle.NORMAL,
   repetitions: 0,
   interval: 0,
   eFactor: 2.5,

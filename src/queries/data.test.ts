@@ -1,7 +1,6 @@
 import {
   getPluginPageBlockDataQuery,
   getPluginPageData,
-  inferReviewModeFromFields,
 } from '~/queries/data';
 
 const parseMockRoamDate = (value: string) => {
@@ -45,7 +44,8 @@ describe('getPluginPageData', () => {
                       string: '[[April 14th, 2026]] 🟢',
                       order: 0,
                       children: [
-                        { string: 'reviewMode:: SPACED_INTERVAL' },
+                        { string: 'algorithm:: SM2' },
+                        { string: 'interaction:: NORMAL' },
                         { string: 'lineByLineProgress:: {"child-1":{"interval":6}}' },
                         { string: 'nextDueDate:: [[April 20th, 2026]]' },
                       ],
@@ -74,14 +74,15 @@ describe('getPluginPageData', () => {
       'data'
     );
     expect(result['card-1']).toMatchObject({
-      reviewMode: 'SPACED_INTERVAL',
+      algorithm: 'SM2',
+      interaction: 'NORMAL',
       lineByLineProgress: '{"child-1":{"interval":6}}',
     });
     const cardData = result['card-1'] as any;
     expect(cardData.nextDueDate).toEqual(new Date('2026-04-20T00:00:00.000Z'));
   });
 
-  it('reads reviewMode from latest session block', async () => {
+  it('reads algorithm and interaction from latest session block', async () => {
     Object.defineProperty(window, 'roamAlphaAPI', {
       value: {
         q: jest.fn(() => [
@@ -95,7 +96,8 @@ describe('getPluginPageData', () => {
                       string: '[[April 14th, 2026]] 🟢',
                       order: 0,
                       children: [
-                        { string: 'reviewMode:: SPACED_INTERVAL' },
+                        { string: 'algorithm:: SM2' },
+                        { string: 'interaction:: NORMAL' },
                         { string: 'repetitions:: 3' },
                         { string: 'interval:: 12' },
                         { string: 'eFactor:: 2.4' },
@@ -121,7 +123,8 @@ describe('getPluginPageData', () => {
     });
 
     expect(result['card-spaced']).toMatchObject({
-      reviewMode: 'SPACED_INTERVAL',
+      algorithm: 'SM2',
+      interaction: 'NORMAL',
       repetitions: 3,
       interval: 12,
       eFactor: 2.4,
@@ -142,7 +145,8 @@ describe('getPluginPageData', () => {
                       string: '[[April 12th, 2026]] 🟢',
                       order: 1,
                       children: [
-                        { string: 'reviewMode:: SPACED_INTERVAL' },
+                        { string: 'algorithm:: SM2' },
+                        { string: 'interaction:: NORMAL' },
                         { string: 'repetitions:: 3' },
                         { string: 'interval:: 12' },
                         { string: 'eFactor:: 2.4' },
@@ -152,7 +156,8 @@ describe('getPluginPageData', () => {
                       string: '[[April 14th, 2026]] 🟢',
                       order: 0,
                       children: [
-                        { string: 'reviewMode:: FIXED_PROGRESSIVE' },
+                        { string: 'algorithm:: PROGRESSIVE' },
+                        { string: 'interaction:: NORMAL' },
                         { string: 'progressiveRepetitions:: 1' },
                         { string: 'intervalMultiplier:: 6' },
                         { string: 'nextDueDate:: [[April 20th, 2026]]' },
@@ -177,7 +182,8 @@ describe('getPluginPageData', () => {
     });
 
     expect(result['card-switching']).toMatchObject({
-      reviewMode: 'FIXED_PROGRESSIVE',
+      algorithm: 'PROGRESSIVE',
+      interaction: 'NORMAL',
       progressiveRepetitions: 1,
       intervalMultiplier: 6,
       repetitions: 3,
@@ -186,7 +192,7 @@ describe('getPluginPageData', () => {
     });
   });
 
-  it('returns no reviewMode when session block has none', async () => {
+  it('defaults algorithm to SM2 and interaction to NORMAL when session block has none', async () => {
     Object.defineProperty(window, 'roamAlphaAPI', {
       value: {
         q: jest.fn(() => [
@@ -222,27 +228,8 @@ describe('getPluginPageData', () => {
     expect(result['card-fixed']).toMatchObject({
       dateCreated: new Date('2026-04-14T00:00:00.000Z'),
       nextDueDate: new Date('2026-04-20T00:00:00.000Z'),
+      algorithm: 'SM2',
+      interaction: 'NORMAL',
     });
-    expect((result['card-fixed'] as any).reviewMode).toBeUndefined();
-  });
-});
-
-describe('inferReviewModeFromFields', () => {
-  it('infers SPACED_INTERVAL from SM2 fields', () => {
-    expect(inferReviewModeFromFields({ repetitions: 3, interval: 12, eFactor: 2.4 })).toBe(
-      'SPACED_INTERVAL'
-    );
-  });
-
-  it('infers FIXED_PROGRESSIVE from fixed-mode fields', () => {
-    expect(inferReviewModeFromFields({ intervalMultiplier: 3 })).toBe('FIXED_PROGRESSIVE');
-  });
-
-  it('returns FIXED_PROGRESSIVE as default when no clues exist', () => {
-    expect(inferReviewModeFromFields({})).toBe('FIXED_PROGRESSIVE');
-  });
-
-  it('resolves explicit reviewMode', () => {
-    expect(inferReviewModeFromFields({ reviewMode: 'SPACED_INTERVAL' })).toBe('SPACED_INTERVAL');
   });
 });

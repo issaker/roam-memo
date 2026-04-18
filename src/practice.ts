@@ -1,6 +1,10 @@
 import { savePracticeData } from '~/queries/save';
 import * as dateUtils from '~/utils/date';
-import { ReviewModes, isFixedMode, Session } from '~/models/session';
+import {
+  SchedulingAlgorithm,
+  isSpacedAlgorithm,
+  Session,
+} from '~/models/session';
 
 /**
  * SM2 (SuperMemo 2) algorithm implementation.
@@ -63,7 +67,7 @@ export const progressiveInterval = (progressiveRepetitions: number): number => {
 type PracticeDataResult = Session & { nextDueDateFromNow?: string };
 
 /**
- * Generate practice result data based on the review mode and current card state.
+ * Generate practice result data based on the algorithm and current card state.
  *
  * Mode Independence Principle:
  *   Each mode only calculates/updates its OWN fields. All other fields are
@@ -83,12 +87,15 @@ type PracticeDataResult = Session & { nextDueDateFromNow?: string };
  */
 export const generatePracticeData = ({
   dateCreated,
-  reviewMode,
+  algorithm,
+  interaction,
   ...props
 }: Session): PracticeDataResult => {
   const referenceDate = dateCreated || new Date();
 
-  if (reviewMode === ReviewModes.SpacedInterval || reviewMode === ReviewModes.SpacedIntervalLBL) {
+  const useSpacedPath = isSpacedAlgorithm(algorithm);
+
+  if (useSpacedPath) {
     const {
       grade,
       interval,
@@ -105,7 +112,8 @@ export const generatePracticeData = ({
     const nextDueDate = dateUtils.addDays(referenceDate, sm2Result.interval);
 
     return {
-      reviewMode,
+      algorithm,
+      interaction,
       grade,
       repetitions: sm2Result.repetition,
       interval: sm2Result.interval,
@@ -130,39 +138,40 @@ export const generatePracticeData = ({
   let nextDueDate: Date | undefined;
   let calculatedIntervalMultiplier = intervalMultiplier;
 
-  switch (reviewMode) {
-    case ReviewModes.FixedProgressive:
-    case ReviewModes.FixedProgressiveLBL: {
+  switch (algorithm) {
+    case SchedulingAlgorithm.PROGRESSIVE: {
       const currentProgReps = progressiveRepetitions || 0;
       calculatedIntervalMultiplier = progressiveInterval(currentProgReps);
       nextDueDate = dateUtils.addDays(referenceDate, calculatedIntervalMultiplier);
       break;
     }
-    case ReviewModes.FixedDays:
+    case SchedulingAlgorithm.FIXED_DAYS:
       calculatedIntervalMultiplier = intervalMultiplier || 3;
       nextDueDate = dateUtils.addDays(referenceDate, calculatedIntervalMultiplier);
       break;
-    case ReviewModes.FixedWeeks:
+    case SchedulingAlgorithm.FIXED_WEEKS:
       calculatedIntervalMultiplier = intervalMultiplier || 1;
       nextDueDate = dateUtils.addDays(referenceDate, calculatedIntervalMultiplier * 7);
       break;
-    case ReviewModes.FixedMonths:
+    case SchedulingAlgorithm.FIXED_MONTHS:
       calculatedIntervalMultiplier = intervalMultiplier || 1;
       nextDueDate = dateUtils.addDays(referenceDate, calculatedIntervalMultiplier * 30);
       break;
-    case ReviewModes.FixedYears:
+    case SchedulingAlgorithm.FIXED_YEARS:
       calculatedIntervalMultiplier = intervalMultiplier || 1;
       nextDueDate = dateUtils.addDays(referenceDate, calculatedIntervalMultiplier * 365);
       break;
   }
 
+  const isProgressive = algorithm === SchedulingAlgorithm.PROGRESSIVE;
+
   return {
-    reviewMode,
+    algorithm,
+    interaction,
     intervalMultiplier: calculatedIntervalMultiplier,
-    progressiveRepetitions:
-      reviewMode === ReviewModes.FixedProgressive || reviewMode === ReviewModes.FixedProgressiveLBL
-        ? (progressiveRepetitions || 0) + 1
-        : progressiveRepetitions,
+    progressiveRepetitions: isProgressive
+      ? (progressiveRepetitions || 0) + 1
+      : progressiveRepetitions,
     ...(repetitions !== undefined && { repetitions }),
     ...(eFactor !== undefined && { eFactor }),
     ...(interval !== undefined && { interval }),
@@ -190,7 +199,8 @@ const practice = async (practiceProps: PracticeProps, isDryRun = false) => {
     eFactor,
     intervalMultiplier,
     progressiveRepetitions,
-    reviewMode,
+    algorithm,
+    interaction,
   } = practiceProps;
 
   const { nextDueDateFromNow, ...practiceResultData } = generatePracticeData({
@@ -199,9 +209,10 @@ const practice = async (practiceProps: PracticeProps, isDryRun = false) => {
     repetitions,
     eFactor,
     dateCreated,
-    reviewMode,
     intervalMultiplier,
     progressiveRepetitions,
+    algorithm,
+    interaction,
   });
 
   if (!isDryRun && !isCramming) {

@@ -1,0 +1,377 @@
+import * as React from 'react';
+import * as Blueprint from '@blueprintjs/core';
+import * as BlueprintSelect from '@blueprintjs/select';
+import styled from '@emotion/styled';
+import * as dateUtils from '~/utils/date';
+import Tooltip from '~/components/Tooltip';
+import ButtonTags from '~/components/ButtonTags';
+import { ALGORITHM_META, INTERACTION_META, SchedulingAlgorithm, InteractionStyle } from '~/models/session';
+import { RenderMode } from '~/models/practice';
+import { MainContext } from '~/components/overlay/PracticeOverlay';
+import { colors } from '~/theme';
+import { useSafeContext } from '~/hooks/useSafeContext';
+import { usePracticeSession } from '~/contexts/PracticeSessionContext';
+
+interface HeaderProps {
+  onCloseCallback: () => void;
+  onTagChange: (tag: string) => void;
+  className?: string;
+  status: string | null;
+  isDone: boolean;
+  nextDueDate?: Date;
+  onToggleBreadcrumbs: () => void;
+  onSettingsClick: () => void;
+}
+
+const HeaderWrapper = styled.div`
+  justify-content: space-between;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-wrap: normal;
+  line-height: inherit;
+  margin: 0;
+  min-height: 50px;
+  border-bottom: 1px solid ${colors.borderSubtle};
+`;
+
+const TagSelector = ({ tagsList, selectedTag, onTagChange }) => {
+  return (
+    <TagSelect
+      items={tagsList}
+      activeItem={selectedTag}
+      filterable={false}
+      itemRenderer={(tag, { handleClick, modifiers }) => {
+        return (
+          <TagSelectorItem
+            text={tag}
+            tagsList={tagsList}
+            active={modifiers.active}
+            key={tag}
+            onClick={handleClick}
+          />
+        );
+      }}
+      onItemSelect={(tag) => {
+        onTagChange(tag);
+      }}
+      popoverProps={{ minimal: true }}
+    >
+      <Blueprint.Button
+        text={selectedTag}
+        rightIcon="caret-down"
+        minimal
+        data-testid="tag-selector-cta"
+      />
+    </TagSelect>
+  );
+};
+const TagSelect = BlueprintSelect.Select.ofType<string>();
+
+const TagSelectorItemWrapper = styled.div<{ active: boolean }>`
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 6px;
+  position: relative;
+  user-select: none;
+  cursor: pointer;
+  border-radius: 2px;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: currentColor;
+    opacity: ${({ active }) => (active ? 0.08 : 0)};
+    border-radius: 2px;
+    pointer-events: none;
+  }
+
+  &:hover::before {
+    opacity: ${({ active }) => (active ? 0.12 : 0.06)};
+  }
+`;
+
+const Tag = styled(Blueprint.Tag)`
+  &.bp3-tag {
+    font-size: 11px;
+    padding: 1px 3px;
+    min-height: auto;
+    min-width: auto;
+  }
+`;
+
+const TagSelectorItem = ({ text, onClick, active, tagsList }) => {
+  const { today, setRenderMode } = usePracticeSession();
+  const dueCount = today.tags[text].due;
+  const newCount = today.tags[text].new;
+  const tagRenderMode = today.tags[text].renderMode || RenderMode.Normal;
+  const [showTagSettings, setShowTagSettings] = React.useState(false);
+
+  const index = tagsList.indexOf(text);
+  const placement = index === tagsList.length - 1 ? 'bottom' : 'top';
+
+  const toggleTagSettings = () => {
+    setShowTagSettings(!showTagSettings);
+  };
+
+  const toggleRenderMode = () => {
+    const newRenderMode =
+      tagRenderMode === RenderMode.Normal ? RenderMode.AnswerFirst : RenderMode.Normal;
+
+    setRenderMode(text, newRenderMode);
+  };
+
+  const tagSettingsMenu = (
+    <div onClick={(e) => e.stopPropagation()}>
+      <Blueprint.Menu className="bg-transparent min-w-full text-sm">
+        <Blueprint.MenuItem
+          text={
+            <div className="flex items-center justify-between">
+              <span className="text-xs">Swap Q/A</span>
+              <Blueprint.Switch
+                alignIndicator={Blueprint.Alignment.RIGHT}
+                checked={tagRenderMode === RenderMode.AnswerFirst}
+                onChange={toggleRenderMode}
+                className="mb-0"
+              />
+            </div>
+          }
+          className="hover:bg-transparent hover:no-underline"
+        />
+        <Blueprint.MenuDivider />
+      </Blueprint.Menu>
+    </div>
+  );
+
+  return (
+    <TagSelectorItemWrapper
+      onClick={onClick}
+      active={active}
+      key={text}
+      tabIndex={-1}
+      data-testid="tag-selector-item"
+      className="flex-col"
+    >
+      <div className="flex">
+        <div className="flex items-center">{text}</div>
+        <div className="ml-2">
+          {dueCount > 0 && (
+            <Tooltip content="Due" placement={placement}>
+              <Tag
+                active
+                minimal
+                intent="primary"
+                className="text-center"
+                data-testid="tag-selector-due"
+              >
+                {dueCount}
+              </Tag>
+            </Tooltip>
+          )}
+          {newCount > 0 && (
+            <Tooltip content="New" placement={placement}>
+              <Tag
+                active
+                minimal
+                intent="success"
+                className="text-center ml-2"
+                data-testid="tag-selector-new"
+              >
+                {newCount}
+              </Tag>
+            </Tooltip>
+          )}
+        </div>
+        <div onClick={(e) => e.stopPropagation()} className="">
+          <Blueprint.Button
+            icon={<Blueprint.Icon icon={showTagSettings ? 'chevron-up' : 'cog'} size={11} />}
+            className="ml-1 bp3-small"
+            data-testid="tag-settings-button"
+            minimal
+            onClick={toggleTagSettings}
+          />
+        </div>
+      </div>
+      <Blueprint.Collapse isOpen={showTagSettings}>{tagSettingsMenu}</Blueprint.Collapse>
+    </TagSelectorItemWrapper>
+  );
+};
+
+const StatusBadge = ({ status, nextDueDate, isCramming }) => {
+  if (isCramming) {
+    return (
+      <Tooltip content="Reviews don't affect scheduling" placement="left">
+        <Blueprint.Tag intent="none">Cramming</Blueprint.Tag>
+      </Tooltip>
+    );
+  }
+  switch (status) {
+    case 'new':
+      return (
+        <Blueprint.Tag intent="success" minimal>
+          New
+        </Blueprint.Tag>
+      );
+
+    case 'dueToday':
+      return (
+        <Blueprint.Tag intent="primary" minimal>
+          Due Today
+        </Blueprint.Tag>
+      );
+
+    case 'pastDue': {
+      const timeAgo = dateUtils.customFromNow(nextDueDate);
+      return (
+        <Blueprint.Tag intent="warning" title={`Due ${timeAgo}`} minimal>
+          Past Due
+        </Blueprint.Tag>
+      );
+    }
+    default:
+      return null;
+  }
+};
+
+const ModeBadge = ({ algorithm, interaction }: { algorithm?: SchedulingAlgorithm; interaction?: InteractionStyle }) => {
+  if (!algorithm && !interaction) return null;
+
+  const algoMeta = algorithm ? ALGORITHM_META[algorithm] : undefined;
+  const interactionMeta = interaction ? INTERACTION_META[interaction] : undefined;
+
+  const groupIntent = algoMeta?.group === 'Spaced' ? 'success' : 'warning';
+  const interactionLabel = interactionMeta?.label;
+
+  return (
+    <>
+      {algoMeta && (
+        <Blueprint.Tag intent={groupIntent} minimal>
+          {algoMeta.group}
+        </Blueprint.Tag>
+      )}
+      {interactionLabel && interaction !== InteractionStyle.NORMAL && (
+        <Blueprint.Tag intent="none" minimal style={{ marginLeft: '2px' }}>
+          {interactionLabel === 'Line by Line' ? 'LBL' : interactionLabel === 'Incremental Read' ? 'Read' : interactionLabel}
+        </Blueprint.Tag>
+      )}
+    </>
+  );
+};
+
+const BoxIcon = styled(Blueprint.Icon)`
+  margin-right: 5px !important;
+`;
+
+const BreadcrumbTooltipContent = ({ showBreadcrumbs }) => {
+  return (
+    <div className="flex align-center">
+      {`${showBreadcrumbs ? 'Hide' : 'Show'} Breadcrumbs`}
+      <span>
+        <ButtonTags kind="light" className="mx-2">
+          B
+        </ButtonTags>
+      </span>
+    </div>
+  );
+};
+
+const Header = ({
+  onCloseCallback,
+  onTagChange,
+  className,
+  status,
+  isDone,
+  nextDueDate,
+  onToggleBreadcrumbs,
+  onSettingsClick,
+}: HeaderProps) => {
+  const {
+    selectedTag,
+    tagsList,
+    isCramming,
+    algorithm,
+    interaction,
+    today,
+    settings,
+  } = usePracticeSession();
+  const { showBreadcrumbs } = settings;
+  const {
+    currentIndex,
+    isLineByLine,
+    lineByLineCurrentIndex,
+    lineByLineTotal,
+  } = useSafeContext(MainContext);
+  const todaySelectedTag = today.tags[selectedTag];
+  const completedTodayCount = todaySelectedTag.completed;
+  const remainingTodayCount = todaySelectedTag.due + todaySelectedTag.new;
+
+  const currentIndexDelta = isCramming ? 0 : completedTodayCount;
+  const currentDisplayCount = currentIndexDelta + currentIndex + 1;
+
+  const toggleBreadcrumbs = () => {
+    onToggleBreadcrumbs();
+  };
+
+  return (
+    <HeaderWrapper className={className} tabIndex={0}>
+      <div className="flex items-center">
+        <BoxIcon icon="box" size={14} />
+        <div tabIndex={-1}>
+          <TagSelector tagsList={tagsList} selectedTag={selectedTag} onTagChange={onTagChange} />
+        </div>
+      </div>
+      <div className="flex items-center justify-end">
+        {isLineByLine && !isDone && (
+          <Blueprint.Tag intent="none" minimal style={{ fontSize: '10px', marginRight: '4px' }}>
+            L{lineByLineCurrentIndex}/{lineByLineTotal}
+          </Blueprint.Tag>
+        )}
+        {!isDone && (
+          <div onClick={toggleBreadcrumbs} className="px-1 cursor-pointer">
+            <Tooltip
+              content={<BreadcrumbTooltipContent showBreadcrumbs={showBreadcrumbs} />}
+              placement="left"
+            >
+              <Blueprint.Icon
+                icon={showBreadcrumbs ? 'eye-open' : 'eye-off'}
+                className={showBreadcrumbs ? 'opacity-100' : 'opacity-60'}
+              />
+            </Tooltip>
+          </div>
+        )}
+        <div onClick={onSettingsClick} className="px-1 cursor-pointer">
+          <Tooltip content="Settings" placement="left">
+            <Blueprint.Icon icon="cog" />
+          </Tooltip>
+        </div>
+        <span data-testid="mode-badge">{!isDone && <ModeBadge algorithm={algorithm} interaction={interaction} />}</span>
+        <span data-testid="status-badge">
+          <StatusBadge
+            status={status}
+            nextDueDate={nextDueDate}
+            isCramming={isCramming}
+            data-testid="status-badge"
+          />
+        </span>
+        <span className="text-sm mx-2 font-medium">
+          <span data-testid="display-count-current">{isDone ? 0 : currentDisplayCount}</span>
+          <span className="opacity-50 mx-1">/</span>
+          <span className="opacity-50" data-testid="display-count-total">
+            {isDone ? 0 : remainingTodayCount}
+          </span>
+        </span>
+        <button
+          aria-label="Close"
+          className="bp3-dialog-close-button bp3-button bp3-minimal bp3-icon-cross"
+          onClick={onCloseCallback}
+        ></button>
+      </div>
+    </HeaderWrapper>
+  );
+};
+
+export default Header;

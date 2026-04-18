@@ -30,10 +30,6 @@ export type Today = {
       newUids: RecordUid[];
       completed: number;
       completedUids: RecordUid[];
-      completedDue: number;
-      completedNew: number;
-      completedDueUids: RecordUid[];
-      completedNewUids: RecordUid[];
       renderMode: RenderMode;
     };
   };
@@ -45,10 +41,6 @@ export type Today = {
     newUids: RecordUid[];
     completed: number;
     completedUids: RecordUid[];
-    completedDue: number;
-    completedNew: number;
-    completedDueUids: RecordUid[];
-    completedNewUids: RecordUid[];
   };
 };
 
@@ -62,9 +54,5 @@ export const TodayInitial: Today = {
     newUids: [],
     completed: 0,
     completedUids: [],
-    completedDue: 0,
-    completedDueUids: [],
-    completedNew: 0,
-    completedNewUids: [],
   },
 };

@@ -8,7 +8,8 @@
  *   ├── data (heading block)
  *   │   ├── ((cardUid1))
  *   │   │   ├── [[Date]] 🟢            ← Latest session (all fields here)
- *   │   │   │   ├── reviewMode:: FIXED_PROGRESSIVE
+ *   │   │   │   ├── algorithm:: SM2
+ *   │   │   │   ├── interaction:: NORMAL
  *   │   │   │   ├── nextDueDate:: [[Date]]
  *   │   │   │   ├── lineByLineProgress:: {...}
  *   │   │   │   ├── grade:: 5
@@ -27,7 +28,7 @@
  *       └── ...
  *
  * Key Design Principle:
- *   All fields (reviewMode, nextDueDate, lineByLineProgress, grade, etc.)
+ *   All fields (algorithm, interaction, nextDueDate, lineByLineProgress, grade, etc.)
  *   are stored uniformly in session blocks. The latest session block is the
  *   single source of truth for the card's current state.
  */
@@ -37,8 +38,7 @@ import {
   CompleteRecords,
   Records,
   RecordUid,
-  ReviewModes,
-  resolveReviewMode,
+  resolveReviewConfig,
 } from '~/models/session';
 import { Today } from '~/models/practice';
 import {
@@ -48,7 +48,6 @@ import {
   calculateCompletedTodayCounts,
   calculateTodayStatus,
   initializeToday,
-  restoreCompletedUids,
 } from '~/queries/today';
 import { generateNewSession, getChildBlocksOnPage } from './utils';
 
@@ -85,7 +84,6 @@ export const getPracticeData = async ({
   addNewCards({ today, tagsList, cardUids, pluginPageData, shuffleCards });
   addDueCards({ today, tagsList, sessionData, isCramming, shuffleCards });
 
-  calculateCombinedCounts({ today, tagsList });
   limitRemainingPracticeData({ today, dailyLimit, tagsList, isCramming });
   calculateCombinedCounts({ today, tagsList });
 
@@ -130,15 +128,9 @@ export const getSelectedTagPageBlocksIds = async (selectedTag): Promise<string[]
   return filteredChildren.map((arr) => arr.uid);
 };
 
-const SPACED_MODE_KEYS = ['grade', 'repetitions', 'interval', 'eFactor'] as const;
-const FIXED_MODE_KEYS = [
-  'intervalMultiplier',
-  'intervalMultiplierType',
-  'progressiveRepetitions',
-] as const;
-
 const SESSION_SNAPSHOT_KEYS = [
-  'reviewMode',
+  'algorithm',
+  'interaction',
   'nextDueDate',
   'lineByLineProgress',
   'repetitions',
@@ -148,34 +140,6 @@ const SESSION_SNAPSHOT_KEYS = [
   'intervalMultiplierType',
   'progressiveRepetitions',
 ] as const;
-
-/**
- * Infer reviewMode from session field patterns (for legacy data without meta blocks).
- * If reviewMode is explicitly set, resolve it. Otherwise, guess from field presence:
- * - SM2 fields (grade, repetitions, interval, eFactor) → SpacedInterval
- * - Fixed fields (intervalMultiplier, progressiveRepetitions) → FixedProgressive
- */
-export const inferReviewModeFromFields = (
-  fields: Partial<{ reviewMode: string; intervalMultiplierType: string } & Record<string, any>>
-) => {
-  if (fields.reviewMode) {
-    return resolveReviewMode(fields.reviewMode, fields.intervalMultiplierType);
-  }
-
-  if (SPACED_MODE_KEYS.some((key) => fields[key] !== undefined)) {
-    return ReviewModes.SpacedInterval;
-  }
-
-  if (FIXED_MODE_KEYS.some((key) => fields[key] !== undefined)) {
-    return ReviewModes.FixedProgressive;
-  }
-
-  return ReviewModes.FixedProgressive;
-};
-
-const hasReviewModeClues = (fields: Record<string, any>) =>
-  SPACED_MODE_KEYS.some((key) => fields[key] !== undefined) ||
-  FIXED_MODE_KEYS.some((key) => fields[key] !== undefined);
 
 /**
  * Rebuild a full latest-session snapshot from sparse historical session blocks.
@@ -199,14 +163,12 @@ const mergeSessionSnapshot = (
     }
   }
 
-  if (rawSession.reviewMode !== undefined) {
-    nextSnapshot.reviewMode = resolveReviewMode(
-      rawSession.reviewMode,
-      rawSession.intervalMultiplierType
-    );
-  } else if (!nextSnapshot.reviewMode && hasReviewModeClues(rawSession)) {
-    nextSnapshot.reviewMode = inferReviewModeFromFields(rawSession);
-  }
+  const config = resolveReviewConfig(
+    nextSnapshot.algorithm,
+    nextSnapshot.interaction
+  );
+  nextSnapshot.algorithm = config.algorithm;
+  nextSnapshot.interaction = config.interaction;
 
   return nextSnapshot;
 };
@@ -216,9 +178,15 @@ const parseFieldValuesFromChildren = (object, children) => {
     if (!field?.string) continue;
     const [key, value] = parseConfigString(field.string);
 
+    if (key === 'reviewMode') continue;
+
     if (key === 'nextDueDate') {
       object[key] = parseRoamDateString(getStringBetween(value, '[[', ']]'));
     } else if (key === 'lineByLineProgress') {
+      object[key] = value;
+    } else if (key === 'algorithm') {
+      object[key] = value;
+    } else if (key === 'interaction') {
       object[key] = value;
     } else if (value === 'true' || value === 'false') {
       object[key] = value === 'true';
@@ -381,6 +349,9 @@ export const getSessionData = async ({
  * Daily limit enforcement: ensures ~25% new cards, rest due cards.
  * Round-robin across decks for fair distribution.
  * Skipped when cramming (no limit) or dailyLimit is 0.
+ *
+ * The remaining limit is `dailyLimit - totalCompleted`: completed cards
+ * reduce the pool without needing to restore them into the UID lists.
  */
 const limitRemainingPracticeData = ({
   today,
@@ -393,13 +364,42 @@ const limitRemainingPracticeData = ({
   tagsList: string[];
   isCramming: boolean;
 }) => {
-  const totalCards = today.combinedToday.due + today.combinedToday.new;
+  const totalCompleted = tagsList.reduce(
+    (sum, tag) => sum + today.tags[tag].completed,
+    0
+  );
+  const totalDueAvailable = tagsList.reduce(
+    (sum, tag) => sum + today.tags[tag].dueUids.length,
+    0
+  );
+  const totalNewAvailable = tagsList.reduce(
+    (sum, tag) => sum + today.tags[tag].newUids.length,
+    0
+  );
+  const totalRemaining = totalDueAvailable + totalNewAvailable;
 
-  if (!dailyLimit || !totalCards || isCramming) {
+  if (!dailyLimit || !totalRemaining || isCramming) {
     return;
   }
 
-  restoreCompletedUids({ today, tagsList });
+  const remainingLimit = Math.max(dailyLimit - totalCompleted, 0);
+
+  if (remainingLimit === 0) {
+    for (const tag of tagsList) {
+      today.tags[tag] = {
+        ...today.tags[tag],
+        dueUids: [],
+        newUids: [],
+        due: 0,
+        new: 0,
+      };
+    }
+    return;
+  }
+
+  if (totalRemaining <= remainingLimit) {
+    return;
+  }
 
   const selectedCards = tagsList.reduce(
     (acc, currentTag) => ({
@@ -413,21 +413,17 @@ const limitRemainingPracticeData = ({
   );
 
   const targetNewCardsRatio = 0.25;
-  const targetTotalCards = dailyLimit;
   const targetNewCards =
-    targetTotalCards === 1 ? 0 : Math.max(1, Math.floor(targetTotalCards * targetNewCardsRatio));
-  const targetDueCards = targetTotalCards - targetNewCards;
+    remainingLimit === 1 ? 0 : Math.max(1, Math.floor(remainingLimit * targetNewCardsRatio));
+  const targetDueCards = remainingLimit - targetNewCards;
 
   let totalNewAdded = 0;
   let totalDueAdded = 0;
-  let totalAdded = totalNewAdded + totalDueAdded;
 
-  roundRobinLoop: while (totalAdded < totalCards) {
+  roundRobinLoop: while (totalNewAdded + totalDueAdded < totalRemaining) {
     let addedInThisRound = false;
     for (const currentTag of tagsList) {
-      totalAdded = totalNewAdded + totalDueAdded;
-
-      if (totalAdded === targetTotalCards) {
+      if (totalNewAdded + totalDueAdded === remainingLimit) {
         break roundRobinLoop;
       }
 
@@ -439,8 +435,8 @@ const limitRemainingPracticeData = ({
 
       const stillNeedNewCards = totalNewAdded < targetNewCards;
       const stillNeedDueCards = totalDueAdded < targetDueCards;
-      const stillHaveDueCards = !!nextDueCard || totalDueAdded < today.combinedToday.due;
-      const stillHaveNewCards = !!nextNewCard || totalNewAdded < today.combinedToday.new;
+      const stillHaveDueCards = !!nextDueCard || totalDueAdded < totalDueAvailable;
+      const stillHaveNewCards = !!nextNewCard || totalNewAdded < totalNewAvailable;
 
       if (nextNewCard && (stillNeedNewCards || !stillHaveDueCards)) {
         selectedCards[currentTag].newUids.push(today.tags[currentTag].newUids[nextNewIndex]);
@@ -457,27 +453,9 @@ const limitRemainingPracticeData = ({
       }
     }
 
-    // Guard against stale counters or empty sources causing an infinite loop.
     if (!addedInThisRound) {
       break;
     }
-  }
-
-  for (const tag of tagsList) {
-    const tagStats = today.tags[tag];
-    const completedDueUids = tagStats.completedDueUids;
-    const completedNewUids = tagStats.completedNewUids;
-    const remainingTargetDue = Math.max(
-      selectedCards[tag].dueUids.length - completedDueUids.length,
-      0
-    );
-    const remainingTargetNew = Math.max(
-      selectedCards[tag].newUids.length - completedNewUids.length,
-      0
-    );
-
-    selectedCards[tag].dueUids = selectedCards[tag].dueUids.slice(0, remainingTargetDue);
-    selectedCards[tag].newUids = selectedCards[tag].newUids.slice(0, remainingTargetNew);
   }
 
   for (const tag of tagsList) {

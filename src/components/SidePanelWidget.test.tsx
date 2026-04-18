@@ -596,10 +596,11 @@ describe('Side Panel Widget', () => {
 
       const dueTag = screen.queryByTestId('due-tag');
       expect(dueTag).toBeInTheDocument();
-      expect(dueTag).toHaveTextContent('4');
+      expect(dueTag).toHaveTextContent('3');
 
       const newTag = screen.queryByTestId('new-tag');
-      expect(newTag).not.toBeInTheDocument();
+      expect(newTag).toBeInTheDocument();
+      expect(newTag).toHaveTextContent('1');
     });
 
     it('renders correct count when limit is 1, prioritizig due cards', async () => {
@@ -831,7 +832,7 @@ describe('Side Panel Widget', () => {
         testUtils.actions.openTagSelector();
       });
 
-      // Here we expect the first deck to be marked complete, and the second deck retains its 1 due card
+      // Here we expect the first deck to have 1 remaining due card (remainingLimit = 1)
       const tagListElements = screen.getAllByTestId('tag-selector-item');
 
       // Since we know there are only two decks (memo and deck-two), we can use indices
@@ -849,9 +850,9 @@ describe('Side Panel Widget', () => {
       const secondDeckDue = within(secondDeckItem).queryByTestId('tag-selector-due');
       const secondDeckNew = within(secondDeckItem).queryByTestId('tag-selector-new');
 
-      expect(defaultDeckDue).not.toBeInTheDocument();
+      expect(defaultDeckDue).toHaveTextContent('1');
       expect(defaultDeckNew).not.toBeInTheDocument();
-      expect(secondDeckDue).toHaveTextContent('1');
+      expect(secondDeckDue).not.toBeInTheDocument();
       expect(secondDeckNew).not.toBeInTheDocument();
     });
   });

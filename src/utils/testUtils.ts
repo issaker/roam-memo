@@ -1,6 +1,6 @@
 import { act, screen, within } from '@testing-library/react';
 import { Settings, defaultSettings } from '~/hooks/useSettings';
-import { ReviewModes, Session } from '~/models/session';
+import { Session, SchedulingAlgorithm, InteractionStyle } from '~/models/session';
 import {
   blockInfoQuery,
   childBlocksOnPageQuery,
@@ -256,7 +256,7 @@ export class MockDataBuilder {
 
   withSession(
     uid: string,
-    overrides: { reviewMode?: ReviewModes; nextDueDate?: Date } & {
+    overrides: { algorithm?: SchedulingAlgorithm; nextDueDate?: Date } & {
       [key in keyof Session]?: any;
     } = {}
   ) {
@@ -264,11 +264,14 @@ export class MockDataBuilder {
       this.sessions[uid] = [];
     }
 
+    const baseSession = generateNewSession({
+      algorithm: SchedulingAlgorithm.SM2,
+      interaction: InteractionStyle.NORMAL,
+      isNew: false,
+    });
+
     this.sessions[uid].push({
-      ...generateNewSession({
-        reviewMode: ReviewModes.SpacedInterval,
-        isNew: false,
-      }),
+      ...baseSession,
       ...overrides,
     });
 
@@ -437,16 +440,16 @@ export const actions = {
   },
   clickSwitchReviewModeButton: async (targetLabel?: string) => {
     const footerActionsElm = screen.getByTestId('footer-actions-wrapper');
-    const reviewModeMenuButton = within(footerActionsElm).queryByTestId('review-mode-button');
+    const algorithmButton = within(footerActionsElm).queryByTestId('algorithm-button');
 
-    if (!reviewModeMenuButton) {
+    if (!algorithmButton) {
       const showAnswerButton = within(footerActionsElm).queryByText('Show Answer');
       const showAnswerElm = showAnswerButton?.closest<HTMLButtonElement>('button');
       showAnswerElm?.click();
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
 
-    const button = screen.getByTestId('review-mode-button');
+    const button = screen.getByTestId('algorithm-button');
     const buttonElm = button.closest<HTMLButtonElement>('button');
 
     if (buttonElm) {
@@ -454,10 +457,10 @@ export const actions = {
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
 
-    const targetText = targetLabel || 'Spaced Interval';
+    const targetText = targetLabel || 'SM2';
     const popoverElm = document.querySelector('.bp3-popover .bp3-popover-content');
     if (popoverElm) {
-      const items = Array.from(popoverElm.querySelectorAll('[data-testid^="card-type-option-"]'));
+      const items = Array.from(popoverElm.querySelectorAll('[data-testid^="algorithm-option-"]'));
       for (const item of items) {
         if (item.textContent?.includes(targetText)) {
           (item as HTMLElement).click();

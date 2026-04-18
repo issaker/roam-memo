@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react-hooks';
 import useCurrentCardData from './useCurrentCardData';
 import { generateNewSession } from '~/queries';
-import { ReviewModes } from '~/models/session';
+import { SchedulingAlgorithm, InteractionStyle } from '~/models/session';
 import * as testUtils from '~/utils/testUtils';
 import React from 'react';
 
@@ -63,10 +63,11 @@ describe('useCurrentCardData', () => {
     expect(result.current.currentCardData).toEqual(undefined);
   });
 
-  it('initializes cardMeta from latestSession reviewMode', async () => {
+  it('initializes cardMeta from latestSession algorithm', async () => {
     const currentCardRefUid = 'card-spaced';
     const session = generateNewSession({
-      reviewMode: ReviewModes.SpacedInterval,
+      algorithm: SchedulingAlgorithm.SM2,
+      interaction: InteractionStyle.NORMAL,
       isNew: false,
     });
 
@@ -79,11 +80,11 @@ describe('useCurrentCardData', () => {
       })
     );
 
-    expect(result.current.reviewMode).toEqual(ReviewModes.SpacedInterval);
-    expect(result.current.cardMeta?.reviewMode).toEqual(ReviewModes.SpacedInterval);
+    expect(result.current.algorithm).toEqual(SchedulingAlgorithm.SM2);
+    expect(result.current.cardMeta?.algorithm).toEqual(SchedulingAlgorithm.SM2);
   });
 
-  it('reviewMode falls back to DEFAULT when latestSession has no reviewMode', async () => {
+  it('algorithm falls back to DEFAULT when latestSession has no algorithm', async () => {
     const currentCardRefUid = 'id_empty';
 
     const { result } = renderHook(() =>
@@ -93,7 +94,7 @@ describe('useCurrentCardData', () => {
       })
     );
 
-    expect(result.current.reviewMode).toEqual(ReviewModes.FixedProgressive);
+    expect(result.current.algorithm).toEqual(SchedulingAlgorithm.SM2);
   });
 
   describe('Card navigation', () => {
@@ -103,25 +104,27 @@ describe('useCurrentCardData', () => {
       const mockBuilder = new testUtils.MockDataBuilder()
         .withCard({ uid: currentCardRefUid_0 })
         .withSession(currentCardRefUid_0, {
-          reviewMode: ReviewModes.SpacedInterval,
+          algorithm: SchedulingAlgorithm.SM2,
+          interaction: InteractionStyle.NORMAL,
         })
         .withCard({ uid: currentCardRefUid_1 })
         .withSession(currentCardRefUid_1, {
           grade: 2,
-          reviewMode: ReviewModes.FixedProgressive,
+          algorithm: SchedulingAlgorithm.PROGRESSIVE,
+          interaction: InteractionStyle.NORMAL,
         });
 
       mockBuilder.mockQueryResults();
       const { practiceData } = await mockBuilder.getPracticeData();
       const { result } = renderHook(() => {
         const [currentCardRefUid, setCurrentCardRefUid] = React.useState(currentCardRefUid_0);
-        const { reviewMode, cardMeta, currentCardData } = useCurrentCardData({
+        const { algorithm, cardMeta, currentCardData } = useCurrentCardData({
           sessions: practiceData[currentCardRefUid],
           currentCardRefUid: currentCardRefUid,
         });
 
         return {
-          reviewMode,
+          algorithm,
           cardMeta,
           currentCardData,
           currentCardRefUid,
@@ -134,9 +137,9 @@ describe('useCurrentCardData', () => {
       });
 
       expect(result.current.currentCardData).toMatchObject({
-        reviewMode: ReviewModes.FixedProgressive,
+        algorithm: SchedulingAlgorithm.PROGRESSIVE,
       });
-      expect(result.current.reviewMode).toEqual(ReviewModes.FixedProgressive);
+      expect(result.current.algorithm).toEqual(SchedulingAlgorithm.PROGRESSIVE);
     });
 
     it('Returns latestSession derived from sessions', async () => {
@@ -145,11 +148,13 @@ describe('useCurrentCardData', () => {
         .withCard({ uid: currentCardRefUid })
         .withSession(currentCardRefUid, {
           grade: 1,
-          reviewMode: ReviewModes.SpacedInterval,
+          algorithm: SchedulingAlgorithm.SM2,
+          interaction: InteractionStyle.NORMAL,
         })
         .withSession(currentCardRefUid, {
           grade: 2,
-          reviewMode: ReviewModes.FixedProgressive,
+          algorithm: SchedulingAlgorithm.PROGRESSIVE,
+          interaction: InteractionStyle.NORMAL,
         });
 
       mockBuilder.mockQueryResults();
@@ -160,7 +165,7 @@ describe('useCurrentCardData', () => {
       );
 
       expect(result.current.latestSession).toBeDefined();
-      expect(result.current.latestSession!.reviewMode).toEqual(ReviewModes.FixedProgressive);
+      expect(result.current.latestSession!.algorithm).toEqual(SchedulingAlgorithm.PROGRESSIVE);
     });
   });
 
@@ -168,7 +173,11 @@ describe('useCurrentCardData', () => {
     it('cardMeta is initialized from latestSession with LBL mode', async () => {
       const currentCardRefUid = 'id_lbl';
       const session = {
-        ...generateNewSession({ reviewMode: ReviewModes.SpacedIntervalLBL, isNew: false }),
+        ...generateNewSession({
+          algorithm: SchedulingAlgorithm.SM2,
+          interaction: InteractionStyle.LBL,
+          isNew: false,
+        }),
       };
 
       const { result } = renderHook(() =>
@@ -178,14 +187,15 @@ describe('useCurrentCardData', () => {
         })
       );
 
-      expect(result.current.cardMeta?.reviewMode).toEqual(ReviewModes.SpacedIntervalLBL);
-      expect(result.current.reviewMode).toEqual(ReviewModes.SpacedIntervalLBL);
+      expect(result.current.cardMeta?.interaction).toEqual(InteractionStyle.LBL);
+      expect(result.current.interaction).toEqual(InteractionStyle.LBL);
     });
 
     it('applyOptimisticCardMeta updates cardMeta immediately', async () => {
       const currentCardRefUid = 'id_opt';
       const session = generateNewSession({
-        reviewMode: ReviewModes.FixedProgressive,
+        algorithm: SchedulingAlgorithm.PROGRESSIVE,
+        interaction: InteractionStyle.NORMAL,
         isNew: false,
       });
 
@@ -196,17 +206,18 @@ describe('useCurrentCardData', () => {
         })
       );
 
-      expect(result.current.reviewMode).toEqual(ReviewModes.FixedProgressive);
+      expect(result.current.algorithm).toEqual(SchedulingAlgorithm.PROGRESSIVE);
 
       act(() => {
         result.current.applyOptimisticCardMeta({
-          reviewMode: ReviewModes.SpacedInterval,
+          algorithm: SchedulingAlgorithm.SM2,
+          interaction: InteractionStyle.NORMAL,
           lineByLineProgress: undefined,
         });
       });
 
-      expect(result.current.cardMeta?.reviewMode).toEqual(ReviewModes.SpacedInterval);
-      expect(result.current.reviewMode).toEqual(ReviewModes.SpacedInterval);
+      expect(result.current.cardMeta?.algorithm).toEqual(SchedulingAlgorithm.SM2);
+      expect(result.current.algorithm).toEqual(SchedulingAlgorithm.SM2);
     });
   });
 });

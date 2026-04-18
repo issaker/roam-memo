@@ -1,5 +1,5 @@
 import * as practice from '~/practice';
-import { ReviewModes } from '~/models/session';
+import { SchedulingAlgorithm, InteractionStyle } from '~/models/session';
 
 describe('supermemo: simulate practice', () => {
   let initInput;
@@ -129,7 +129,8 @@ describe('supermemo: simulate practice', () => {
     test('generatePracticeData does not pass through line-by-line fields (managed separately)', () => {
       const result = practice.generatePracticeData({
         dateCreated: new Date('2026-04-14T00:00:00.000Z'),
-        reviewMode: ReviewModes.SpacedInterval,
+        algorithm: SchedulingAlgorithm.SM2,
+        interaction: InteractionStyle.NORMAL,
         grade: 5,
         interval: 0,
         repetitions: 0,
@@ -137,7 +138,7 @@ describe('supermemo: simulate practice', () => {
       });
 
       expect(result.lineByLineProgress).toBeUndefined();
-      expect(result.reviewMode).toBe(ReviewModes.SpacedInterval);
+      expect(result.algorithm).toBe(SchedulingAlgorithm.SM2);
     });
   });
 
@@ -145,7 +146,8 @@ describe('supermemo: simulate practice', () => {
     test('Progressive mode does not increment SM2 repetitions', () => {
       const result = practice.generatePracticeData({
         dateCreated: new Date('2026-04-15T00:00:00.000Z'),
-        reviewMode: ReviewModes.FixedProgressive,
+        algorithm: SchedulingAlgorithm.PROGRESSIVE,
+        interaction: InteractionStyle.NORMAL,
         interval: 11,
         repetitions: 3,
         eFactor: 2.26,
@@ -160,7 +162,8 @@ describe('supermemo: simulate practice', () => {
     test('Progressive mode inherits SM2 interval and eFactor unchanged', () => {
       const result = practice.generatePracticeData({
         dateCreated: new Date('2026-04-15T00:00:00.000Z'),
-        reviewMode: ReviewModes.FixedProgressive,
+        algorithm: SchedulingAlgorithm.PROGRESSIVE,
+        interaction: InteractionStyle.NORMAL,
         interval: 11,
         repetitions: 3,
         eFactor: 2.26,
@@ -175,7 +178,8 @@ describe('supermemo: simulate practice', () => {
     test('Progressive mode does not write SM2 fields when they are undefined', () => {
       const result = practice.generatePracticeData({
         dateCreated: new Date('2026-04-15T00:00:00.000Z'),
-        reviewMode: ReviewModes.FixedProgressive,
+        algorithm: SchedulingAlgorithm.PROGRESSIVE,
+        interaction: InteractionStyle.NORMAL,
         progressiveRepetitions: 0,
       });
 
@@ -190,7 +194,8 @@ describe('supermemo: simulate practice', () => {
     test('SM2 mode inherits progressiveRepetitions and intervalMultiplier', () => {
       const result = practice.generatePracticeData({
         dateCreated: new Date('2026-04-15T00:00:00.000Z'),
-        reviewMode: ReviewModes.SpacedInterval,
+        algorithm: SchedulingAlgorithm.SM2,
+        interaction: InteractionStyle.NORMAL,
         grade: 4,
         interval: 6,
         repetitions: 2,
@@ -208,7 +213,8 @@ describe('supermemo: simulate practice', () => {
     test('SM2 mode does not write Progressive fields when they are undefined', () => {
       const result = practice.generatePracticeData({
         dateCreated: new Date('2026-04-15T00:00:00.000Z'),
-        reviewMode: ReviewModes.SpacedInterval,
+        algorithm: SchedulingAlgorithm.SM2,
+        interaction: InteractionStyle.NORMAL,
         grade: 5,
         interval: 0,
         repetitions: 0,
@@ -224,7 +230,8 @@ describe('supermemo: simulate practice', () => {
     test('Switching SM2 → Progressive preserves SM2 fields', () => {
       const sm2Result = practice.generatePracticeData({
         dateCreated: new Date('2026-04-15T00:00:00.000Z'),
-        reviewMode: ReviewModes.SpacedInterval,
+        algorithm: SchedulingAlgorithm.SM2,
+        interaction: InteractionStyle.NORMAL,
         grade: 4,
         interval: 6,
         repetitions: 2,
@@ -233,7 +240,8 @@ describe('supermemo: simulate practice', () => {
 
       const progResult = practice.generatePracticeData({
         dateCreated: new Date('2026-04-15T00:00:00.000Z'),
-        reviewMode: ReviewModes.FixedProgressive,
+        algorithm: SchedulingAlgorithm.PROGRESSIVE,
+        interaction: InteractionStyle.NORMAL,
         interval: sm2Result.interval,
         repetitions: sm2Result.repetitions,
         eFactor: sm2Result.eFactor,
@@ -260,7 +268,8 @@ describe('supermemo: simulate practice', () => {
 
       const progResult = practice.generatePracticeData({
         dateCreated: new Date('2026-04-15T00:00:00.000Z'),
-        reviewMode: ReviewModes.FixedProgressive,
+        algorithm: SchedulingAlgorithm.PROGRESSIVE,
+        interaction: InteractionStyle.NORMAL,
         interval: 11,
         repetitions: 3,
         eFactor: 2.26,
@@ -273,7 +282,8 @@ describe('supermemo: simulate practice', () => {
 
       const sm2Result = practice.generatePracticeData({
         dateCreated: new Date('2026-04-15T00:00:00.000Z'),
-        reviewMode: ReviewModes.SpacedInterval,
+        algorithm: SchedulingAlgorithm.SM2,
+        interaction: InteractionStyle.NORMAL,
         grade: 4,
         interval: progResult.interval,
         repetitions: progResult.repetitions,
@@ -289,7 +299,8 @@ describe('supermemo: simulate practice', () => {
     test('Switching Progressive → SM2 preserves Progressive fields', () => {
       const progResult = practice.generatePracticeData({
         dateCreated: new Date('2026-04-15T00:00:00.000Z'),
-        reviewMode: ReviewModes.FixedProgressive,
+        algorithm: SchedulingAlgorithm.PROGRESSIVE,
+        interaction: InteractionStyle.NORMAL,
         interval: 11,
         repetitions: 3,
         eFactor: 2.26,
@@ -299,7 +310,8 @@ describe('supermemo: simulate practice', () => {
 
       const sm2Result = practice.generatePracticeData({
         dateCreated: new Date('2026-04-15T00:00:00.000Z'),
-        reviewMode: ReviewModes.SpacedInterval,
+        algorithm: SchedulingAlgorithm.SM2,
+        interaction: InteractionStyle.NORMAL,
         grade: 4,
         interval: progResult.interval,
         repetitions: progResult.repetitions,

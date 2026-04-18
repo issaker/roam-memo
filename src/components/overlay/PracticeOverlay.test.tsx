@@ -5,7 +5,7 @@ import * as dateUtils from '~/utils/date';
 
 import App from '~/app';
 import { shouldReinsertReadCard } from './PracticeOverlay';
-import { ReviewModes } from '~/models/session';
+import { SchedulingAlgorithm, InteractionStyle } from '~/models/session';
 import * as saveQueries from '~/queries/save';
 
 /** Check that a Date value is within toleranceMs of the expected Date (default 1s) */
@@ -100,7 +100,7 @@ describe('PracticeOverlay', () => {
   it('Grading works correctly when switching review modes', async () => {
     const mockBuilder = new testUtils.MockDataBuilder();
 
-    jest.spyOn(saveQueries, 'updateCardType').mockResolvedValue(undefined);
+    jest.spyOn(saveQueries, 'updateReviewConfig').mockResolvedValue(undefined);
 
     const dueCard1 = 'id_due_1';
     mockBuilder.withCard({ uid: dueCard1 }).withSession(dueCard1, {
@@ -129,7 +129,7 @@ describe('PracticeOverlay', () => {
 
     const result = await testUtils.grade('Good', mockBuilder);
     expect(result.updatedRecord).toMatchObject({
-      reviewMode: ReviewModes.SpacedInterval,
+      algorithm: SchedulingAlgorithm.SM2,
       dataPageTitle: testUtils.dataPageTitle,
       refUid: 'id_due_1',
     });
@@ -142,11 +142,12 @@ describe('PracticeOverlay', () => {
   it('Grading works correctly when switching review modes starting with fixed', async () => {
     const mockBuilder = new testUtils.MockDataBuilder();
 
-    jest.spyOn(saveQueries, 'updateCardType').mockResolvedValue(undefined);
+    jest.spyOn(saveQueries, 'updateReviewConfig').mockResolvedValue(undefined);
 
     const dueCard1 = 'id_due_1';
     mockBuilder.withCard({ uid: dueCard1 }).withSession(dueCard1, {
-      reviewMode: ReviewModes.FixedProgressive,
+      algorithm: SchedulingAlgorithm.PROGRESSIVE,
+      interaction: InteractionStyle.NORMAL,
       grade: 1,
       dateCreated: dateUtils.subtractDays(new Date(), 1),
       nextDueDate: new Date(),
@@ -163,19 +164,20 @@ describe('PracticeOverlay', () => {
 
     const result = await testUtils.grade('Next', mockBuilder);
     expect(result.updatedRecord).toMatchObject({
-      reviewMode: ReviewModes.FixedProgressive,
+      algorithm: SchedulingAlgorithm.PROGRESSIVE,
       dataPageTitle: testUtils.dataPageTitle,
       refUid: 'id_due_1',
     });
   });
 
-  it('persists SPACED_INTERVAL when grading right after switching from fixed mode', async () => {
+  it('persists SM2 when grading right after switching from fixed mode', async () => {
     const mockBuilder = new testUtils.MockDataBuilder();
-    jest.spyOn(saveQueries, 'updateCardType').mockResolvedValue(undefined);
+    jest.spyOn(saveQueries, 'updateReviewConfig').mockResolvedValue(undefined);
 
     const dueCard1 = 'id_due_1';
     mockBuilder.withCard({ uid: dueCard1 }).withSession(dueCard1, {
-      reviewMode: ReviewModes.FixedProgressive,
+      algorithm: SchedulingAlgorithm.PROGRESSIVE,
+      interaction: InteractionStyle.NORMAL,
       grade: 1,
       dateCreated: dateUtils.subtractDays(new Date(), 1),
       nextDueDate: new Date(),
@@ -191,12 +193,12 @@ describe('PracticeOverlay', () => {
     });
 
     await act(async () => {
-      await testUtils.actions.clickSwitchReviewModeButton('Spaced Interval');
+      await testUtils.actions.clickSwitchReviewModeButton('SM2');
     });
 
     const result = await testUtils.grade('Good', mockBuilder);
     expect(result.updatedRecord).toMatchObject({
-      reviewMode: ReviewModes.SpacedInterval,
+      algorithm: SchedulingAlgorithm.SM2,
       dataPageTitle: testUtils.dataPageTitle,
       refUid: 'id_due_1',
     });
@@ -207,7 +209,8 @@ describe('PracticeOverlay', () => {
     const dueCard1 = 'id_due_fixed_1';
 
     mockBuilder.withCard({ uid: dueCard1 }).withSession(dueCard1, {
-      reviewMode: ReviewModes.FixedProgressive,
+      algorithm: SchedulingAlgorithm.PROGRESSIVE,
+      interaction: InteractionStyle.NORMAL,
       grade: 1,
       dateCreated: dateUtils.subtractDays(new Date(), 1),
       nextDueDate: new Date(),
@@ -226,12 +229,13 @@ describe('PracticeOverlay', () => {
     expect(screen.getByText('Next')).toBeInTheDocument();
   });
 
-  it('Incremental Read (FIXED_PROGRESSIVE_LBL) shows line-by-line reading UI', async () => {
+  it('Incremental Read (PROGRESSIVE + READ) shows line-by-line reading UI', async () => {
     const mockBuilder = new testUtils.MockDataBuilder();
     const dueCard1 = 'id_due_fixed_lbl';
 
     mockBuilder.withCard({ uid: dueCard1 }).withSession(dueCard1, {
-      reviewMode: ReviewModes.FixedProgressiveLBL,
+      algorithm: SchedulingAlgorithm.PROGRESSIVE,
+      interaction: InteractionStyle.READ,
       lineByLineProgress: JSON.stringify({}),
       grade: 1,
       dateCreated: dateUtils.subtractDays(new Date(), 1),

@@ -6,71 +6,12 @@
  *   The latest session block is the single source of truth.
  *
  *   Session block fields:
- *   - reviewMode:         The card's review algorithm mode (e.g. SPACED_INTERVAL, FIXED_PROGRESSIVE).
- *                         LBL modes (SPACED_INTERVAL_LBL, FIXED_PROGRESSIVE_LBL) encode
- *                         line-by-line functionality directly — no separate lineByLineReview field.
+ *   - algorithm:          Scheduling algorithm (SM2, PROGRESSIVE, FIXED_DAYS, etc.)
+ *   - interaction:        Interaction style (NORMAL, LBL, READ)
  *   - nextDueDate:        Next due date for the card.
  *   - lineByLineProgress: JSON string tracking per-child progress for LBL cards.
  *   - grade, interval, repetitions, eFactor, etc.: Algorithm-specific parameters.
  */
-
-export enum ReviewModes {
-  SpacedInterval = 'SPACED_INTERVAL',
-  SpacedIntervalLBL = 'SPACED_INTERVAL_LBL',       // LBL Review (逐行复习)
-  FixedProgressive = 'FIXED_PROGRESSIVE',
-  FixedProgressiveLBL = 'FIXED_PROGRESSIVE_LBL',   // Incremental Read (渐进阅读)
-  FixedDays = 'FIXED_DAYS',
-  FixedWeeks = 'FIXED_WEEKS',
-  FixedMonths = 'FIXED_MONTHS',
-  FixedYears = 'FIXED_YEARS',
-}
-
-export const isFixedMode = (mode: ReviewModes | undefined): boolean =>
-  mode === ReviewModes.FixedProgressive ||
-  mode === ReviewModes.FixedProgressiveLBL ||
-  mode === ReviewModes.FixedDays ||
-  mode === ReviewModes.FixedWeeks ||
-  mode === ReviewModes.FixedMonths ||
-  mode === ReviewModes.FixedYears;
-
-export const isSpacedMode = (mode: ReviewModes | undefined): boolean =>
-  mode === ReviewModes.SpacedInterval || mode === ReviewModes.SpacedIntervalLBL;
-
-export const isLBLReviewMode = (mode: ReviewModes | undefined): boolean =>
-  mode === ReviewModes.SpacedIntervalLBL;
-
-export const isIncrementalReadMode = (mode: ReviewModes | undefined): boolean =>
-  mode === ReviewModes.FixedProgressiveLBL;
-
-export const isSM2LBLMode = isLBLReviewMode;
-export const isProgressiveLBLMode = isIncrementalReadMode;
-
-export const DEFAULT_REVIEW_MODE = ReviewModes.FixedProgressive;
-
-export const LEGACY_REVIEW_MODE_MAP: Record<string, ReviewModes> = {
-  FIXED_INTERVAL: ReviewModes.FixedProgressive,
-  SPACED_INTERVAL: ReviewModes.SpacedInterval,
-};
-
-export const resolveReviewMode = (rawMode: string | undefined, intervalMultiplierType?: string): ReviewModes => {
-  if (!rawMode) return DEFAULT_REVIEW_MODE;
-  if (rawMode in ReviewModes) return rawMode as ReviewModes;
-  if (rawMode in LEGACY_REVIEW_MODE_MAP) {
-    const resolved = LEGACY_REVIEW_MODE_MAP[rawMode];
-    if (resolved === ReviewModes.FixedProgressive && intervalMultiplierType) {
-      const subModeMap: Record<string, ReviewModes> = {
-        Days: ReviewModes.FixedDays,
-        Weeks: ReviewModes.FixedWeeks,
-        Months: ReviewModes.FixedMonths,
-        Years: ReviewModes.FixedYears,
-        Progressive: ReviewModes.FixedProgressive,
-      };
-      return subModeMap[intervalMultiplierType] || resolved;
-    }
-    return resolved;
-  }
-  return DEFAULT_REVIEW_MODE;
-};
 
 interface SessionCommon {
   nextDueDate?: Date;
@@ -78,12 +19,9 @@ interface SessionCommon {
   isRoamSrOldPracticeRecord?: boolean;
 }
 
-/**
- * Session: represents a single review record for a card.
- * All fields are stored uniformly in session blocks.
- */
 export type Session = {
-  reviewMode: ReviewModes;
+  algorithm: SchedulingAlgorithm;
+  interaction: InteractionStyle;
   repetitions?: number;
   interval?: number;
   eFactor?: number;
@@ -93,12 +31,9 @@ export type Session = {
   lineByLineProgress?: string;
 } & SessionCommon;
 
-/**
- * CardMeta: derived from the latest session block for UI convenience.
- * No longer persisted separately — the latest session is the authority.
- */
 export interface CardMeta {
-  reviewMode?: ReviewModes;
+  algorithm: SchedulingAlgorithm;
+  interaction: InteractionStyle;
   lineByLineProgress?: string;
   nextDueDate?: Date;
 }
@@ -130,3 +65,91 @@ export interface LineByLineChildData {
 }
 
 export type LineByLineProgressMap = Record<string, LineByLineChildData>;
+
+export enum SchedulingAlgorithm {
+  SM2 = 'SM2',
+  PROGRESSIVE = 'PROGRESSIVE',
+  FIXED_DAYS = 'FIXED_DAYS',
+  FIXED_WEEKS = 'FIXED_WEEKS',
+  FIXED_MONTHS = 'FIXED_MONTHS',
+  FIXED_YEARS = 'FIXED_YEARS',
+}
+
+export enum InteractionStyle {
+  NORMAL = 'NORMAL',
+  LBL = 'LBL',
+  READ = 'READ',
+}
+
+export type ReviewConfig = {
+  algorithm: SchedulingAlgorithm;
+  interaction: InteractionStyle;
+};
+
+export const DEFAULT_REVIEW_CONFIG: ReviewConfig = {
+  algorithm: SchedulingAlgorithm.SM2,
+  interaction: InteractionStyle.NORMAL,
+};
+
+export type AlgorithmGroup = 'Spaced' | 'Fixed';
+
+export type AlgorithmMeta = {
+  group: AlgorithmGroup;
+  label: string;
+};
+
+export type InteractionMeta = {
+  label: string;
+  icon?: string;
+};
+
+export const ALGORITHM_META: Record<SchedulingAlgorithm, AlgorithmMeta> = {
+  [SchedulingAlgorithm.SM2]: { group: 'Spaced', label: 'SM2' },
+  [SchedulingAlgorithm.PROGRESSIVE]: { group: 'Fixed', label: 'Progressive' },
+  [SchedulingAlgorithm.FIXED_DAYS]: { group: 'Fixed', label: 'Fixed Days' },
+  [SchedulingAlgorithm.FIXED_WEEKS]: { group: 'Fixed', label: 'Fixed Weeks' },
+  [SchedulingAlgorithm.FIXED_MONTHS]: { group: 'Fixed', label: 'Fixed Months' },
+  [SchedulingAlgorithm.FIXED_YEARS]: { group: 'Fixed', label: 'Fixed Years' },
+};
+
+export const INTERACTION_META: Record<InteractionStyle, InteractionMeta> = {
+  [InteractionStyle.NORMAL]: { label: 'Normal', icon: 'layers' },
+  [InteractionStyle.LBL]: { label: 'Line by Line', icon: 'list' },
+  [InteractionStyle.READ]: { label: 'Incremental Read', icon: 'book' },
+};
+
+export const isFixedAlgorithm = (algorithm: SchedulingAlgorithm): boolean => {
+  return ALGORITHM_META[algorithm]?.group === 'Fixed';
+};
+
+export const isSpacedAlgorithm = (algorithm: SchedulingAlgorithm): boolean => {
+  return ALGORITHM_META[algorithm]?.group === 'Spaced';
+};
+
+export const isFixedMode = (mode: SchedulingAlgorithm | undefined): boolean => {
+  if (!mode) return false;
+  return isFixedAlgorithm(mode);
+};
+
+export const isSpacedMode = (mode: SchedulingAlgorithm | undefined): boolean => {
+  if (!mode) return false;
+  return isSpacedAlgorithm(mode);
+};
+
+export const isLBLReviewMode = (interaction?: InteractionStyle): boolean =>
+  interaction === InteractionStyle.LBL;
+
+export const isIncrementalReadMode = (interaction?: InteractionStyle): boolean =>
+  interaction === InteractionStyle.READ;
+
+export const isLineByLineUI = (interaction?: InteractionStyle): boolean =>
+  isLBLReviewMode(interaction) || isIncrementalReadMode(interaction);
+
+export const resolveReviewConfig = (
+  rawAlgorithm?: string,
+  rawInteraction?: string
+): ReviewConfig => {
+  const algorithm = Object.values(SchedulingAlgorithm).find(a => a === rawAlgorithm) || DEFAULT_REVIEW_CONFIG.algorithm;
+  const interaction = Object.values(InteractionStyle).find(i => i === rawInteraction) || DEFAULT_REVIEW_CONFIG.interaction;
+  return { algorithm, interaction };
+};

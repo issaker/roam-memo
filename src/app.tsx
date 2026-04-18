@@ -14,6 +14,7 @@ import * as React from 'react';
 import * as Blueprint from '@blueprintjs/core';
 import PracticeOverlay from '~/components/overlay/PracticeOverlay';
 import SidePanelWidget from '~/components/SidePanelWidget';
+import { PracticeSessionProvider } from '~/contexts/PracticeSessionContext';
 import practice from '~/practice';
 import usePracticeData from '~/hooks/usePracticeData';
 import useTags from '~/hooks/useTags';
@@ -42,13 +43,7 @@ const App = () => {
     tagsListString,
     dataPageTitle,
     dailyLimit,
-    historyCleanupKeepCount,
-    rtlEnabled,
     shuffleCards,
-    forgotReinsertOffset,
-    readReinsertOffset,
-    showBreadcrumbs,
-    showModeBorders,
   } = settings;
   const { selectedTag, setSelectedTag, tagsList } = useTags({ tagsListString });
 
@@ -114,7 +109,7 @@ const App = () => {
     refreshData();
   };
 
-  const handleMemoTagChange = (tag) => {
+  const handleMemoTagChange = (tag: string) => {
     setSelectedTag(tag);
   };
 
@@ -165,31 +160,26 @@ const App = () => {
       <>
         <SidePanelWidget onClickCallback={onShowPracticeOverlay} today={today} />
         {showPracticeOverlay && (
-          <PracticeOverlay
-            setRenderMode={setRenderMode}
-            isOpen={true}
+          <PracticeSessionProvider
+            settings={settings}
             practiceData={practiceData}
-            handlePracticeClick={handlePracticeClick}
-            onCloseCallback={onClosePracticeOverlayCallback}
-            handleMemoTagChange={handleMemoTagChange}
-            tagsList={tagsList}
+            today={today}
             selectedTag={selectedTag}
+            tagsList={tagsList}
             isCramming={isCramming}
             setIsCramming={setIsCramming}
-            rtlEnabled={rtlEnabled}
-            today={today}
-            forgotReinsertOffset={forgotReinsertOffset}
-            readReinsertOffset={readReinsertOffset}
+            handlePracticeClick={handlePracticeClick}
+            handleMemoTagChange={handleMemoTagChange}
             fetchPracticeData={fetchPracticeData}
             dataPageTitle={dataPageTitle}
-            historyCleanupKeepCount={historyCleanupKeepCount}
-            showBreadcrumbs={showBreadcrumbs}
-            showModeBorders={showModeBorders}
-            tagsListString={tagsListString}
-            dailyLimit={dailyLimit}
-            shuffleCards={shuffleCards}
+            setRenderMode={setRenderMode}
             updateSetting={updateSetting}
-          />
+          >
+            <PracticeOverlay
+              isOpen={true}
+              onCloseCallback={onClosePracticeOverlayCallback}
+            />
+          </PracticeSessionProvider>
         )}
       </>
     </Blueprint.HotkeysProvider>

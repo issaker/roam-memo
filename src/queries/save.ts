@@ -6,7 +6,8 @@
  * Unified data layout — all fields stored in session blocks:
  *   ((cardUid))
  *   ├── [[Date]] 🟢            ← latest session block
- *   │   ├── reviewMode:: FIXED_PROGRESSIVE
+ *   │   ├── algorithm:: SM2
+ *   │   ├── interaction:: NORMAL
  *   │   ├── nextDueDate:: [[Date]]
  *   │   ├── lineByLineProgress:: {...}
  *   │   ├── grade:: 5
@@ -15,14 +16,14 @@
  *   └── [[Date]] 🔴            ← older session block
  *       └── ...
  *
- * The meta block has been removed. reviewMode and nextDueDate are now
+ * The meta block has been removed. algorithm and interaction are now
  * stored in each session record alongside algorithm-specific fields.
  * lineByLineReview is no longer stored — its function is encoded in
- * the reviewMode value (e.g. SPACED_INTERVAL_LBL, FIXED_PROGRESSIVE_LBL).
+ * the interaction value (e.g. LINE_BY_LINE).
  */
 import * as stringUtils from '~/utils/string';
 import * as dateUtils from '~/utils/date';
-import { LineByLineProgressMap, ReviewModes } from '~/models/session';
+import { LineByLineProgressMap, SchedulingAlgorithm, InteractionStyle } from '~/models/session';
 import {
   createChildBlock,
   getChildBlock,
@@ -30,8 +31,6 @@ import {
   getOrCreateChildBlock,
   getOrCreatePage,
 } from '~/queries/utils';
-
-import { CARD_META_SESSION_KEYS } from '~/constants';
 
 const getEmojiFromGrade = (grade) => {
   switch (grade) {
@@ -105,7 +104,7 @@ const upsertLatestSessionField = async ({
 
 /**
  * Save a single practice session result to the data page.
- * All fields (including reviewMode, nextDueDate, lineByLineProgress)
+ * All fields (including algorithm, interaction, nextDueDate, lineByLineProgress)
  * are written to the session block.
  */
 export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...data }) => {
@@ -133,7 +132,7 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
 
   for (const key of Object.keys(data)) {
     if (data[key] === undefined) continue;
-    if (CARD_META_SESSION_KEYS.has(key)) continue;
+    if (key === 'reviewMode') continue;
 
     let value = data[key];
     if (key === 'nextDueDate') {
@@ -144,6 +143,13 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
     }
 
     await createChildBlock(newDataBlockId, `${key}:: ${value}`, -1);
+  }
+
+  if (data.algorithm) {
+    await createChildBlock(newDataBlockId, `algorithm:: ${data.algorithm}`, -1);
+  }
+  if (data.interaction) {
+    await createChildBlock(newDataBlockId, `interaction:: ${data.interaction}`, -1);
   }
 };
 
@@ -210,17 +216,19 @@ export const updateLineByLineProgress = async ({
 };
 
 /**
- * Update reviewMode in the latest session block.
- * lineByLineReview is no longer stored — LBL is encoded in reviewMode.
+ * Update algorithm and interaction in the latest session block.
+ * lineByLineReview is no longer stored — LBL is encoded in interaction.
  */
-export const updateCardType = async ({
+export const updateReviewConfig = async ({
   refUid,
   dataPageTitle,
-  reviewMode,
+  algorithm,
+  interaction,
 }: {
   refUid: string;
   dataPageTitle: string;
-  reviewMode: ReviewModes;
+  algorithm?: SchedulingAlgorithm;
+  interaction?: InteractionStyle;
 }) => {
   await getOrCreatePage(dataPageTitle);
   const dataBlockUid = await getOrCreateBlockOnPage(dataPageTitle, 'data', -1, {
@@ -232,5 +240,10 @@ export const updateCardType = async ({
     open: false,
   });
 
-  await upsertLatestSessionField({ cardDataBlockUid, key: 'reviewMode', value: reviewMode });
+  if (algorithm) {
+    await upsertLatestSessionField({ cardDataBlockUid, key: 'algorithm', value: algorithm });
+  }
+  if (interaction) {
+    await upsertLatestSessionField({ cardDataBlockUid, key: 'interaction', value: interaction });
+  }
 };

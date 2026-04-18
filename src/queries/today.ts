@@ -33,10 +33,6 @@ export const initializeToday = ({ tagsList, cachedData }) => {
       newUids: [],
       dueUids: [],
       completedUids: [],
-      completedDue: 0,
-      completedNew: 0,
-      completedDueUids: [],
-      completedNewUids: [],
       renderMode: cachedTagData?.renderMode || RenderMode.Normal,
     };
   }
@@ -74,8 +70,6 @@ export const calculateCompletedTodayCounts = ({ today, tagsList, sessionData }) 
   for (const tag of tagsList) {
     let count = 0;
     const completedUids: RecordUid[] = [];
-    const completedDueUids: RecordUid[] = [];
-    const completedNewUids: RecordUid[] = [];
 
     const currentTagSessionData = sessionData[tag];
     Object.keys(currentTagSessionData).forEach((cardUid) => {
@@ -86,14 +80,8 @@ export const calculateCompletedTodayCounts = ({ today, tagsList, sessionData }) 
         latestSession && dateUtils.isSameDay(latestSession.dateCreated, new Date());
 
       if (isCompletedToday) {
-        const isFirstSession = cardData.length === 1;
-        const wasDueToday = !isFirstSession;
-        const wasNew = isFirstSession;
-
         count++;
         completedUids.push(cardUid);
-        if (wasDueToday) completedDueUids.push(cardUid);
-        if (wasNew) completedNewUids.push(cardUid);
       }
     });
 
@@ -101,10 +89,6 @@ export const calculateCompletedTodayCounts = ({ today, tagsList, sessionData }) 
       ...(today.tags[tag] || {}),
       completed: count,
       completedUids,
-      completedDueUids,
-      completedNewUids,
-      completedDue: completedDueUids.length,
-      completedNew: completedNewUids.length,
     };
   }
 
@@ -120,10 +104,6 @@ export const calculateCombinedCounts = ({ today, tagsList }) => {
     newUids: [],
     completed: 0,
     completedUids: [],
-    completedDue: 0,
-    completedDueUids: [],
-    completedNew: 0,
-    completedNewUids: [],
   };
 
   for (const tag of tagsList) {
@@ -134,14 +114,6 @@ export const calculateCombinedCounts = ({ today, tagsList }) => {
     today.combinedToday.completed += today.tags[tag].completed;
     today.combinedToday.completedUids = today.combinedToday.completedUids.concat(
       today.tags[tag].completedUids
-    );
-    today.combinedToday.completedDue += today.tags[tag].completedDue;
-    today.combinedToday.completedDueUids = today.combinedToday.completedDueUids.concat(
-      today.tags[tag].completedDueUids
-    );
-    today.combinedToday.completedNew += today.tags[tag].completedNew;
-    today.combinedToday.completedNewUids = today.combinedToday.completedNewUids.concat(
-      today.tags[tag].completedNewUids
     );
   }
 };
@@ -258,19 +230,5 @@ export const addDueCards = ({ today, tagsList, sessionData, isCramming, shuffleC
       dueUids: dueCardsUids,
       due: dueCardsUids.length,
     };
-  }
-};
-
-/**
- * Restores completed card UIDs back into the new/due lists.
- * Needed so that the daily limit algorithm can compute the original
- * distribution before any cards were completed.
- */
-export const restoreCompletedUids = ({ today, tagsList }) => {
-  for (const currentTag of tagsList) {
-    today.tags[currentTag].newUids.push(...today.tags[currentTag].completedNewUids);
-    today.tags[currentTag].dueUids.push(...today.tags[currentTag].completedDueUids);
-    today.tags[currentTag].new = today.tags[currentTag].newUids.length;
-    today.tags[currentTag].due = today.tags[currentTag].dueUids.length;
   }
 };
