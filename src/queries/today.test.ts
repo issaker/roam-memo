@@ -1,5 +1,5 @@
 import { getDueCardUids } from './today';
-import { CompleteRecords, SchedulingAlgorithm, InteractionStyle, Session } from '~/models/session';
+import { Records, SchedulingAlgorithm, InteractionStyle, Session } from '~/models/session';
 
 const makeSession = (overrides: Partial<Session> = {}): Session => ({
   algorithm: SchedulingAlgorithm.SM2,
@@ -9,8 +9,6 @@ const makeSession = (overrides: Partial<Session> = {}): Session => ({
   sm2_eFactor: 2.5,
   ...overrides,
 });
-
-const makeCardData = (overrides: Partial<Session> = {}): Session[] => [makeSession(overrides)];
 
 describe('getDueCardUids', () => {
   it('returns empty array when no session data', () => {
@@ -23,9 +21,9 @@ describe('getDueCardUids', () => {
     const pastDate = new Date(now.getTime() - 86400000);
     const futureDate = new Date(now.getTime() + 86400000);
 
-    const sessionData: CompleteRecords = {
-      card_past: makeCardData({ nextDueDate: pastDate }),
-      card_future: makeCardData({ nextDueDate: futureDate }),
+    const sessionData: Records = {
+      card_past: makeSession({ nextDueDate: pastDate }),
+      card_future: makeSession({ nextDueDate: futureDate }),
     };
 
     const result = getDueCardUids(sessionData, false);
@@ -36,9 +34,9 @@ describe('getDueCardUids', () => {
     const now = new Date();
     const futureDate = new Date(now.getTime() + 86400000 * 7);
 
-    const sessionData: CompleteRecords = {
-      card_a: makeCardData({ nextDueDate: futureDate }),
-      card_b: makeCardData({ nextDueDate: futureDate }),
+    const sessionData: Records = {
+      card_a: makeSession({ nextDueDate: futureDate }),
+      card_b: makeSession({ nextDueDate: futureDate }),
     };
 
     const result = getDueCardUids(sessionData, true);
@@ -52,10 +50,10 @@ describe('getDueCardUids', () => {
       const oneDayOverdue = new Date(now.getTime() - 86400000);
       const justDue = new Date(now.getTime() - 1000);
 
-      const sessionData: CompleteRecords = {
-        card_just_due: makeCardData({ nextDueDate: justDue }),
-        card_five_overdue: makeCardData({ nextDueDate: fiveDaysOverdue }),
-        card_one_overdue: makeCardData({ nextDueDate: oneDayOverdue }),
+      const sessionData: Records = {
+        card_just_due: makeSession({ nextDueDate: justDue }),
+        card_five_overdue: makeSession({ nextDueDate: fiveDaysOverdue }),
+        card_one_overdue: makeSession({ nextDueDate: oneDayOverdue }),
       };
 
       const result = getDueCardUids(sessionData, false);
@@ -71,9 +69,9 @@ describe('getDueCardUids', () => {
       const tenDaysOverdue = new Date(now.getTime() - 86400000 * 10);
       const oneDayOverdue = new Date(now.getTime() - 86400000);
 
-      const sessionData: CompleteRecords = {
-        card_less_overdue: makeCardData({ nextDueDate: oneDayOverdue }),
-        card_more_overdue: makeCardData({ nextDueDate: tenDaysOverdue }),
+      const sessionData: Records = {
+        card_less_overdue: makeSession({ nextDueDate: oneDayOverdue }),
+        card_more_overdue: makeSession({ nextDueDate: tenDaysOverdue }),
       };
 
       const result = getDueCardUids(sessionData, false);
@@ -86,10 +84,10 @@ describe('getDueCardUids', () => {
       const now = new Date();
       const sameDate = new Date(now.getTime() - 86400000);
 
-      const sessionData: CompleteRecords = {
-        card_easy: makeCardData({ nextDueDate: sameDate, sm2_eFactor: 2.8 }),
-        card_hard: makeCardData({ nextDueDate: sameDate, sm2_eFactor: 1.3 }),
-        card_medium: makeCardData({ nextDueDate: sameDate, sm2_eFactor: 2.0 }),
+      const sessionData: Records = {
+        card_easy: makeSession({ nextDueDate: sameDate, sm2_eFactor: 2.8 }),
+        card_hard: makeSession({ nextDueDate: sameDate, sm2_eFactor: 1.3 }),
+        card_medium: makeSession({ nextDueDate: sameDate, sm2_eFactor: 2.0 }),
       };
 
       const result = getDueCardUids(sessionData, false);
@@ -100,10 +98,10 @@ describe('getDueCardUids', () => {
       const now = new Date();
       const sameDate = new Date(now.getTime() - 86400000);
 
-      const sessionData: CompleteRecords = {
-        card_no_efactor: makeCardData({ nextDueDate: sameDate, sm2_eFactor: undefined }),
-        card_explicit_25: makeCardData({ nextDueDate: sameDate, sm2_eFactor: 2.5 }),
-        card_low_efactor: makeCardData({ nextDueDate: sameDate, sm2_eFactor: 1.5 }),
+      const sessionData: Records = {
+        card_no_efactor: makeSession({ nextDueDate: sameDate, sm2_eFactor: undefined }),
+        card_explicit_25: makeSession({ nextDueDate: sameDate, sm2_eFactor: 2.5 }),
+        card_low_efactor: makeSession({ nextDueDate: sameDate, sm2_eFactor: 1.5 }),
       };
 
       const result = getDueCardUids(sessionData, false);
@@ -118,10 +116,10 @@ describe('getDueCardUids', () => {
       const now = new Date();
       const sameDate = new Date(now.getTime() - 86400000);
 
-      const sessionData: CompleteRecords = {
-        card_mature: makeCardData({ nextDueDate: sameDate, sm2_eFactor: 2.5, sm2_repetitions: 10 }),
-        card_new: makeCardData({ nextDueDate: sameDate, sm2_eFactor: 2.5, sm2_repetitions: 0 }),
-        card_mid: makeCardData({ nextDueDate: sameDate, sm2_eFactor: 2.5, sm2_repetitions: 3 }),
+      const sessionData: Records = {
+        card_mature: makeSession({ nextDueDate: sameDate, sm2_eFactor: 2.5, sm2_repetitions: 10 }),
+        card_new: makeSession({ nextDueDate: sameDate, sm2_eFactor: 2.5, sm2_repetitions: 0 }),
+        card_mid: makeSession({ nextDueDate: sameDate, sm2_eFactor: 2.5, sm2_repetitions: 3 }),
       };
 
       const result = getDueCardUids(sessionData, false);
@@ -132,9 +130,9 @@ describe('getDueCardUids', () => {
       const now = new Date();
       const sameDate = new Date(now.getTime() - 86400000);
 
-      const sessionData: CompleteRecords = {
-        card_no_reps: makeCardData({ nextDueDate: sameDate, sm2_eFactor: 2.5, sm2_repetitions: undefined }),
-        card_zero_reps: makeCardData({ nextDueDate: sameDate, sm2_eFactor: 2.5, sm2_repetitions: 0 }),
+      const sessionData: Records = {
+        card_no_reps: makeSession({ nextDueDate: sameDate, sm2_eFactor: 2.5, sm2_repetitions: undefined }),
+        card_zero_reps: makeSession({ nextDueDate: sameDate, sm2_eFactor: 2.5, sm2_repetitions: 0 }),
       };
 
       const result = getDueCardUids(sessionData, false);
@@ -148,12 +146,12 @@ describe('getDueCardUids', () => {
       const threeDaysOverdue = new Date(now.getTime() - 86400000 * 3);
       const oneDayOverdue = new Date(now.getTime() - 86400000);
 
-      const sessionData: CompleteRecords = {
-        card_a: makeCardData({ nextDueDate: threeDaysOverdue, sm2_eFactor: 2.8, sm2_repetitions: 10 }),
-        card_b: makeCardData({ nextDueDate: oneDayOverdue, sm2_eFactor: 1.3, sm2_repetitions: 0 }),
-        card_c: makeCardData({ nextDueDate: threeDaysOverdue, sm2_eFactor: 1.3, sm2_repetitions: 5 }),
-        card_d: makeCardData({ nextDueDate: threeDaysOverdue, sm2_eFactor: 1.3, sm2_repetitions: 1 }),
-        card_e: makeCardData({ nextDueDate: threeDaysOverdue, sm2_eFactor: 2.0, sm2_repetitions: 0 }),
+      const sessionData: Records = {
+        card_a: makeSession({ nextDueDate: threeDaysOverdue, sm2_eFactor: 2.8, sm2_repetitions: 10 }),
+        card_b: makeSession({ nextDueDate: oneDayOverdue, sm2_eFactor: 1.3, sm2_repetitions: 0 }),
+        card_c: makeSession({ nextDueDate: threeDaysOverdue, sm2_eFactor: 1.3, sm2_repetitions: 5 }),
+        card_d: makeSession({ nextDueDate: threeDaysOverdue, sm2_eFactor: 1.3, sm2_repetitions: 1 }),
+        card_e: makeSession({ nextDueDate: threeDaysOverdue, sm2_eFactor: 2.0, sm2_repetitions: 0 }),
       };
 
       const result = getDueCardUids(sessionData, false);

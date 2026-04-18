@@ -5,9 +5,9 @@
  * - LBL + SM2: 每行子 block 用 SM2 打分（Forgot/Hard/Good/Perfect），Forgot 触发插队
  * - LBL + Progressive/Fixed: 每行子 block 只显示 Next 按钮，点击后插队 N 张再读下一行
  *
- * 关键修复：
- * - sessionOverrides 必须同时包含 algorithm 和 interaction，否则插队后卡片模式丢失
- * - isLblNext 由 isFixedAlgorithm(algorithm) 判断，不再依赖 InteractionStyle.READ
+ * 算法独立原则：
+ * - 每个算法只操作自己的字段，其他算法字段原样传递
+ * - sessionOverrides 必须包含 algorithm 和 interaction，确保插队后卡片模式不丢失
  */
 import * as React from 'react';
 import { LineByLineProgressMap, SchedulingAlgorithm, InteractionStyle, isFixedAlgorithm } from '~/models/session';
@@ -17,17 +17,17 @@ import * as dateUtils from '~/utils/date';
 
 /**
  * 判断 LBL + Fixed 算法下是否应插队。
- * 条件：readReinsertOffset > 0 且当前子 block 不是最后一个（最后一个无需插队）。
+ * 条件：lblNextReinsertOffset > 0 且当前子 block 不是最后一个（最后一个无需插队）。
  */
-export const shouldReinsertReadCard = ({
+export const shouldReinsertLblCard = ({
   currentChildIndex,
   totalChildren,
-  readReinsertOffset,
+  lblNextReinsertOffset,
 }: {
   currentChildIndex: number;
   totalChildren: number;
-  readReinsertOffset: number;
-}) => readReinsertOffset > 0 && currentChildIndex < totalChildren - 1;
+  lblNextReinsertOffset: number;
+}) => lblNextReinsertOffset > 0 && currentChildIndex < totalChildren - 1;
 
 const parseLineByLineProgress = (progressStr?: string): LineByLineProgressMap => {
   if (!progressStr) return {};
@@ -41,10 +41,10 @@ const parseLineByLineProgress = (progressStr?: string): LineByLineProgressMap =>
 interface UseLineByLineReviewInput {
   currentCardRefUid: string | undefined;
   childUidsList: string[];
-  isLineByLineUI: boolean;
+  isLBLReviewMode: boolean;
   isLBLReview: boolean;
   dataPageTitle: string;
-  readReinsertOffset: number;
+  lblNextReinsertOffset: number;
   forgotReinsertOffset: number;
   currentIndex: number;
   currentCardData: any;
@@ -69,10 +69,10 @@ interface UseLineByLineReviewOutput {
 export default function useLineByLineReview({
   currentCardRefUid,
   childUidsList,
-  isLineByLineUI,
+  isLBLReviewMode,
   isLBLReview,
   dataPageTitle,
-  readReinsertOffset,
+  lblNextReinsertOffset,
   forgotReinsertOffset,
   currentIndex,
   currentCardData,
@@ -84,8 +84,6 @@ export default function useLineByLineReview({
   setCardQueue,
   lineByLineProgressStr,
 }: UseLineByLineReviewInput): UseLineByLineReviewOutput {
-  // LBL + Fixed 算法（Progressive/Fixed_*）= 自动翻页模式（原 Incremental Read 行为）
-  // LBL + SM2 = 打分模式
   const isLblNext = isFixedAlgorithm(algorithm);
   const lineByLineProgress = React.useMemo(
     () => parseLineByLineProgress(lineByLineProgressStr),
@@ -96,7 +94,7 @@ export default function useLineByLineReview({
   const [lineByLineCurrentChildIndex, setLineByLineCurrentChildIndex] = React.useState(0);
 
   React.useEffect(() => {
-    if (!isLineByLineUI || !childUidsList.length) {
+    if (!isLBLReviewMode || !childUidsList.length) {
       setLineByLineRevealedCount(0);
       setLineByLineCurrentChildIndex(0);
       return;
@@ -122,10 +120,10 @@ export default function useLineByLineReview({
     } else {
       setLineByLineRevealedCount(firstDueIndex);
     }
-  }, [isLineByLineUI, isLblNext, currentCardRefUid, childUidsList, lineByLineProgress]);
+  }, [isLBLReviewMode, isLblNext, currentCardRefUid, childUidsList, lineByLineProgress]);
 
   const lineByLineIsCardComplete =
-    isLineByLineUI && lineByLineCurrentChildIndex >= childUidsList.length;
+    isLBLReviewMode && lineByLineCurrentChildIndex >= childUidsList.length;
 
   const onLineByLineGrade = React.useCallback(
     async (grade: number) => {
@@ -145,9 +143,9 @@ export default function useLineByLineReview({
           ...lineByLineProgress,
           [childUid]: {
             nextDueDate: childNextDueDate.toISOString(),
-            sm2_interval: nextInterval,
-            sm2_repetitions: (existingData?.sm2_repetitions || 0) + 1,
-            sm2_eFactor: existingData?.sm2_eFactor || 2.5,
+            sm2_interval: existingData?.sm2_interval,
+            sm2_repetitions: existingData?.sm2_repetitions,
+            sm2_eFactor: existingData?.sm2_eFactor,
             progressive_repetitions: progReps + 1,
           },
         };
@@ -174,14 +172,14 @@ export default function useLineByLineReview({
         }));
 
         if (
-          shouldReinsertReadCard({
+          shouldReinsertLblCard({
             currentChildIndex: lineByLineCurrentChildIndex,
             totalChildren: childUidsList.length,
-            readReinsertOffset,
+            lblNextReinsertOffset,
           }) &&
           currentCardRefUid
         ) {
-          const readInsertIndex = currentIndex + 1 + readReinsertOffset;
+          const readInsertIndex = currentIndex + 1 + lblNextReinsertOffset;
           setCardQueue((prev) => {
             const newQueue = [...prev];
             const targetIndex = Math.min(readInsertIndex, newQueue.length);
@@ -215,6 +213,7 @@ export default function useLineByLineReview({
           sm2_interval: sm2Result.sm2_interval,
           sm2_repetitions: sm2Result.sm2_repetitions,
           sm2_eFactor: sm2Result.sm2_eFactor,
+          progressive_repetitions: existingData?.progressive_repetitions,
         },
       };
 
@@ -275,7 +274,7 @@ export default function useLineByLineReview({
       currentCardData,
       algorithm,
       interaction,
-      readReinsertOffset,
+      lblNextReinsertOffset,
       forgotReinsertOffset,
       currentIndex,
       setSessionOverrides,

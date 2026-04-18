@@ -7,7 +7,7 @@
  */
 import * as React from 'react';
 import { Today, TodayInitial } from '~/models/practice';
-import { CompleteRecords } from '~/models/session';
+import { Records } from '~/models/session';
 import * as queries from '~/queries';
 
 const usePracticeCardsData = ({
@@ -27,7 +27,7 @@ const usePracticeCardsData = ({
   dailyLimit: number;
   shuffleCards: boolean;
 }) => {
-  const [practiceData, setPracticeData] = React.useState<CompleteRecords>({});
+  const [practiceData, setPracticeData] = React.useState<Records>({});
   const [refetchTrigger, setRefetchTrigger] = React.useState(false);
   const [today, setToday] = React.useState<Today>(TodayInitial);
 

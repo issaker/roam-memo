@@ -44,7 +44,7 @@ export const saveSettingsToPage = async (dataPageTitle: string, settings: Settin
       rtlEnabled: settings.rtlEnabled.toString(),
       shuffleCards: settings.shuffleCards.toString(),
       forgotReinsertOffset: settings.forgotReinsertOffset.toString(),
-      readReinsertOffset: settings.readReinsertOffset.toString(),
+      lblNextReinsertOffset: settings.lblNextReinsertOffset.toString(),
       showBreadcrumbs: settings.showBreadcrumbs.toString(),
       showModeBorders: settings.showModeBorders.toString(),
       dailynoteEnabled: settings.dailynoteEnabled.toString(),
@@ -152,8 +152,11 @@ export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Setti
             case 'forgotReinsertOffset':
               loadedSettings.forgotReinsertOffset = Number(value) || 3;
               break;
+            case 'lblNextReinsertOffset':
+              loadedSettings.lblNextReinsertOffset = Number(value) || 3;
+              break;
             case 'readReinsertOffset':
-              loadedSettings.readReinsertOffset = Number(value) || 3;
+              loadedSettings.lblNextReinsertOffset = Number(value) || 3;
               break;
             case 'showBreadcrumbs':
               loadedSettings.showBreadcrumbs = value === 'true';

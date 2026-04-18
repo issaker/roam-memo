@@ -4,33 +4,11 @@ A spaced repetition plugin for [Roam Research](https://roamresearch.com), using 
 
 ![Demo Preview](https://user-images.githubusercontent.com/1279335/189250105-656e6ba3-7703-46e6-bc71-ee8c5f3e39ab.gif)
 
-## Table of Contents
+## Quick Start
 
-- [What is Spaced Repetition](#what-is-spaced-repetition)
-- [Installation](#installation)
-- [Getting Started](#getting-started)
-- [Features](#features)
-- [Architecture: SchedulingAlgorithm × InteractionStyle](#architecture-schedulingalgorithm--interactionstyle)
-  - [Scheduling Algorithms](#scheduling-algorithms)
-  - [Interaction Styles](#interaction-styles)
-  - [Algorithm Details](#algorithm-details)
-  - [Interaction Style Details](#interaction-style-details)
-  - [Dynamic Switching](#dynamic-switching)
-- [Design Decisions](#design-decisions)
-- [Data Migration](#data-migration)
-- [Urgency-Based Due Card Sorting](#urgency-based-due-card-sorting)
-- [Settings Architecture](#settings-architecture)
-- [Data Architecture](#data-architecture)
-- [Development](#development)
-- [Bug Reports & Feature Requests](#bug-reports--feature-requests)
+### Installation
 
-## What is Spaced Repetition
-
-Spaced repetition reviews information based on how well you remember it, focusing more on difficult cards and less on easy ones. This is one of the most effective methods for long-term memorization.
-
-## Installation
-
-This is a modified and upgraded version of the original Memo plugin. It cannot be installed via Roam Depot. Instead, load it using the `{{[[roam/js]]}}` block on any page in your Roam graph:
+This is a modified version of the original Memo plugin. Load it using the `{{[[roam/js]]}}` block on any page in your Roam graph:
 
 ````
 - {{[[roam/js]]}}
@@ -49,390 +27,180 @@ This is a modified and upgraded version of the original Memo plugin. It cannot b
       ```
 ````
 
-## Getting Started
+### Basic Usage
 
-1. Tag any block you wish to memorize with `#memo` (or your configured tag).
-2. Click "Review" in the sidebar to launch.
-3. Start reviewing.
+1. Tag any block you wish to memorize with `#memo` (or your configured tag)
+2. Click "Review" in the sidebar to launch
+3. Start reviewing — child blocks are treated as answers (initially hidden, click "Show Answer" to reveal)
 
-> **Tip:** Child blocks are treated as answers and are initially hidden. Click "Show Answer" to reveal them.
+### Keyboard Shortcuts
+
+| Action | Shortcut | Notes |
+|--------|----------|-------|
+| Show answer | `space` | Before answer is shown |
+| Perfect | `space` | SM2 only, after answer shown |
+| Forgot | `f` | SM2 only |
+| Hard | `h` | SM2 only |
+| Good | `g` | SM2 only |
+| Skip | `s` / `→` | |
+| Previous card | `←` | |
+| Breadcrumbs | `b` | |
+| Close memo | `esc` | |
+| Edit interval | `e` | Fixed algorithms only |
+
+Command Palette: Type "Memo: Start Review Session" (`Cmd+P` / `Ctrl+P`)
 
 ## Features
 
 ### Multi Deck Support
-
-Enter a comma-separated list of tags in "Tag Pages" in settings to create multiple decks. Supports quoted tags containing commas (e.g., `"french exam, fun facts"`). A special "DailyNote" deck is available (enabled by default) that aggregates all top-level blocks from your daily journal pages.
+Enter comma-separated tags in "Tag Pages" to create multiple decks. Supports quoted tags containing commas (e.g., `"french exam, fun facts"`).
 
 ### DailyNote Deck
-
-A special deck that aggregates all top-level blocks from your Roam Research DailyNote pages (daily journal entries) into a single review deck. Each first-level block on any DailyNote page becomes a review card.
-
-- Enabled by default; can be toggled off in Settings via "Enable DailyNote Deck"
-- Appears at the bottom of the deck selector with a calendar icon
-- Cards follow the same urgency-based sorting as regular decks
-- Cards that overlap with regular decks share the same session data
+Aggregates all top-level blocks from daily journal pages into a review deck. Enabled by default; toggle via "Enable DailyNote Deck" in Settings.
 
 ### Text Masking (Cloze)
-
-Hide text for recall practice using braces `{}`, e.g., `{hide me}`. Cloze text is masked with a background color overlay and revealed on answer.
+Hide text for recall practice using braces: `{hide me}`. Masked with background color, revealed on answer.
 
 ### Daily Limits
-
-Set a daily review limit in settings. The plugin ensures ~25% of reviewed cards are new, with round-robin distribution across decks for fairness.
+Set a daily review limit in settings. ~25% of reviewed cards are new; round-robin distribution across decks for fairness.
 
 ### Shuffle Cards
-
-Enable card shuffling in settings to randomize the order of new and due cards during review.
+Enable to randomize card order. Default: due cards sorted by urgency (most overdue → lowest eFactor → fewest repetitions). Fixed algorithm cards use default eFactor (2.5) for moderate queue priority.
 
 ### Cram Mode
-
-After finishing due cards, continue reviewing all cards in the deck without affecting scheduling. Useful for exam prep.
+After finishing due cards, continue reviewing all cards without affecting scheduling.
 
 ### History Data Cleanup
-
-Clean up old session history data from the data page. Configure how many recent date session blocks to keep per card (default: 3). Older session blocks beyond the specified count will be deleted. This helps reduce data page size over time.
+Clean up old session history data. Configure how many recent session blocks to keep per card (default: 3).
 
 ### Breadcrumbs
-
-Show the block's page hierarchy as breadcrumbs for context. Toggle with `b` key. Visibility preference is persisted across sessions.
+Show the block's page hierarchy for context. Toggle with `b` key. Preference persisted across sessions.
 
 ### Mode Indicator Badge
+Color-coded badges in the header bar for instant visual identification:
+- **Algorithm badge**: Spaced (green) / Fixed (orange)
+- **Interaction badge**: LBL (when active)
+- Dialog border color matches the algorithm group (toggle via "Show Review Mode Borders")
 
-The header bar displays color-coded badges derived from the card's **Scheduling Algorithm** and **Interaction Style**, providing instant visual identification of the current review configuration.
+## Architecture
 
-**Algorithm badge** (left of status tags):
+### SchedulingAlgorithm × InteractionStyle
 
-| Badge | Group | Algorithms | Color |
-| ----- | ----- | ---------- | ----- |
-| **Spaced** | Spaced | `SM2`, `PROGRESSIVE` | Green |
-| **Fixed** | Fixed | `FIXED_DAYS/WEEKS/MONTHS/YEARS` | Orange |
-
-**Interaction badge** (shown when not Normal):
-
-| Badge | Interaction Style | Description |
-| ----- | ----------------- | ----------- |
-| **LBL** | `LBL` | Line-by-Line review |
-
-The dialog border color also dynamically matches the algorithm group color, reinforcing the visual cue across the entire window. Can be toggled via the "Show Review Mode Borders" setting.
-
-### Keyboard Shortcuts
-
-| Action         | Shortcut   |
-| -------------- | ---------- |
-| Show answer    | `space`    |
-| Skip           | `s` or `→` |
-| Previous card  | `←`        |
-| Breadcrumbs    | `b`        |
-| Close memo     | `esc`      |
-| Perfect / Next | `space`    |
-| Forgot         | `f`        |
-| Hard           | `h`        |
-| Good           | `g`        |
-| Edit interval  | `e`        |
-
-### Command Palette
-
-Type "Memo: Start Review Session" in the command palette (`Cmd+P` / `Ctrl+P`).
-
-## Privacy & Security
-
-- All practice data is stored in your Roam graph on the configured data page.
-- Memo does not send practice/session payloads to any external server.
-- The legacy Roam-SR remote bulk import path has been removed to protect user privacy.
-
-## Architecture: SchedulingAlgorithm × InteractionStyle
-
-The review system uses a **two-dimensional orthogonal architecture**: each card is configured by independently choosing a **Scheduling Algorithm** (how intervals are calculated) and an **Interaction Style** (how the card is presented during review). These two dimensions are fully independent — any algorithm can pair with any interaction style, producing 12 possible combinations without requiring new enum values.
+The review system uses a **two-dimensional orthogonal architecture**. Each card is configured by independently choosing a **Scheduling Algorithm** (how intervals are calculated) and an **Interaction Style** (how the card is presented). These two dimensions are fully independent — any algorithm pairs with any interaction style.
 
 | Dimension | Purpose | Values |
 |-----------|---------|--------|
-| **Scheduling Algorithm** | Controls interval calculation | `SM2`, `PROGRESSIVE`, `FIXED_DAYS`, `FIXED_WEEKS`, `FIXED_MONTHS`, `FIXED_YEARS` |
-| **Interaction Style** | Controls card presentation | `NORMAL`, `LBL` |
+| **Scheduling Algorithm** | Interval calculation | `SM2`, `PROGRESSIVE`, `FIXED_DAYS/WEEKS/MONTHS/YEARS` |
+| **Interaction Style** | Card presentation | `NORMAL`, `LBL` |
 
 All definitions are in `src/models/session.ts`.
 
-### Scheduling Algorithms
+#### Scheduling Algorithms
 
-| Algorithm | Group | Label | Description |
-|-----------|-------|-------|-------------|
-| `SM2` | Spaced | SM2 | Modified SuperMemo 2 — adaptive intervals based on grading |
-| `PROGRESSIVE` | Fixed | Progressive | Exponential curve (2→6→12→24→48→96 days) |
-| `FIXED_DAYS` | Fixed | Fixed Days | Fixed day interval |
-| `FIXED_WEEKS` | Fixed | Fixed Weeks | Fixed week interval |
-| `FIXED_MONTHS` | Fixed | Fixed Months | Fixed month interval |
-| `FIXED_YEARS` | Fixed | Fixed Years | Fixed year interval |
+| Algorithm | Group | Description |
+|-----------|-------|-------------|
+| `SM2` | Spaced | Modified SuperMemo 2 — adaptive intervals based on grading (Forgot/Hard/Good/Perfect) |
+| `PROGRESSIVE` | Fixed | Exponential curve: 2→6→12→24→48→96 days |
+| `FIXED_DAYS/WEEKS/MONTHS/YEARS` | Fixed | Fixed intervals, configurable per card via interval editor (`E` key) |
 
-Adding a new algorithm only requires registering it in the enum and `ALGORITHM_META`.
+**SM2 details**: `interval × eFactor × (grade/5)`. Grade mapping: Forgot(0), Hard(2), Good(4), Perfect(5). Grade 0 → review again today; Grades 1-2 → review tomorrow. E-Factor minimum: 1.3.
 
-### Interaction Styles
+**Progressive**: Standalone exponential curve, independent of SM2. Only modifies `progressive_repetitions`, never pollutes SM2 fields.
 
-| Style | Label | Icon | Description |
-|-------|-------|------|-------------|
-| `NORMAL` | Normal | `layers` | Standard card review — show question, reveal answer |
-| `LBL` | Line by Line | `list` | Per-child Q&A with independent scheduling |
+#### Interaction Styles
 
-> **Note:** `READ` (Incremental Read) has been removed. Its functionality is now covered by `LBL + Progressive/Fixed` — the algorithm determines whether LBL shows grading buttons (SM2) or a "Next" button (Progressive/Fixed).
+| Style | Description |
+|-------|-------------|
+| `NORMAL` | Standard card review — show question, reveal answer |
+| `LBL` | Line-by-Line — per-child Q&A with independent scheduling |
 
-### Algorithm Details
+**LBL behavior is determined by the algorithm**:
+- **LBL + SM2**: Show parent, reveal children one at a time, grade each with SM2 buttons. "Forgot" reinserts card into queue.
+- **LBL + Progressive/Fixed**: First unread child auto-revealed, click "Next" to advance with automatic reinsertion.
 
-#### SM2 Algorithm (Memory Training)
+> The `READ` (Incremental Read) interaction has been removed — its functionality is now covered by `LBL + Progressive/Fixed`.
 
-Uses a **modified SM2 algorithm** to optimize long-term memory retention with grading: Forgot / Hard / Good / Perfect.
+#### Dynamic Switching
+Each card's `algorithm` and `interaction` are stored in the latest session block. Changes take effect immediately on card navigation via two independent selectors (bottom-right of grading area).
 
-- **Interval Calculation**: `interval × eFactor × (grade/5)` — grade-based adjustment (Grade 3 → 60%, Grade 4 → 80%, Grade 5 → 100%)
-- **E-Factor Update**: Always updated. Lower grades → more frequent reviews. Minimum eFactor = 1.3.
-- **Reset Behavior**: Grade 0 → review again today (interval=0); Grades 1-2 → review tomorrow (interval=1)
-- **Grade Mapping**: Forgot(0), Hard(2), Good(4), Perfect(5)
-
-#### Progressive Algorithm (Progressive Review)
-
-A relaxed approach for content you want to revisit regularly with automatic interval growth:
-
-- Schedule: 2 → 6 → 12 → 24 → 48 → 96 days...
-- Calculation: `progressiveInterval(n)` — standalone exponential curve independent of SM2
-- Fully independent: only modifies `progressive_repetitions`, never pollutes SM2 fields
-
-> **Tip:** New cards default to the Progressive algorithm for a gentler learning experience. Switch to SM2 anytime for more granular control.
-
-#### Fixed Interval Algorithms (Days / Weeks / Months / Years)
-
-Manual fixed intervals for predictable review schedules. The interval multiplier is configurable per card via the interval editor (`E` key).
-
-### Interaction Style Details
-
-#### Line by Line (LBL)
-
-Each child block is treated as an independent Q&A item. The behavior depends on the algorithm:
-
-**LBL + SM2** (Memory Training):
-1. The parent block (question) is shown with all children hidden
-2. Click "Show Answer" to reveal one child block at a time in outline order
-3. Grade each child using the standard SM2 buttons (Forgot/Hard/Good/Perfect)
-4. Each child block keeps its own independent SM2 data
-5. Review starts from the top and skips to the first due child
-6. After the last due child is graded, the session advances to the next card
-7. If "Forgot" is clicked, the card is reinserted into the queue N cards later
-
-**LBL + Progressive/Fixed** (Incremental Reading):
-1. The first unread child block is automatically revealed
-2. Click "Next" to advance — the card is reinserted into the queue N cards later
-3. Next time the card appears, the next unread child is shown
-4. After all children are read, the card is marked complete for today
-
-**Visual indicators:** L2/5 tag shows line progress; mastered lines display with reduced opacity; active line has a green left border.
-
-#### Incremental Read (removed)
-
-The `READ` interaction style has been removed. Its functionality is now covered by `LBL + Progressive/Fixed`. The algorithm determines the LBL behavior:
-- **LBL + SM2**: SM2 grading buttons per child line
-- **LBL + Progressive/Fixed**: "Next" button with automatic reinsertion
-
-This simplification eliminates a redundant interaction type that was functionally identical to `LBL + Progressive`.
-
-### Dynamic Switching
-
-Each card's `algorithm` and `interaction` are stored in the **latest session block**. Changes take effect immediately on card navigation — no session restart required. Two independent selectors (bottom-right of the grading area) replace the old single `reviewMode` dropdown.
-
-## Design Decisions
-
-### Why migrate from 8 ReviewModes to Algorithm × Interaction?
-
-The original architecture used a combined `ReviewModes` enum with 8 values, where each value encoded both scheduling and interaction behavior (e.g., `SPACED_INTERVAL_LBL` = SM2 + LBL). This design had fundamental limitations:
-
-- **Not orthogonal**: Adding a new algorithm or interaction required defining N new enum values (one per combination)
-- **Not extensible**: Combinations like PROGRESSIVE + LBL or FIXED_DAYS + READ were impossible without new enum entries
-- **Coupled concerns**: Scheduling logic and presentation logic were mixed in a single dimension
-
-The new two-dimensional design (`SchedulingAlgorithm` × `InteractionStyle`) separates these concerns completely. Adding a new algorithm or interaction is independent — they combine automatically.
-
-### Why remove runtime backward compatibility in favor of data migration?
-
-The old system maintained runtime compatibility by reading `reviewMode::` fields and decomposing them into `{ algorithm, interaction }` on every card load. This added complexity to the data loading path and created a permanent compatibility layer that could never be removed.
-
-The new approach uses a **one-time data migration** that converts `reviewMode::` fields to `algorithm::` + `interaction::` at the data level. This:
-
-- **Simplifies** the data loading pipeline — no legacy resolution needed
-- **Secures** the data format — the source of truth is always the new fields
-- **Eliminates** the permanent compatibility tax from the codebase
-
-### Why merge READ into LBL?
-
-The `READ` (Incremental Read) interaction style was functionally identical to `LBL + Progressive`. Having a separate interaction type for this combination was confusing because:
-
-- The algorithm already determines the UI behavior (SM2 → grading buttons, Progressive/Fixed → Next button)
-- Users had to understand two separate concepts (interaction + algorithm) when only the algorithm mattered for LBL behavior
-- It created 18 possible combinations (3 interactions × 6 algorithms) when only 12 were meaningful
-
-By removing `READ`, the system is simpler: LBL behavior is determined by the algorithm. This reduces the combination space to 12 (2 interactions × 6 algorithms) with zero semantic loss.
-
-### Why rename fields with the `{owner}_{purpose}` convention?
-
-The old field names (`repetitions`, `interval`, `eFactor`, `grade`) were ambiguous — they didn't indicate which algorithm owned them. This made debugging difficult and increased the risk of cross-algorithm field pollution.
-
-The new naming convention (`sm2_repetitions`, `sm2_interval`, `progressive_repetitions`, etc.) makes field ownership explicit, making it immediately clear which algorithm a field belongs to and reducing the chance of bugs where one algorithm accidentally modifies another's fields.
-
-### Why update same-day session blocks instead of creating new ones?
-
-Previously, `savePracticeData` always created a new session block for each practice invocation. When a card was reinserted (via Forgot or LBL Next) and graded again on the same day, this produced duplicate `[[Date]]` blocks, leading to data bloat and potential snapshot merge errors.
-
-The new behavior checks if a session block for today already exists. If it does, the existing block is updated in-place (title and fields). If not, a new block is created. This ensures each card has at most one session block per day.
-
-### Why add LBL forgot reinsertion?
-
-Previously, when a user clicked "Forgot" on an LBL child line, the card would simply record the grade and move on. This was inconsistent with how normal cards behave — a "Forgot" normal card is reinserted into the review queue for another attempt within the same session. LBL forgot reinsertion brings LBL cards in line with this behavior, ensuring a consistent review experience across all interaction styles.
-
-## Data Migration
-
-After upgrading to the new `SchedulingAlgorithm × InteractionStyle` architecture, you should run the Data Migration tool once to convert your existing data.
-
-### How to migrate
-
-1. Open the Memo overlay and click the gear icon to access **Settings**
-2. Navigate to the **Data Migration** section
-3. Click the migration button to start
-
-### What the migration does
-
-The migration converts your data from the old format to the new format:
-
-- **`reviewMode::` → `algorithm::` + `interaction::`**: Each old `reviewMode` value (e.g., `SPACED_INTERVAL_LBL`) is decomposed into its constituent parts (`algorithm:: SM2` + `interaction:: LBL`)
-- **`cardType::` → `reviewMode::`**: Very old `cardType` fields are renamed first
-- **Missing reviewMode**: Cards without a mode are inferred from their existing data fields
-- **Meta block merge**: Orphaned meta block fields are merged into the latest session block
-- **`lineByLineReview:: Y` → LBL interaction**: The old LBL flag is converted to the new interaction style
-- **`interaction:: READ` → `interaction:: LBL`**: The removed READ interaction is mapped to LBL
-- **Field renaming**: Old field names are converted to the new `{owner}_{purpose}` naming convention:
-  - `repetitions` → `sm2_repetitions`, `interval` → `sm2_interval`, `eFactor` → `sm2_eFactor`, `grade` → `sm2_grade`
-  - `progressiveRepetitions` → `progressive_repetitions`, `intervalMultiplier` → `progressive_interval` or `fixed_multiplier`
-  - `lineByLineProgress` → `lbl_progress`
-- **Duplicate field cleanup**: Removes duplicate `algorithm::` and `interaction::` blocks within session blocks
-- **Obsolete field deletion**: Removes `intervalMultiplierType::` blocks
-
-The migration is **safe to run multiple times** — already-migrated cards are skipped.
-
-> **Important:** Run the migration once after upgrading. All new card data will use the `algorithm::` + `interaction::` format automatically.
-
-## Urgency-Based Due Card Sorting
-
-Due cards are sorted by **memory urgency** using a three-level priority system:
-
-| Priority | Sort Key      | Direction     | Rationale                                                |
-| -------- | ------------- | ------------- | -------------------------------------------------------- |
-| 1st      | `nextDueDate` | Earlier first | More overdue → lower retrieval strength → higher urgency |
-| 2nd      | `sm2_eFactor`     | Lower first   | Lower eFactor → faster forgetting rate → higher urgency  |
-| 3rd      | `sm2_repetitions` | Fewer first   | Fewer reps → less stable memory → higher urgency         |
-
-When `shuffleCards` is enabled, this sort is overridden by random shuffling.
-
-## Settings Architecture
-
-Settings use a **single-source-of-truth** design with `extensionAPI.settings` as the primary store and the Roam data page as a persistent backup.
-
-| Layer | Role | Persistence | When Written |
-|-------|------|-------------|-------------|
-| `extensionAPI.settings` | **Primary** | Roam Depot: persistent · roam/js: in-memory | On "Apply & Close" |
-| Roam data page (`roam/memo`) | **Backup** | Persistent (blocks) | Debounced 5s after last change |
-
-**Key design decisions:**
-
-1. **Explicit save**: Settings are only saved when the user clicks "Apply & Close" in the Settings dialog. This prevents queue errors and risks from immediate setting application
-2. **Apply & Close**: Saves all settings, closes the Settings dialog and the Practice Overlay. The user must manually reopen the plugin window for new settings to take full effect
-3. **Close (discard)**: Closes the Settings dialog without saving any changes made in the current session
-4. **Page as backup, not source**: The data page is only read at startup when `extensionAPI.settings` is empty (roam/js cold start)
-5. **5-second debounced page sync**: Coalesces rapid changes into a single write, reducing Roam sync indicator load
-6. **Unmount flush**: Pending debounced syncs are flushed immediately when the overlay closes
-
-In **roam/js mode**, an in-memory overlay wraps `extensionAPI.settings` to provide working `getAll/set/get` methods. Settings are lost on page reload, which is why the data page backup exists.
-
-## Data Architecture
+### Data Model
 
 All practice data is stored on a Roam page (default: `roam/memo`). Each card's data follows a **unified session-block architecture** — all fields are stored in session records, with no separate meta block.
-
-### Session Block Layout
-
-The latest session block is the single source of truth for the card's current state:
-
-```
-((cardUid))
-├── [[April 14th, 2026]] 🟢    ← Latest session (SINGLE SOURCE OF TRUTH)
-│   ├── algorithm:: SM2
-│   ├── interaction:: LBL
-│   ├── nextDueDate:: [[April 15th, 2026]]
-│   ├── lbl_progress:: {"childUid": {...}}
-│   ├── sm2_grade:: 5
-│   ├── sm2_eFactor:: 2.5
-│   ├── sm2_repetitions:: 3
-│   ├── sm2_interval:: 6
-│   ├── progressive_repetitions:: 2
-│   └── progressive_interval:: 6
-└── [[April 13th, 2026]] 🔴    ← Older session
-    └── ...
-```
-
-**Key principles:**
-
-- `algorithm` and `interaction` are the primary fields for scheduling configuration
-- `nextDueDate` is stored in each session block alongside algorithm-specific fields
-- Each algorithm only modifies its OWN fields; all other fields are inherited unchanged from the previous session
-- Field naming follows the `{owner}_{purpose}` convention: `sm2_*`, `progressive_*`, `fixed_*`, `lbl_*`
-
-### Algorithm Independence & Full Field Inheritance
-
-| Algorithm | Calculated Fields | Inherited Fields (unchanged) |
-|-----------|-------------------|------------------------------|
-| SM2 | `sm2_grade`, `sm2_interval`, `sm2_repetitions`, `sm2_eFactor` | `progressive_repetitions`, `progressive_interval`, `fixed_multiplier` |
-| Progressive | `progressive_repetitions`, `progressive_interval` | `sm2_interval`, `sm2_repetitions`, `sm2_eFactor`, `fixed_multiplier` |
-| Fixed Days/Weeks/Months/Years | `fixed_multiplier` | `sm2_interval`, `sm2_repetitions`, `sm2_eFactor`, `progressive_repetitions`, `progressive_interval` |
-
-Switching algorithms never loses data — each algorithm preserves all fields from other algorithms.
-
-### lbl_progress Data Format
-
-The `lbl_progress` field stores per-child scheduling data as JSON:
-
-```json
-{
-  "childUid1": {
-    "nextDueDate": "2026-04-16T00:00:00.000Z",
-    "sm2_interval": 2,
-    "sm2_repetitions": 1,
-    "sm2_eFactor": 2.5,
-    "progressive_repetitions": 1
-  }
-}
-```
-
-- **LBL + SM2** uses SM2 fields (`sm2_interval`, `sm2_repetitions`, `sm2_eFactor`) per child
-- **LBL + Progressive/Fixed** uses `progressive_repetitions` per child
-
-### Full Data Page Structure
 
 ```
 roam/memo (page)
 ├── data (heading block)
-│   ├── ((cardUid1))
-│   │   ├── [[Date]] 🟢
+│   ├── ((cardUid))
+│   │   ├── [[April 14th, 2026]] 🟢    ← Latest session (SINGLE SOURCE OF TRUTH)
 │   │   │   ├── algorithm:: SM2
-│   │   │   ├── interaction:: NORMAL
-│   │   │   ├── nextDueDate:: [[Date]]
+│   │   │   ├── interaction:: LBL
+│   │   │   ├── nextDueDate:: [[April 15th, 2026]]
 │   │   │   ├── sm2_grade:: 5
-│   │   │   └── sm2_eFactor:: 2.5
-│   │   └── [[Date]] 🔴
-│   │       └── ...
-│   └── ((cardUid2))
-│       └── ...
+│   │   │   ├── sm2_eFactor:: 2.5
+│   │   │   ├── sm2_repetitions:: 3
+│   │   │   ├── sm2_interval:: 6
+│   │   │   ├── progressive_repetitions:: 2
+│   │   │   └── progressive_interval:: 6
+│   │   └── [[April 13th, 2026]] 🔴    ← Older session
+│   └── ...
 ├── cache (heading block)
-│   └── [[tagName]]
-│       ├── renderMode:: normal
-│       └── ...
 └── settings (heading block)
-    ├── tagsListString:: memo
-    └── ...
 ```
 
-## Development
+**Key principles**:
+- The latest session block is the single source of truth
+- Field naming follows `{owner}_{purpose}` convention: `sm2_*`, `progressive_*`, `fixed_*`, `lbl_*`
+- Each algorithm only modifies its OWN fields; other fields are inherited unchanged → switching algorithms never loses data
+- `lbl_progress` stores per-child scheduling data as JSON
+- `progressive_interval` is the calculated interval (2→6→12→24→48→96 days) based on `progressive_repetitions`
 
-### Build
+### Settings Architecture
+
+Settings use a **single-source-of-truth** design:
+
+| Layer | Role | When Written |
+|-------|------|-------------|
+| `extensionAPI.settings` | **Primary** | On "Apply & Close" |
+| Roam data page (`roam/memo`) | **Backup** | Debounced 5s after last change |
+
+**Key behaviors**:
+- **Apply & Close**: Saves settings, closes dialog and overlay. Must manually reopen for full effect.
+- **Close (discard)**: Closes without saving.
+- **roam/js mode**: In-memory overlay wraps `extensionAPI.settings`; data page backup restores settings on cold start.
+- **Unmount flush**: Pending debounced syncs are flushed immediately when overlay closes.
+
+## Key Design Decisions & Pitfalls
+
+### Why Algorithm × Interaction instead of 8 ReviewModes?
+The old `ReviewModes` enum encoded both scheduling and interaction in each value (e.g., `SPACED_INTERVAL_LBL` = SM2 + LBL). This was **not orthogonal** — adding one algorithm required N new enum values. The new two-dimensional design separates concerns completely; adding either dimension is independent.
+
+### Why data migration instead of runtime backward compatibility?
+The old system read `reviewMode::` fields and decomposed them at runtime on every card load — a permanent compatibility tax. The new approach uses **one-time data migration** that converts `reviewMode::` to `algorithm::` + `interaction::` at the data level, simplifying the loading pipeline permanently.
+
+### Why merge READ into LBL?
+`READ` was functionally identical to `LBL + Progressive`. Since the algorithm already determines LBL behavior (SM2 → grading buttons, Progressive/Fixed → Next button), a separate READ type was redundant. Removing it reduces the combination space from 18 to 12 with zero semantic loss.
+
+### Why the `{owner}_{purpose}` field naming convention?
+Old names (`repetitions`, `interval`, `eFactor`) were ambiguous — they didn't indicate which algorithm owned them. New names (`sm2_repetitions`, `progressive_interval`) make field ownership explicit, reducing cross-algorithm pollution bugs.
+
+### Why update same-day session blocks instead of creating new ones?
+Previously, reinserted cards graded again on the same day produced duplicate `[[Date]]` blocks, causing data bloat. The new behavior updates the existing same-day session block in-place — each card has at most one session block per day.
+
+### ⚠️ Build Pitfall: Do NOT remove `library.export: 'default'`
+Roam loads plugins via `<script>` tag. The UMD wrapper needs proper default export handling. Removing this causes `Uncaught SyntaxError: Unexpected token 'export'` and silent plugin failure.
+
+## Data Migration
+
+After upgrading to the `SchedulingAlgorithm × InteractionStyle` architecture, run the Data Migration tool once:
+
+1. Open Memo overlay → gear icon → **Settings**
+2. Navigate to **Data Migration** → Click migration button
+
+**What it does**: `reviewMode::` → `algorithm::` + `interaction::`, `cardType::` → `reviewMode::`, meta block merge, `lineByLineReview:: Y` → LBL, `interaction:: READ` → `LBL`, field renaming to `{owner}_{purpose}` convention, duplicate/obsolete field cleanup.
+
+**Safe to run multiple times** — already-migrated cards are skipped.
+
+## Development
 
 ```bash
 npm install
@@ -441,70 +209,46 @@ npm run typecheck    # TypeScript type checking
 npm run test         # Run tests
 ```
 
-### Build Configuration
-
-- Webpack UMD output with `library.type: 'umd'` and `library.export: 'default'`
-- Babel preset-env for ES5 compatibility
-- External dependencies: React, ReactDOM, BlueprintJS, ChronoNode
-
-**⚠️ CRITICAL: Do NOT remove `library.export: 'default'`!**
-
-Roam Research loads the plugin via `<script>` tag. The UMD wrapper needs proper default export handling. Removing this causes `Uncaught SyntaxError: Unexpected token 'export'` and the plugin fails silently.
-
 ### Project Structure
 
 ```
 src/
 ├── extension.tsx          # Plugin entry point (onload/onunload)
-├── app.tsx                # Root React component, orchestrates review workflow
-├── practice.ts            # SM2 algorithm + Fixed Interval algorithm
-├── constants.ts           # Shared constants (including DAILYNOTE_DECK_KEY)
+├── app.tsx                # Root React component
+├── practice.ts            # SM2 + Progressive + Fixed Interval algorithms
+├── constants.ts           # Shared constants
 ├── models/
-│   ├── session.ts         # Session & CardMeta models, SchedulingAlgorithm, InteractionStyle, ALGORITHM_META, INTERACTION_META
+│   ├── session.ts         # Session, CardMeta, SchedulingAlgorithm, InteractionStyle
 │   └── practice.ts        # Today's review status model
 ├── queries/
-│   ├── data.ts            # Core data layer
-│   ├── today.ts           # Today's review calculation
+│   ├── data.ts            # Core data layer (session block parsing & merging)
+│   ├── today.ts           # Today's review calculation (due/new/completed)
 │   ├── save.ts            # Write practice data to Roam session blocks
 │   ├── cache.ts           # Per-tag cache
 │   ├── settings.ts        # Settings page persistence
-│   ├── utils.ts           # Roam API query helpers
+│   └── utils.ts           # Roam API query helpers
 ├── hooks/
 │   ├── useSettings.ts     # Settings single-source-of-truth
-│   ├── usePracticeData.tsx # Practice data fetching with ref-based caching
+│   ├── usePracticeData.tsx # Practice data fetching
 │   ├── useCurrentCardData.tsx # Active card data with latest-session resolution
-│   ├── useLineByLineReview.ts # LBL interaction logic (behavior determined by algorithm)
-│   ├── useBlockInfo.tsx   # Block content + breadcrumbs
-│   ├── useCloze.tsx       # Cloze deletion ({text} masking)
-│   ├── useCachedData.ts   # Per-tag cache management
-│   ├── useTags.tsx        # Tag list parsing with quoted-tag support
+│   ├── useLineByLineReview.ts # LBL interaction logic
 │   └── ...                # Other UI interaction hooks
+├── components/overlay/
+│   ├── PracticeOverlay.tsx  # Main review overlay
+│   ├── Header.tsx / Footer.tsx / CardBlock.tsx / LineByLineView.tsx
+│   ├── SettingsDialog.tsx   # Settings + HistoryCleanup + Data Migration
+│   └── ...
 ├── contexts/
-│   └── PracticeSessionContext.tsx # Session-level state
-├── components/
-│   ├── overlay/
-│   │   ├── PracticeOverlay.tsx  # Main review overlay
-│   │   ├── Header.tsx           # Header with algorithm/interaction badges
-│   │   ├── CardBlock.tsx        # Card rendering with answer toggle
-│   │   ├── Footer.tsx           # Grading controls + algorithm & interaction selectors
-│   │   ├── LineByLineView.tsx   # Line-by-line child block rendering
-│   │   ├── SettingsDialog.tsx   # Settings dialog with HistoryCleanup integration
-│   │   └── HistoryCleanup.tsx   # History data cleanup UI
-│   ├── SettingsForm.tsx         # Settings form component
-│   ├── SidePanelWidget.tsx      # Sidebar review button + stats
-│   ├── ButtonTags.tsx           # Deck selector buttons
-│   ├── MigrateLegacyDataPanel.tsx # Data migration tool
-│   └── ...                      # Other UI components
-├── utils/
-│   ├── date.ts            # Date operations
-│   ├── string.ts          # String parsing
-│   ├── dom.ts             # DOM simulation
-│   ├── async.ts           # Sleep + debounce
-│   ├── mediaQueries.ts    # Responsive breakpoints
-│   ├── zIndexFix.ts       # CSS z-index fix injection
-│   └── testUtils.ts       # Test helpers
+│   └── PracticeSessionContext.tsx
+├── utils/                  # date, string, dom, async, mediaQueries, zIndexFix
 └── theme.ts               # Theme color definitions
 ```
+
+## Privacy & Security
+
+- All practice data is stored in your Roam graph on the configured data page
+- Memo does not send practice/session payloads to any external server
+- The legacy Roam-SR remote bulk import path has been removed
 
 ## Bug Reports & Feature Requests
 

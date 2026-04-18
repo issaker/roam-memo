@@ -6,7 +6,7 @@
  *           → calculateCombinedCounts → limitRemainingPracticeData → calculateTodayStatus
  */
 import * as dateUtils from '~/utils/date';
-import { CompleteRecords, RecordUid, Session } from '~/models/session';
+import { Records, RecordUid, Session } from '~/models/session';
 import { CompletionStatus, RenderMode, Today, TodayInitial } from '~/models/practice';
 import { generateNewSession } from '~/queries/utils';
 
@@ -74,10 +74,9 @@ export const calculateCompletedTodayCounts = ({ today, tagsList, sessionData }) 
     const currentTagSessionData = sessionData[tag];
     Object.keys(currentTagSessionData).forEach((cardUid) => {
       const cardData = currentTagSessionData[cardUid];
-      const latestSession = cardData[cardData.length - 1];
-      if (latestSession?.isNew) return;
+      if (cardData?.isNew) return;
       const isCompletedToday =
-        latestSession && dateUtils.isSameDay(latestSession.dateCreated, new Date());
+        cardData && dateUtils.isSameDay(cardData.dateCreated, new Date());
 
       if (isCompletedToday) {
         count++;
@@ -128,7 +127,7 @@ export const addNewCards = ({
   today: Today;
   tagsList: string[];
   cardUids: Record<string, RecordUid[]>;
-  pluginPageData: CompleteRecords;
+  pluginPageData: Records;
   shuffleCards: boolean;
 }) => {
   for (const currentTag of tagsList) {
@@ -136,17 +135,14 @@ export const addNewCards = ({
     let newCardsUids: RecordUid[] = [];
 
     allSelectedTagCardsUids.forEach((referenceId) => {
-      const latestSession = pluginPageData[referenceId]?.[
-        pluginPageData[referenceId].length - 1
-      ] as Session & { isNew?: boolean };
+      const latestSession = pluginPageData[referenceId] as Session & { isNew?: boolean };
       if (
         !pluginPageData[referenceId] ||
-        !pluginPageData[referenceId].length ||
         (latestSession?.isNew && !latestSession?.nextDueDate)
       ) {
         newCardsUids.push(referenceId);
-        if (!pluginPageData[referenceId] || !pluginPageData[referenceId].length) {
-          pluginPageData[referenceId] = [generateNewSession()];
+        if (!pluginPageData[referenceId]) {
+          pluginPageData[referenceId] = generateNewSession();
         }
       }
     });
@@ -165,16 +161,14 @@ export const addNewCards = ({
   }
 };
 
-export const getDueCardUids = (currentTagSessionData: CompleteRecords, isCramming) => {
+export const getDueCardUids = (currentTagSessionData: Records, isCramming) => {
   const results: RecordUid[] = [];
   if (!Object.keys(currentTagSessionData).length) return results;
 
   const now = new Date();
   Object.keys(currentTagSessionData).forEach((cardUid) => {
-    const cardData = currentTagSessionData[cardUid] as Session[];
-
-    const latestSession = cardData[cardData.length - 1];
-    if (!latestSession) return;
+    const latestSession = currentTagSessionData[cardUid] as Session & { isNew?: boolean };
+    if (!latestSession || latestSession?.isNew) return;
 
     const nextDueDate = latestSession.nextDueDate;
 
@@ -183,31 +177,26 @@ export const getDueCardUids = (currentTagSessionData: CompleteRecords, isCrammin
     }
   });
 
-  // Urgency-based three-level sort for due cards:
-  //   1. nextDueDate (ascending) — more overdue cards first
-  //   2. eFactor (ascending) — harder-to-remember cards first (lower eFactor = faster forgetting)
-  //   3. repetitions (ascending) — less mature memories first (fewer reps = less stable)
   results.sort((a, b) => {
-    const aCards = currentTagSessionData[a] as Session[];
-    const aLatestSession = aCards[aCards.length - 1];
-    const bCards = currentTagSessionData[b] as Session[];
-    const bLatestSession = bCards[bCards.length - 1];
+    const aLatestSession = currentTagSessionData[a] as Session;
+    const bLatestSession = currentTagSessionData[b] as Session;
 
-    // Level 1: Overdue days — earlier dueDate = more overdue = higher urgency
     const aDueDate = aLatestSession?.nextDueDate || new Date(0);
     const bDueDate = bLatestSession?.nextDueDate || new Date(0);
     if (aDueDate.getTime() !== bDueDate.getTime()) {
       return aDueDate.getTime() - bDueDate.getTime();
     }
 
-    // Level 2: Material difficulty — lower eFactor = faster forgetting = higher urgency
+    // Secondary/tertiary sort uses SM2 fields (sm2_eFactor, sm2_repetitions).
+    // For Fixed algorithm cards, these default to 2.5 and 0 respectively,
+    // which is intentional: Fixed cards get moderate priority in the queue —
+    // higher than low-urgency SM2 cards (high eFactor) but not the highest.
     const aEfactor = aLatestSession?.sm2_eFactor ?? 2.5;
     const bEfactor = bLatestSession?.sm2_eFactor ?? 2.5;
     if (aEfactor !== bEfactor) {
       return aEfactor - bEfactor;
     }
 
-    // Level 3: Memory maturity — fewer repetitions = less stable = higher urgency
     const aReps = aLatestSession?.sm2_repetitions ?? 0;
     const bReps = bLatestSession?.sm2_repetitions ?? 0;
     return aReps - bReps;

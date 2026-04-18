@@ -7,21 +7,14 @@ import * as asyncUtils from '~/utils/async';
 import { generatePracticeData } from '~/practice';
 import Tooltip from '~/components/Tooltip';
 import ButtonTags from '~/components/ButtonTags';
-import { isFixedMode, isLineByLineUI, SchedulingAlgorithm, InteractionStyle, ALGORITHM_META, INTERACTION_META } from '~/models/session';
+import { isFixedAlgorithm, isLBLReviewMode, SchedulingAlgorithm, InteractionStyle, ALGORITHM_META, INTERACTION_META, Session } from '~/models/session';
 import { MainContext } from '~/components/overlay/PracticeOverlay';
 import { usePracticeSession } from '~/contexts/PracticeSessionContext';
 import { getIntentColor, colors } from '~/theme';
 
-interface IntervalEstimate {
-  algorithm: SchedulingAlgorithm;
-  sm2_grade: number;
-  sm2_repetitions: number;
-  sm2_interval: number;
-  sm2_eFactor: number;
-  dateCreated: string;
-  nextDueDate: string;
-  nextDueDateFromNow: string;
-}
+type IntervalEstimate = Session & {
+  nextDueDateFromNow?: string;
+};
 
 type IntervalEstimates =
   | undefined
@@ -80,7 +73,7 @@ const Footer = ({
         default:
           break;
       }
-      activateButtonFn(key, () => onPracticeClick({ grade, refUid: refUid }));
+      activateButtonFn(key, () => onPracticeClick({ sm2_grade: grade, refUid: refUid }));
     },
     [onPracticeClick, refUid]
   );
@@ -109,7 +102,7 @@ const Footer = ({
           if (!showAnswers) {
             activateButtonFn('space-button', showAnswerFn);
           } else {
-            if (isFixedMode(algorithmFromSession)) {
+            if (isFixedAlgorithm(algorithmFromSession)) {
               intervalPractice();
             } else {
               gradeFn(5);
@@ -140,28 +133,28 @@ const Footer = ({
         global: true,
         label: 'Grade 0',
         onKeyDown: () => gradeFn(0),
-        disabled: isFixedMode(algorithmFromSession),
+        disabled: isFixedAlgorithm(algorithmFromSession),
       },
       {
         combo: 'H',
         global: true,
         label: 'Grade 2',
         onKeyDown: () => gradeFn(2),
-        disabled: isFixedMode(algorithmFromSession),
+        disabled: isFixedAlgorithm(algorithmFromSession),
       },
       {
         combo: 'G',
         global: true,
         label: 'Grade 4',
         onKeyDown: () => gradeFn(4),
-        disabled: !isFixedMode(algorithmFromSession),
+        disabled: isFixedAlgorithm(algorithmFromSession),
       },
       {
         combo: 'E',
         global: true,
         label: 'Edit Interval',
         onKeyDown: toggleIntervalEditorOpen,
-        disabled: !isFixedMode(algorithmFromSession),
+        disabled: !isFixedAlgorithm(algorithmFromSession),
       },
     ],
     [skipFn, onPrevClick, showAnswers, showAnswerFn, intervalPractice, gradeFn]
@@ -179,7 +172,7 @@ const Footer = ({
     const { sm2_interval, sm2_repetitions, sm2_eFactor, progressive_repetitions, progressive_interval, fixed_multiplier } = currentCardData;
     const estimates = {};
 
-    const iterateCount = isFixedMode(algorithmFromSession) ? 1 : grades.length;
+    const iterateCount = isFixedAlgorithm(algorithmFromSession) ? 1 : grades.length;
     for (let i = 0; i < iterateCount; i++) {
       const grade = grades[i];
       const practiceResultData = generatePracticeData({
@@ -292,9 +285,8 @@ const GradingControlsWrapper = ({
   const { cardMeta } = React.useContext(MainContext);
   const { algorithm, interaction, onSelectAlgorithm, onSelectInteraction } = usePracticeSession();
 
-  const isFixedModeActive = isFixedMode(algorithm);
-  // LBL + Fixed 算法 = 自动翻页模式（原 Incremental Read），显示 Next 按钮
-  const isLblNextActive = isLineByLineUI(interaction) && isFixedMode(algorithm);
+  const isFixedModeActive = isFixedAlgorithm(algorithm);
+  const isLblNextActive = isLBLReviewMode(interaction) && isFixedAlgorithm(algorithm);
   return (
     <div className="flex items-center flex-wrap justify-evenly gap-3 w-full">
       <button
@@ -340,7 +332,7 @@ const GradingControlsWrapper = ({
         ▶
       </button>
       {isLblNextActive ? (
-        <IncrementalReadControls
+        <LblNextControls
           activeButtonKey={activeButtonKey}
           intervalPractice={intervalPractice}
           intervalEstimates={intervalEstimates}
@@ -373,14 +365,14 @@ const GradingControlsWrapper = ({
 };
 
 /**
- * IncrementalReadControls
+ * LblNextControls
  *
- * Simplified grading UI for Incremental Read mode (FIXED_PROGRESSIVE_LBL).
+ * Simplified grading UI for LBL + Fixed algorithm mode (LBL + Progressive/Fixed).
  * Displays a "Read" indicator with the next interval and a "Next" button
  * that advances to the next card. No grading buttons — the per-child
  * Progressive interval is calculated automatically in onLineByLineGrade.
  */
-const IncrementalReadControls = ({
+const LblNextControls = ({
   activeButtonKey,
   intervalPractice,
   intervalEstimates,

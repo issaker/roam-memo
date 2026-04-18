@@ -40,7 +40,7 @@ export type Settings = {
   rtlEnabled: boolean;
   shuffleCards: boolean;
   forgotReinsertOffset: number;
-  readReinsertOffset: number;
+  lblNextReinsertOffset: number;
   showBreadcrumbs: boolean;
   showModeBorders: boolean;
   dailynoteEnabled: boolean;
@@ -54,7 +54,7 @@ export const defaultSettings: Settings = {
   rtlEnabled: false,
   shuffleCards: false,
   forgotReinsertOffset: 3,
-  readReinsertOffset: 3,
+  lblNextReinsertOffset: 3,
   showBreadcrumbs: false,
   showModeBorders: true,
   dailynoteEnabled: true,
@@ -66,7 +66,7 @@ const SETTING_TYPES = {
   rtlEnabled: 'boolean',
   shuffleCards: 'boolean',
   forgotReinsertOffset: 'number',
-  readReinsertOffset: 'number',
+  lblNextReinsertOffset: 'number',
   showBreadcrumbs: 'boolean',
   showModeBorders: 'boolean',
   dailynoteEnabled: 'boolean',

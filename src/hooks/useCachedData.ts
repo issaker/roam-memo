@@ -6,7 +6,6 @@
  */
 import React from 'react';
 import * as queries from '~/queries';
-import { saveCacheData } from '~/queries';
 
 const useCachedData = ({
   dataPageTitle,
@@ -37,7 +36,7 @@ const useCachedData = ({
   );
   return {
     saveCacheData: async (data: { [key: string]: any }, overrides?: { [key: string]: any }) => {
-      await saveCacheData({ dataPageTitle, data, selectedTag, ...overrides });
+      await queries.saveCacheData({ dataPageTitle, data, selectedTag, ...overrides });
       setRefetchTrigger((prev) => prev + 1);
     },
     deleteCacheDataKey,

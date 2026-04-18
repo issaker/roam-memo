@@ -45,8 +45,6 @@ const createAndRenderContainer = () => {
 
 function onload({ extensionAPI }: { extensionAPI: any }) {
   try {
-    console.log('Memo: Initializing...');
-
     const compatibleExtensionAPI = extensionAPI || {};
 
     const inMemorySettings: Record<string, any> = {};
@@ -92,7 +90,6 @@ function onload({ extensionAPI }: { extensionAPI: any }) {
     const container = createAndRenderContainer();
     if (container) {
       ReactDOM.render(<App />, container);
-      console.log('Memo: Initialized successfully');
     } else {
       console.error('Memo: Failed to create container - sidebar element not found');
     }
@@ -110,7 +107,6 @@ function onunload() {
   }
 
   removeZIndexFixStyles();
-  console.log('Memo: Unloaded');
 }
 
 const plugin = {

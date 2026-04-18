@@ -1,13 +1,13 @@
 import * as React from 'react';
 import { Settings } from '~/hooks/useSettings';
-import { CompleteRecords, SchedulingAlgorithm, InteractionStyle } from '~/models/session';
+import { Records, SchedulingAlgorithm, InteractionStyle } from '~/models/session';
 import { Today, RenderMode } from '~/models/practice';
 import { handlePracticeProps } from '~/app';
 import { useSafeContext } from '~/hooks/useSafeContext';
 
 export interface PracticeSessionContextValue {
   settings: Settings;
-  practiceData: CompleteRecords;
+  practiceData: Records;
   today: Today;
   selectedTag: string;
   tagsList: string[];
@@ -33,7 +33,7 @@ export const PracticeSessionContext = React.createContext<PracticeSessionContext
 
 interface PracticeSessionProviderProps {
   settings: Settings;
-  practiceData: CompleteRecords;
+  practiceData: Records;
   today: Today;
   selectedTag: string;
   tagsList: string[];

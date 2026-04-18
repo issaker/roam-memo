@@ -18,13 +18,11 @@
  *
  * The meta block has been removed. algorithm and interaction are now
  * stored in each session record alongside algorithm-specific fields.
- * lineByLineReview is no longer stored — its function is encoded in
- * the interaction value (e.g. LINE_BY_LINE).
+ * The interaction value (NORMAL or LBL) encodes the review mode.
  */
 import * as stringUtils from '~/utils/string';
 import * as dateUtils from '~/utils/date';
 import { LineByLineProgressMap, SchedulingAlgorithm, InteractionStyle } from '~/models/session';
-import { parseConfigString } from '~/utils/string';
 import {
   createChildBlock,
   getChildBlock,
@@ -32,6 +30,7 @@ import {
   getOrCreateChildBlock,
   getOrCreatePage,
 } from '~/queries/utils';
+import { SESSION_SNAPSHOT_KEYS } from '~/queries/data';
 
 const getEmojiFromGrade = (grade) => {
   switch (grade) {
@@ -48,7 +47,7 @@ const getEmojiFromGrade = (grade) => {
     case 0:
       return '🔴';
     default:
-      return '🟢';
+      return '⚪';
   }
 };
 
@@ -111,6 +110,10 @@ const upsertLatestSessionField = async ({
  * 同日 Session Block 去重逻辑：
  * 如果当天已有 session block，则更新其标题（emoji 可能变化）并删除旧子字段后重新写入，
  * 而不是创建新的日期 block。这避免了同一卡片在同一天产生多个重复的 session block。
+ *
+ * 字段完整性保护：
+ * 重写前校验写入数据是否覆盖了 SESSION_SNAPSHOT_KEYS 中的所有已存在字段。
+ * 缺失字段从同日 session block 的现有子块中补全，防止"删除全部→重写"策略丢失字段。
  */
 export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...data }) => {
   await getOrCreatePage(dataPageTitle);
@@ -149,7 +152,23 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
     await window.roamAlphaAPI.updateBlock({
       block: { uid: todayBlock.uid, string: sessionBlockTitle },
     });
+
     if (todayBlock.children) {
+      const existingFields: Record<string, any> = {};
+      for (const child of todayBlock.children) {
+        if (child?.string) {
+          const [key, value] = stringUtils.parseConfigString(child.string);
+          if (key && SESSION_SNAPSHOT_KEYS.includes(key as any) && data[key] === undefined) {
+            existingFields[key] = value;
+          }
+        }
+      }
+      for (const key of Object.keys(existingFields)) {
+        if (data[key] === undefined) {
+          data[key] = existingFields[key];
+        }
+      }
+
       for (const child of todayBlock.children) {
         if (child?.uid) {
           await window.roamAlphaAPI.deleteBlock({ block: { uid: child.uid } });
@@ -324,7 +343,7 @@ export const deduplicateSessionFields = async ({
 
       for (const field of sessionBlock.children) {
         if (!field?.string || !field.uid) continue;
-        const [key] = parseConfigString(field.string);
+        const [key] = stringUtils.parseConfigString(field.string);
         if (DEDUP_FIELD_KEYS.includes(key)) {
           if (!keyBlocks[key]) keyBlocks[key] = [];
           keyBlocks[key].push({ uid: field.uid, string: field.string });

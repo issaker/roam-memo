@@ -5,7 +5,8 @@ import {
   blockInfoQuery,
   childBlocksOnPageQuery,
   dataPageReferencesIdsQuery,
-  dailyNoteBlockUidsQuery,
+  allPagesQuery,
+  pageTopLevelBlocksQuery,
   generateNewSession,
   getDataPageQuery,
   getPluginPageBlockDataQuery,
@@ -114,7 +115,12 @@ export const generateMockRoamAlphaAPI = ({
         shouldReturnPromise: false,
       },
       {
-        query: dailyNoteBlockUidsQuery,
+        query: allPagesQuery,
+        result: [],
+        shouldReturnPromise: false,
+      },
+      {
+        query: pageTopLevelBlocksQuery,
         result: [],
         shouldReturnPromise: false,
       },

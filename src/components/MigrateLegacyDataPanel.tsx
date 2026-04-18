@@ -3,12 +3,11 @@
  *
  * Migrates legacy data structures to the unified session-block architecture:
  *
- * Phase 1: cardType → reviewMode rename in meta blocks
- * Phase 2: Merge meta block fields (reviewMode, nextDueDate, lineByLineProgress)
- *          into the latest session block, then delete the meta block
- * Phase 3: Convert lineByLineReview:: Y → LBL reviewMode
- * Phase 4: Clean up redundant session-level reviewMode blocks
- * Phase 5: Convert reviewMode → algorithm + interaction in session blocks
+ * Phase 1: cardType → reviewMode rename + write reviewMode to session + duplicate cleanup + meta block merge into session
+ * Phase 2: Delete session-level reviewMode field blocks
+ * Phase 3: Convert reviewMode → algorithm + interaction in session blocks
+ * Phase 4: Deduplicate algorithm/interaction fields + rename old field names to {owner}_{purpose} convention + convert READ → LBL
+ * Phase 5: Compact latest session snapshots (fill missing fields from merged history)
  */
 import * as React from 'react';
 import { Alert } from '@blueprintjs/core';
@@ -18,6 +17,9 @@ import {
   isLBLReviewMode,
   resolveReviewConfig,
 } from '~/models/session';
+
+const DEBUG_MIGRATION = false;
+const debugLog = (...args: any[]) => { if (DEBUG_MIGRATION) console.log(...args); };
 
 const LEGACY_MODE_TO_CONFIG: Record<string, { algorithm: SchedulingAlgorithm; interaction: InteractionStyle }> = {
   SPACED_INTERVAL: { algorithm: SchedulingAlgorithm.SM2, interaction: InteractionStyle.NORMAL },
@@ -30,7 +32,7 @@ const LEGACY_MODE_TO_CONFIG: Record<string, { algorithm: SchedulingAlgorithm; in
   FIXED_YEARS: { algorithm: SchedulingAlgorithm.FIXED_YEARS, interaction: InteractionStyle.NORMAL },
 };
 import { updateReviewConfig, deduplicateSessionFields } from '~/queries';
-import { getPluginPageData } from '~/queries/data';
+import { getPluginPageData, SESSION_SNAPSHOT_KEYS } from '~/queries/data';
 import { getStringBetween, parseConfigString } from '~/utils/string';
 
 const CARD_META_BLOCK_NAME = 'meta';
@@ -365,7 +367,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
         conversionTasks,
       };
 
-      console.log('[Memo] Scan complete:', {
+      debugLog('[Memo] Scan complete:', {
         cardsNeedingConversion: result.cardsNeedingConversion,
         cardsAlreadyConverted: result.cardsAlreadyConverted,
       });
@@ -515,7 +517,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
                 string: `reviewMode:: ${task.cardTypeBlockValue}`,
               },
             });
-            console.log(`[Memo] Phase 1: card ${task.cardUid} — renamed cardType → reviewMode`);
+            debugLog(`[Memo] Phase 1: card ${task.cardUid} — renamed cardType → reviewMode`);
           }
 
           if (task.needsReviewModeWrite || task.needsCardTypeRename) {
@@ -526,14 +528,14 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
               algorithm: config?.algorithm,
               interaction: config?.interaction,
             });
-            console.log(`[Memo] Phase 1: card ${task.cardUid} — wrote reviewMode (mode=${task.resolvedMode})`);
+            debugLog(`[Memo] Phase 1: card ${task.cardUid} — wrote reviewMode (mode=${task.resolvedMode})`);
           }
 
           if (task.needsDuplicateCleanup && task.duplicateBlockUids.length > 0) {
             for (const uid of task.duplicateBlockUids) {
               await window.roamAlphaAPI.deleteBlock({ block: { uid } });
             }
-            console.log(`[Memo] Phase 1: card ${task.cardUid} — cleaned ${task.duplicateBlockUids.length} duplicate blocks`);
+            debugLog(`[Memo] Phase 1: card ${task.cardUid} — cleaned ${task.duplicateBlockUids.length} duplicate blocks`);
           }
 
           if (task.needsMetaMerge && task.latestSessionBlockUid) {
@@ -563,7 +565,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
             if (task.metaBlockUid) {
               await window.roamAlphaAPI.deleteBlock({ block: { uid: task.metaBlockUid } });
             }
-            console.log(`[Memo] Phase 1: card ${task.cardUid} — merged meta block into session`);
+            debugLog(`[Memo] Phase 1: card ${task.cardUid} — merged meta block into session`);
           }
 
           migrated++;
@@ -638,7 +640,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
 
           try {
             if (!task.latestSessionBlockUid) {
-              console.log(`[Memo] Phase 3: SKIP card ${task.cardUid} — no session block found`);
+              debugLog(`[Memo] Phase 3: SKIP card ${task.cardUid} — no session block found`);
               phase3Skipped++;
               continue;
             }
@@ -661,7 +663,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
               await window.roamAlphaAPI.deleteBlock({ block: { uid: field.uid } });
             }
 
-            console.log(`[Memo] Phase 3: card ${task.cardUid} — reviewMode=${task.resolvedMode} → algorithm=${task.algorithm}, interaction=${task.interaction} (SUCCESS)`);
+            debugLog(`[Memo] Phase 3: card ${task.cardUid} — reviewMode=${task.resolvedMode} → algorithm=${task.algorithm}, interaction=${task.interaction} (SUCCESS)`);
             phase3Converted++;
           } catch (err) {
             const msg = `Phase 3 card ${task.cardUid}: ${err instanceof Error ? err.message : String(err)}`;
@@ -685,7 +687,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
         }
       }
 
-      console.log(`[Memo] Migration summary:`, {
+      debugLog(`[Memo] Migration summary:`, {
         phase1: { migrated, errors, skipped },
         phase2: { sessionBlocksCleaned: allSessionUids.length },
         phase3: { converted: phase3Converted, skipped: phase3Skipped, errors: phase3Errors },
@@ -700,7 +702,7 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
 
       try {
         const dedupResult = await deduplicateSessionFields({ dataPageTitle });
-        console.log(`[Memo] Phase 4 dedup: cleaned=${dedupResult.cleaned}, errors=${dedupResult.errors}`);
+        debugLog(`[Memo] Phase 4 dedup: cleaned=${dedupResult.cleaned}, errors=${dedupResult.errors}`);
       } catch (err) {
         console.error('[Memo] Phase 4 dedup error:', err);
         errMsgs.push(`Phase 4 dedup: ${err instanceof Error ? err.message : String(err)}`);
@@ -712,11 +714,12 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
         eFactor: 'sm2_eFactor',
         grade: 'sm2_grade',
         progressiveRepetitions: 'progressive_repetitions',
+        progressiveInterval: 'progressive_interval',
         intervalMultiplier: 'fixed_multiplier',
         lineByLineProgress: 'lbl_progress',
       };
 
-      const FIELDS_TO_DELETE = ['intervalMultiplierType'];
+      const FIELDS_TO_DELETE = ['intervalMultiplierType', 'lineByLineReview'];
 
       setProgress({
         total,
@@ -796,11 +799,138 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
         }
       }
 
-      console.log(`[Memo] Phase 4 summary:`, {
+      debugLog(`[Memo] Phase 4 summary:`, {
         renamed: phase4Renamed,
         deleted: phase4Deleted,
         readConverted: phase4ReadConverted,
         errors: phase4Errors,
+      });
+
+      setProgress({
+        total,
+        migrated,
+        skipped,
+        phase: 'Phase 5: Compacting latest session snapshots',
+      });
+
+      let phase5Compacted = 0;
+      let phase5Skipped = 0;
+      let phase5Errors = 0;
+
+      try {
+        const compactedData = await getPluginPageData({ dataPageTitle, limitToLatest: false });
+        const compactQuery = `[
+          :find (pull ?pluginPageChildren [
+            :block/string
+            :block/children
+            :block/order
+            :block/uid
+            {:block/children ...}])
+          :in $ ?pageTitle ?dataBlockName
+          :where
+          [?page :node/title ?pageTitle]
+          [?page :block/children ?pluginPageChildren]
+          [?pluginPageChildren :block/string ?dataBlockName]
+        ]`;
+
+        const compactQueryResults = await window.roamAlphaAPI.q(compactQuery, dataPageTitle, 'data');
+        const compactDataChildren = compactQueryResults.map((arr) => arr[0])[0]?.children || [];
+
+        for (const cardChild of compactDataChildren) {
+          if (!cardChild?.string) continue;
+          const cardUid = getStringBetween(cardChild.string, '((', '))');
+          if (!cardUid) continue;
+
+          const sessions = compactedData[cardUid];
+          if (!sessions || !Array.isArray(sessions) || !sessions.length) {
+            phase5Skipped++;
+            continue;
+          }
+
+          const mergedSnapshot = sessions[sessions.length - 1];
+
+          const sessionBlocks = (cardChild.children || [])
+            .filter((c) => {
+              if (!c?.string) return false;
+              const dateStr = getStringBetween(c.string, '[[', ']]');
+              return !!dateStr;
+            })
+            .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+          if (!sessionBlocks.length) {
+            phase5Skipped++;
+            continue;
+          }
+
+          const latestBlock = sessionBlocks[0];
+          const existingFields = new Set<string>();
+          if (latestBlock.children) {
+            for (const field of latestBlock.children) {
+              if (!field?.string) continue;
+              const [key] = parseConfigString(field.string);
+              if (key) existingFields.add(key);
+            }
+          }
+
+          const missingFields: { key: string; value: string }[] = [];
+          for (const key of SESSION_SNAPSHOT_KEYS) {
+            if (existingFields.has(key)) continue;
+            const value = (mergedSnapshot as any)[key];
+            if (value === undefined || value === null) continue;
+
+            if (key === 'nextDueDate' && value instanceof Date) {
+              const dateStr = value.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+              }).replace(/(\d+)(st|nd|rd|th)/, '$1$2');
+              missingFields.push({ key, value: `[[${dateStr}]]` });
+            } else if (key === 'lbl_progress') {
+              missingFields.push({ key, value: typeof value === 'string' ? value : JSON.stringify(value) });
+            } else {
+              missingFields.push({ key, value: String(value) });
+            }
+          }
+
+          if (missingFields.length === 0) {
+            phase5Skipped++;
+            continue;
+          }
+
+          try {
+            for (const { key, value } of missingFields) {
+              await window.roamAlphaAPI.createBlock({
+                location: { 'parent-uid': latestBlock.uid, order: -1 },
+                block: { string: `${key}:: ${value}`, open: false },
+              });
+            }
+            phase5Compacted++;
+          } catch (err) {
+            console.error(`[Memo] Phase 5 compact error for card ${cardUid}:`, err);
+            phase5Errors++;
+          }
+
+          if ((phase5Compacted + phase5Skipped + phase5Errors) % BATCH_SIZE === 0) {
+            setProgress({
+              total,
+              migrated,
+              skipped,
+              phase: `Phase 5: Compacting snapshots (${phase5Compacted + phase5Skipped + phase5Errors}/${compactDataChildren.length})`,
+            });
+            await sleep(BATCH_DELAY_MS);
+          } else {
+            await sleep(CARD_DELAY_MS);
+          }
+        }
+      } catch (err) {
+        console.error('[Memo] Phase 5 compact error:', err);
+        errMsgs.push(`Phase 5 compact: ${err instanceof Error ? err.message : String(err)}`);
+      }
+
+      debugLog(`[Memo] Phase 5 summary:`, {
+        compacted: phase5Compacted,
+        skipped: phase5Skipped,
+        errors: phase5Errors,
       });
 
       setProgress({ total, migrated, skipped, phase: 'Done' });

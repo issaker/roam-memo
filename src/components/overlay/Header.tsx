@@ -259,7 +259,7 @@ const ModeBadge = ({ algorithm, interaction }: { algorithm?: SchedulingAlgorithm
       )}
       {interactionLabel && interaction !== InteractionStyle.NORMAL && (
         <Blueprint.Tag intent="none" minimal style={{ marginLeft: '2px' }}>
-          {interactionLabel === 'Line by Line' ? 'LBL' : interactionLabel === 'Incremental Read' ? 'Read' : interactionLabel}
+          {interactionLabel === 'Line by Line' ? 'LBL' : interactionLabel}
         </Blueprint.Tag>
       )}
     </>

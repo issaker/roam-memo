@@ -4,7 +4,7 @@ import * as testUtils from '~/utils/testUtils';
 import * as dateUtils from '~/utils/date';
 
 import App from '~/app';
-import { shouldReinsertReadCard } from './PracticeOverlay';
+import { shouldReinsertLblCard } from './PracticeOverlay';
 import { SchedulingAlgorithm, InteractionStyle } from '~/models/session';
 import * as saveQueries from '~/queries/save';
 
@@ -229,7 +229,7 @@ describe('PracticeOverlay', () => {
     expect(screen.getByText('Next')).toBeInTheDocument();
   });
 
-  it('Incremental Read (PROGRESSIVE + READ) shows line-by-line reading UI', async () => {
+  it('LBL + Progressive shows line-by-line reading UI', async () => {
     const mockBuilder = new testUtils.MockDataBuilder();
     const dueCard1 = 'id_due_fixed_lbl';
 
@@ -255,36 +255,36 @@ describe('PracticeOverlay', () => {
     expect(screen.getByText('Next')).toBeInTheDocument();
   });
 
-  it('Incremental Read reinsertion stops on the last line', () => {
+  it('LBL reinsertion stops on the last line', () => {
     expect(
-      shouldReinsertReadCard({
+      shouldReinsertLblCard({
         currentChildIndex: 0,
         totalChildren: 1,
-        readReinsertOffset: 3,
+        lblNextReinsertOffset: 3,
       })
     ).toBe(false);
 
     expect(
-      shouldReinsertReadCard({
+      shouldReinsertLblCard({
         currentChildIndex: 1,
         totalChildren: 3,
-        readReinsertOffset: 3,
+        lblNextReinsertOffset: 3,
       })
     ).toBe(true);
 
     expect(
-      shouldReinsertReadCard({
+      shouldReinsertLblCard({
         currentChildIndex: 2,
         totalChildren: 3,
-        readReinsertOffset: 3,
+        lblNextReinsertOffset: 3,
       })
     ).toBe(false);
 
     expect(
-      shouldReinsertReadCard({
+      shouldReinsertLblCard({
         currentChildIndex: 1,
         totalChildren: 3,
-        readReinsertOffset: 0,
+        lblNextReinsertOffset: 0,
       })
     ).toBe(false);
   });

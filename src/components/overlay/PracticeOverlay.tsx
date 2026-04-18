@@ -6,7 +6,7 @@
  * Architecture:
  * - Receives practice data, settings, and callbacks as props from App
  * - useCurrentCardData derives card state from the session history (no polling)
- * - MainContext provides shared state (reviewMode, intervalMultiplier, etc.) to child components
+ * - MainContext provides shared state (algorithm, interaction, fixed_multiplier editor state, etc.) to child components
  * - Footer handles grading buttons and keyboard shortcuts
  * - CardBlock renders the actual Roam block content
  *
@@ -33,15 +33,15 @@ import LineByLineView from '~/components/overlay/LineByLineView';
 import SettingsDialog from '~/components/overlay/SettingsDialog';
 import {
   Session,
-  isFixedMode,
+  isFixedAlgorithm,
   isLBLReviewMode,
   DEFAULT_REVIEW_CONFIG,
   SchedulingAlgorithm,
   InteractionStyle,
   ALGORITHM_META,
 } from '~/models/session';
-import useLineByLineReview, { shouldReinsertReadCard } from '~/hooks/useLineByLineReview';
-export { shouldReinsertReadCard };
+import useLineByLineReview, { shouldReinsertLblCard } from '~/hooks/useLineByLineReview';
+export { shouldReinsertLblCard };
 import useCurrentCardData from '~/hooks/useCurrentCardData';
 import { generateNewSession, updateReviewConfig } from '~/queries';
 
@@ -94,7 +94,7 @@ const PracticeOverlay = ({
   const {
     rtlEnabled,
     forgotReinsertOffset,
-    readReinsertOffset,
+    lblNextReinsertOffset,
     showBreadcrumbs,
     showModeBorders,
   } = settings;
@@ -113,18 +113,10 @@ const PracticeOverlay = ({
 
   const currentCardRefUid = cardQueue[currentIndex] as string | undefined;
   const sessions = React.useMemo(() => {
-    const currentSessions = currentCardRefUid ? practiceData[currentCardRefUid] : [];
-    if (!currentSessions?.length) {
-      return currentCardRefUid && sessionOverrides[currentCardRefUid]
-        ? [sessionOverrides[currentCardRefUid]]
-        : [];
-    }
-
+    const currentSession = currentCardRefUid ? practiceData[currentCardRefUid] : undefined;
     const sessionOverride = currentCardRefUid ? sessionOverrides[currentCardRefUid] : undefined;
-    if (!sessionOverride) return currentSessions;
-
-    // Keep reinserted cards aligned with the latest in-session snapshot.
-    return [...currentSessions.slice(0, -1), sessionOverride];
+    const effectiveSession = sessionOverride || currentSession;
+    return effectiveSession ? [effectiveSession] : [];
   }, [currentCardRefUid, practiceData, sessionOverrides]);
   const { currentCardData, cardMeta, algorithm, interaction, latestSession, applyOptimisticCardMeta } =
     useCurrentCardData({
@@ -167,7 +159,7 @@ const PracticeOverlay = ({
 
     if (!cardChanged) return;
 
-    if (isFixedMode(latestSession.algorithm as SchedulingAlgorithm | undefined)) {
+    if (isFixedAlgorithm(latestSession.algorithm as SchedulingAlgorithm | undefined)) {
       setIntervalMultiplier(latestSession.fixed_multiplier as number);
     } else {
       setIntervalMultiplier(newFixedSessionDefaults.fixed_multiplier as number);
@@ -215,10 +207,10 @@ const PracticeOverlay = ({
   } = useLineByLineReview({
     currentCardRefUid,
     childUidsList,
-    isLineByLineUI: isLineByLineActive,
+    isLBLReviewMode: isLineByLineActive,
     isLBLReview,
     dataPageTitle,
-    readReinsertOffset,
+    lblNextReinsertOffset,
     forgotReinsertOffset,
     currentIndex,
     currentCardData,
@@ -235,13 +227,13 @@ const PracticeOverlay = ({
     const effectiveInteraction = (latestSession?.interaction || interaction) as InteractionStyle | undefined;
     const effectiveAlgorithm = (latestSession?.algorithm || algorithm) as SchedulingAlgorithm | undefined;
     const effectiveIsLBL = isLBLReviewMode(effectiveInteraction) && hasBlockChildrenUids;
-    const effectiveIsLblNext = effectiveIsLBL && isFixedMode(effectiveAlgorithm);
+    const effectiveIsLblNext = effectiveIsLBL && isFixedAlgorithm(effectiveAlgorithm);
 
     if (effectiveIsLblNext) {
       setShowAnswers(true);
     } else if (effectiveIsLBL) {
       setShowAnswers(false);
-    } else if (isFixedMode(effectiveAlgorithm)) {
+    } else if (isFixedAlgorithm(effectiveAlgorithm)) {
       setShowAnswers(true);
     } else if (hasBlockChildren || hasCloze) {
       setShowAnswers(false);
@@ -293,7 +285,7 @@ const PracticeOverlay = ({
       const practiceProps = {
         ...currentCardData,
         ...gradeData,
-        intervalMultiplier,
+        fixed_multiplier: intervalMultiplier,
         algorithm,
         interaction,
       };

@@ -1,31 +1,30 @@
 import {
   SchedulingAlgorithm,
   InteractionStyle,
-  isFixedMode,
-  isSpacedMode,
+  isFixedAlgorithm,
+  isSpacedAlgorithm,
   isLBLReviewMode,
-  isLineByLineUI,
   ALGORITHM_META,
   INTERACTION_META,
 } from '~/models/session';
 
 describe('mode classification functions', () => {
-  it('isFixedMode returns true for Fixed algorithms', () => {
-    expect(isFixedMode(SchedulingAlgorithm.PROGRESSIVE)).toBe(true);
-    expect(isFixedMode(SchedulingAlgorithm.FIXED_DAYS)).toBe(true);
-    expect(isFixedMode(SchedulingAlgorithm.FIXED_WEEKS)).toBe(true);
-    expect(isFixedMode(SchedulingAlgorithm.FIXED_MONTHS)).toBe(true);
-    expect(isFixedMode(SchedulingAlgorithm.FIXED_YEARS)).toBe(true);
-    expect(isFixedMode(SchedulingAlgorithm.SM2)).toBe(false);
+  it('isFixedAlgorithm returns true for Fixed algorithms', () => {
+    expect(isFixedAlgorithm(SchedulingAlgorithm.PROGRESSIVE)).toBe(true);
+    expect(isFixedAlgorithm(SchedulingAlgorithm.FIXED_DAYS)).toBe(true);
+    expect(isFixedAlgorithm(SchedulingAlgorithm.FIXED_WEEKS)).toBe(true);
+    expect(isFixedAlgorithm(SchedulingAlgorithm.FIXED_MONTHS)).toBe(true);
+    expect(isFixedAlgorithm(SchedulingAlgorithm.FIXED_YEARS)).toBe(true);
+    expect(isFixedAlgorithm(SchedulingAlgorithm.SM2)).toBe(false);
   });
 
-  it('isSpacedMode returns true for Spaced algorithms', () => {
-    expect(isSpacedMode(SchedulingAlgorithm.SM2)).toBe(true);
-    expect(isSpacedMode(SchedulingAlgorithm.PROGRESSIVE)).toBe(false);
-    expect(isSpacedMode(SchedulingAlgorithm.FIXED_DAYS)).toBe(false);
-    expect(isSpacedMode(SchedulingAlgorithm.FIXED_WEEKS)).toBe(false);
-    expect(isSpacedMode(SchedulingAlgorithm.FIXED_MONTHS)).toBe(false);
-    expect(isSpacedMode(SchedulingAlgorithm.FIXED_YEARS)).toBe(false);
+  it('isSpacedAlgorithm returns true for Spaced algorithms', () => {
+    expect(isSpacedAlgorithm(SchedulingAlgorithm.SM2)).toBe(true);
+    expect(isSpacedAlgorithm(SchedulingAlgorithm.PROGRESSIVE)).toBe(false);
+    expect(isSpacedAlgorithm(SchedulingAlgorithm.FIXED_DAYS)).toBe(false);
+    expect(isSpacedAlgorithm(SchedulingAlgorithm.FIXED_WEEKS)).toBe(false);
+    expect(isSpacedAlgorithm(SchedulingAlgorithm.FIXED_MONTHS)).toBe(false);
+    expect(isSpacedAlgorithm(SchedulingAlgorithm.FIXED_YEARS)).toBe(false);
   });
 
   it('isLBLReviewMode returns true only for LBL interaction', () => {
@@ -33,16 +32,10 @@ describe('mode classification functions', () => {
     expect(isLBLReviewMode(InteractionStyle.NORMAL)).toBe(false);
   });
 
-  it('isLineByLineUI returns true only for LBL interaction', () => {
-    expect(isLineByLineUI(InteractionStyle.LBL)).toBe(true);
-    expect(isLineByLineUI(InteractionStyle.NORMAL)).toBe(false);
-  });
-
   it('all classification functions return false for undefined', () => {
-    expect(isFixedMode(undefined)).toBe(false);
-    expect(isSpacedMode(undefined)).toBe(false);
+    expect(isFixedAlgorithm(undefined)).toBe(false);
+    expect(isSpacedAlgorithm(undefined)).toBe(false);
     expect(isLBLReviewMode(undefined)).toBe(false);
-    expect(isLineByLineUI(undefined)).toBe(false);
   });
 });
 

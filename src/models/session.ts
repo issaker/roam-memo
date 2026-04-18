@@ -57,19 +57,15 @@ export interface Records {
   [key: RecordUid]: Session | NewSession;
 }
 
-export interface NewRecords {
-  [key: RecordUid]: NewSession;
-}
-
 export interface CompleteRecords {
   [key: RecordUid]: Session[];
 }
 
 export interface LineByLineChildData {
   nextDueDate: string;
-  sm2_interval: number;
-  sm2_repetitions: number;
-  sm2_eFactor: number;
+  sm2_interval?: number;
+  sm2_repetitions?: number;
+  sm2_eFactor?: number;
   progressive_repetitions?: number;
 }
 
@@ -130,28 +126,17 @@ export const INTERACTION_META: Record<InteractionStyle, InteractionMeta> = {
   [InteractionStyle.LBL]: { label: 'Line by Line', icon: 'list' },
 };
 
-export const isFixedAlgorithm = (algorithm: SchedulingAlgorithm): boolean => {
+export const isFixedAlgorithm = (algorithm: SchedulingAlgorithm | undefined): boolean => {
+  if (!algorithm) return false;
   return ALGORITHM_META[algorithm]?.group === 'Fixed';
 };
 
-export const isSpacedAlgorithm = (algorithm: SchedulingAlgorithm): boolean => {
+export const isSpacedAlgorithm = (algorithm: SchedulingAlgorithm | undefined): boolean => {
+  if (!algorithm) return false;
   return ALGORITHM_META[algorithm]?.group === 'Spaced';
 };
 
-export const isFixedMode = (mode: SchedulingAlgorithm | undefined): boolean => {
-  if (!mode) return false;
-  return isFixedAlgorithm(mode);
-};
-
-export const isSpacedMode = (mode: SchedulingAlgorithm | undefined): boolean => {
-  if (!mode) return false;
-  return isSpacedAlgorithm(mode);
-};
-
 export const isLBLReviewMode = (interaction?: InteractionStyle): boolean =>
-  interaction === InteractionStyle.LBL;
-
-export const isLineByLineUI = (interaction?: InteractionStyle): boolean =>
   interaction === InteractionStyle.LBL;
 
 /**

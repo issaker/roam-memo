@@ -36,7 +36,6 @@ export const colors = {
   // Card mode indicator colors (aligned with intent colors for visual consistency)
   modeSpaced: 'var(--roam-success-color, #56d364)', // Spaced = green = same as "New" tag
   modeFixed: 'var(--roam-warning-color, #d29922)', // Fixed = orange = same as "Past Due" tag
-  modeIncrementalRead: 'var(--roam-warning-color, #d29922)', // Read = orange = same as Fixed
 
   // Line-by-line review accents
   lineByLineCurrentBorder: 'var(--roam-success-color, #56d364)',
@@ -63,8 +62,8 @@ Header / Footer / CardBlock
     ↓ uses intent colors
 Buttons (primary/success/warning/danger)
     ↓ uses mode colors
-ModeBadge (success=Spaced / warning=Fixed / warning=Read)
-Dialog border (modeSpaced / modeFixed / modeIncrementalRead)
+ModeBadge (success=Spaced / warning=Fixed)
+Dialog border (modeSpaced / modeFixed)
 ```
 
 ## File Structure
@@ -74,7 +73,7 @@ src/
 ├── theme.ts              # Single source of color definitions
 ├── app.tsx               # Main app (no theme-related logic)
 └── components/overlay/
-    ├── PracticeOverlay.tsx  # Dialog inherits background + dynamic border color (based on reviewMode)
+    ├── PracticeOverlay.tsx  # Dialog inherits background + dynamic border color (based on algorithm group)
     ├── Footer.tsx           # Buttons use intent colors
     └── CardBlock.tsx        # Cloze mask uses fixed color
 ```
@@ -103,9 +102,9 @@ A: This is a fixed light gray per design spec — it doesn't change with theme t
 
 A: Required to override Blueprint.js defaults for fullscreen behavior.
 
-### Q: Why does modeIncrementalRead use orange?
+### Q: Why are there only two mode colors (Spaced/Fixed)?
 
-A: Incremental Read is based on the Progressive interval algorithm, belonging to the "fixed interval" family alongside Fixed mode. Green (Spaced) = SM2 adaptive intervals; Orange (Fixed/Read) = fixed interval family. This creates a clear two-color distinction.
+A: The READ interaction style has been removed from the system (its functionality is now covered by LBL + Progressive/Fixed). LBL + Fixed cards use `modeFixed` (orange) instead of a separate color. This keeps the visual system simple: green = SM2, orange = everything else.
 
 ## Maintenance Guide
 

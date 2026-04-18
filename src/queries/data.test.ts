@@ -131,7 +131,7 @@ describe('getPluginPageData', () => {
     });
   });
 
-  it('rebuilds a full latest snapshot by inheriting mode fields from older sessions', async () => {
+  it('reads only the latest session block fields without merging from older sessions', async () => {
     Object.defineProperty(window, 'roamAlphaAPI', {
       value: {
         q: jest.fn(() => [
@@ -186,9 +186,6 @@ describe('getPluginPageData', () => {
       interaction: 'NORMAL',
       progressive_repetitions: 1,
       progressive_interval: 6,
-      sm2_repetitions: 3,
-      sm2_interval: 12,
-      sm2_eFactor: 2.4,
     });
   });
 

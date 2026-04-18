@@ -6,7 +6,7 @@ export interface SettingsFormSettings {
   dataPageTitle: string;
   dailyLimit: number;
   forgotReinsertOffset: number;
-  readReinsertOffset: number;
+  lblNextReinsertOffset: number;
   showModeBorders: boolean;
   rtlEnabled: boolean;
   shuffleCards: boolean;
@@ -29,7 +29,7 @@ const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
       dataPageTitle: settings.dataPageTitle,
       dailyLimit: settings.dailyLimit,
       forgotReinsertOffset: settings.forgotReinsertOffset,
-      readReinsertOffset: settings.readReinsertOffset,
+      lblNextReinsertOffset: settings.lblNextReinsertOffset,
       showModeBorders: settings.showModeBorders,
       rtlEnabled: settings.rtlEnabled,
       shuffleCards: settings.shuffleCards,
@@ -46,7 +46,7 @@ const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
         dataPageTitle: settings.dataPageTitle,
         dailyLimit: settings.dailyLimit,
         forgotReinsertOffset: settings.forgotReinsertOffset,
-        readReinsertOffset: settings.readReinsertOffset,
+        lblNextReinsertOffset: settings.lblNextReinsertOffset,
         showModeBorders: settings.showModeBorders,
         rtlEnabled: settings.rtlEnabled,
         shuffleCards: settings.shuffleCards,
@@ -57,7 +57,7 @@ const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
       settings.dataPageTitle,
       settings.dailyLimit,
       settings.forgotReinsertOffset,
-      settings.readReinsertOffset,
+      settings.lblNextReinsertOffset,
       settings.showModeBorders,
       settings.rtlEnabled,
       settings.shuffleCards,
@@ -152,10 +152,10 @@ const SettingsForm = React.forwardRef<SettingsFormHandle, SettingsFormProps>(
           <input
             type="number"
             className="bp3-input"
-            value={formSettings.readReinsertOffset}
+            value={formSettings.lblNextReinsertOffset}
             onChange={(e) => {
               const value = Number(e.target.value);
-              setFormSettings((prev) => ({ ...prev, readReinsertOffset: value }));
+              setFormSettings((prev) => ({ ...prev, lblNextReinsertOffset: value }));
             }}
             placeholder="3"
             style={{ width: '100%' }}

@@ -8,9 +8,7 @@
  * Uses the 'arrive' library to detect dynamically created DOM elements.
  */
 import React from 'react';
-import Arrive from 'arrive';
-
-Arrive;
+import 'arrive';
 
 const useOnBlockInteract = ({
   onEnterCallback,

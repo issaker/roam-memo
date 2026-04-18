@@ -119,7 +119,7 @@ describe('useCurrentCardData', () => {
       const { result } = renderHook(() => {
         const [currentCardRefUid, setCurrentCardRefUid] = React.useState(currentCardRefUid_0);
         const { algorithm, cardMeta, currentCardData } = useCurrentCardData({
-          sessions: practiceData[currentCardRefUid],
+          sessions: [practiceData[currentCardRefUid]],
           currentCardRefUid: currentCardRefUid,
         });
 
@@ -161,7 +161,7 @@ describe('useCurrentCardData', () => {
       const { practiceData } = await mockBuilder.getPracticeData();
 
       const { result } = renderHook(() =>
-        useCurrentCardData({ sessions: practiceData[currentCardRefUid], currentCardRefUid })
+        useCurrentCardData({ sessions: [practiceData[currentCardRefUid]], currentCardRefUid })
       );
 
       expect(result.current.latestSession).toBeDefined();

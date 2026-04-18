@@ -28,17 +28,18 @@
  *       └── ...
  *
  * Key Design Principle:
- *   All fields (algorithm, interaction, nextDueDate, lineByLineProgress, grade, etc.)
+ *   All fields (algorithm, interaction, nextDueDate, lbl_progress, sm2_grade, sm2_eFactor,
+ *   sm2_repetitions, sm2_interval, progressive_repetitions, progressive_interval, fixed_multiplier)
  *   are stored uniformly in session blocks. The latest session block is the
  *   single source of truth for the card's current state.
  */
 import { getStringBetween, parseConfigString, parseRoamDateString } from '~/utils/string';
 import * as stringUtils from '~/utils/string';
 import {
-  CompleteRecords,
   Records,
   RecordUid,
   resolveReviewConfig,
+  CompleteRecords,
 } from '~/models/session';
 import { Today } from '~/models/practice';
 import {
@@ -62,8 +63,8 @@ export const getPracticeData = async ({
 }) => {
   const pluginPageData = (await getPluginPageData({
     dataPageTitle,
-    limitToLatest: false,
-  })) as CompleteRecords;
+    limitToLatest: true,
+  })) as Records;
 
   const today = initializeToday({ tagsList, cachedData });
   const sessionData = {};
@@ -141,7 +142,7 @@ export const getSelectedTagPageBlocksIds = async (selectedTag): Promise<string[]
  * 已移除的废弃字段：intervalMultiplierType（幽灵字段，无实际用途）
  * 已移除的旧字段名兼容映射：由 Data Migration 负责转换，运行时不再兼容
  */
-const SESSION_SNAPSHOT_KEYS = [
+export const SESSION_SNAPSHOT_KEYS = [
   'algorithm',
   'interaction',
   'nextDueDate',
@@ -245,6 +246,41 @@ const parseSessionHistory = (sessionChildren, uid) => {
   return normalizedSessions;
 };
 
+/**
+ * 直接解析最新的 session block，不做历史合并。
+ *
+ * 性能优化：当 limitToLatest=true 时，无需从最旧 session 开始逐个合并，
+ * 因为 savePracticeData 已全量写入所有字段（含跨算法字段传递），
+ * 最新 session block 本身就是完整快照。
+ */
+const parseLatestSession = (sessionChildren, uid) => {
+  if (!sessionChildren.length) {
+    return { ...generateNewSession(), refUid: uid };
+  }
+
+  const sortedSessionChildren = [...sessionChildren].sort((a, b) => a.order - b.order);
+  const latestChild = sortedSessionChildren[0];
+
+  if (!latestChild?.string) {
+    return { ...generateNewSession(), refUid: uid };
+  }
+
+  const rawRecord: Record<string, any> = {
+    refUid: uid,
+    dateCreated: parseRoamDateString(getStringBetween(latestChild.string, '[[', ']]')),
+  };
+
+  if (latestChild.children) {
+    parseFieldValuesFromChildren(rawRecord, latestChild.children);
+  }
+
+  const config = resolveReviewConfig(rawRecord.algorithm, rawRecord.interaction);
+  rawRecord.algorithm = config.algorithm;
+  rawRecord.interaction = config.interaction;
+
+  return rawRecord;
+};
+
 const mapPluginPageDataLatest = (queryResultsData): Records =>
   queryResultsData
     .map((arr) => arr[0])[0]
@@ -252,10 +288,7 @@ const mapPluginPageDataLatest = (queryResultsData): Records =>
       if (!cur?.string) return acc;
       const uid = getStringBetween(cur.string, '((', '))');
       const sessionChildren = cur.children?.filter(isSessionHeadingBlock) || [];
-
-      const normalizedSessions = parseSessionHistory(sessionChildren, uid);
-      acc[uid] = normalizedSessions[normalizedSessions.length - 1];
-
+      acc[uid] = parseLatestSession(sessionChildren, uid);
       return acc;
     }, {}) || {};
 
@@ -334,7 +367,7 @@ export const getSessionData = async ({
   tag,
   dataPageTitle,
 }: {
-  pluginPageData: CompleteRecords;
+  pluginPageData: Records;
   tag: string;
   dataPageTitle: string;
 }) => {

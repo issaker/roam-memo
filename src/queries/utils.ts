@@ -15,7 +15,6 @@ import {
   SchedulingAlgorithm,
   InteractionStyle,
   isSpacedAlgorithm,
-  isSpacedMode,
 } from '~/models/session';
 
 export const parentChainInfoQuery = `[
@@ -191,19 +190,44 @@ export const getChildBlocksOnPage = async (page) => {
   return queryResults;
 };
 
-export const dailyNoteBlockUidsQuery = `
-    [:find ?blockUid
-     :where
-     [?page :page/create-email]
-     [?page :block/children ?block]
-     [?block :block/uid ?blockUid]
-     [?block :block/string ?str]
-     [(not= ?str "")]]
-  `;
+export const DAILY_NOTE_TITLE_PATTERN = /^[A-Z][a-z]+ \d{1,2}(st|nd|rd|th), \d{4}$/;
+
+export const allPagesQuery = `
+  [:find ?uid ?title
+   :where
+   [?page :node/title ?title]
+   [?page :block/uid ?uid]]
+`;
+
+export const pageTopLevelBlocksQuery = `
+  [:find ?blockUid
+   :in $ ?pageUid
+   :where
+   [?page :block/uid ?pageUid]
+   [?page :block/children ?block]
+   [?block :block/uid ?blockUid]
+   [?block :block/string ?str]
+   [(not= ?str "")]]
+`;
 
 export const getDailyNoteBlockUids = async (): Promise<string[]> => {
-  const results = window.roamAlphaAPI.q(dailyNoteBlockUidsQuery);
-  return results.map((arr) => arr[0]);
+  const pages = window.roamAlphaAPI.q(allPagesQuery);
+
+  const dailyNotePageUids = pages
+    .filter((arr) => DAILY_NOTE_TITLE_PATTERN.test(arr[1]))
+    .map((arr) => arr[0]);
+
+  if (!dailyNotePageUids.length) {
+    return [];
+  }
+
+  const blockUids: string[] = [];
+  for (const pageUid of dailyNotePageUids) {
+    const blocks = window.roamAlphaAPI.q(pageTopLevelBlocksQuery, pageUid);
+    blockUids.push(...blocks.map((arr) => arr[0]));
+  }
+
+  return blockUids;
 };
 
 export const createChildBlock = async (parent_uid, block, order, blockProps = {}) => {
