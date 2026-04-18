@@ -26,39 +26,39 @@ describe('supermemo: simulate practice', () => {
 
     test('Next practice', () => {
       result = practice.supermemo(result, 5);
-      expect(result).toEqual({ sm2_eFactor: 2.8000000000000003, sm2_interval: 16, sm2_repetitions: 3 });
+      expect(result).toEqual({ sm2_eFactor: 2.8, sm2_interval: 16, sm2_repetitions: 3 });
     });
 
     test('Next practice', () => {
       result = practice.supermemo(result, 5);
-      expect(result).toEqual({ sm2_eFactor: 2.9000000000000004, sm2_interval: 45, sm2_repetitions: 4 });
+      expect(result).toEqual({ sm2_eFactor: 2.9, sm2_interval: 45, sm2_repetitions: 4 });
     });
 
     test('Next practice', () => {
       result = practice.supermemo(result, 5);
-      expect(result).toEqual({ sm2_eFactor: 3.0000000000000004, sm2_interval: 131, sm2_repetitions: 5 });
+      expect(result).toEqual({ sm2_eFactor: 3, sm2_interval: 131, sm2_repetitions: 5 });
     });
   });
 
   describe('Regressions', () => {
     beforeEach(() => {
-      initInput = { sm2_eFactor: 3.0000000000000004, sm2_interval: 131, sm2_repetitions: 5 };
+      initInput = { sm2_eFactor: 3, sm2_interval: 131, sm2_repetitions: 5 };
       result = undefined;
     });
 
     test('Grade 0: Reset and review today', () => {
       result = practice.supermemo(initInput, 0);
-      expect(result).toEqual({ sm2_eFactor: 2.2000000000000006, sm2_interval: 0, sm2_repetitions: 0 });
+      expect(result).toEqual({ sm2_eFactor: 2.2, sm2_interval: 0, sm2_repetitions: 0 });
     });
 
     test('Grade 1: Review tomorrow', () => {
       result = practice.supermemo(initInput, 1);
-      expect(result).toEqual({ sm2_eFactor: 2.4600000000000004, sm2_interval: 1, sm2_repetitions: 0 });
+      expect(result).toEqual({ sm2_eFactor: 2.46, sm2_interval: 1, sm2_repetitions: 0 });
     });
   });
 
   describe('Relative', () => {
-    const initInput = { sm2_eFactor: 3.0000000000000004, sm2_interval: 131, sm2_repetitions: 5 };
+    const initInput = { sm2_eFactor: 3, sm2_interval: 131, sm2_repetitions: 5 };
     const gradeResultsArr = new Array(6)
       .fill(undefined)
       .map((_, i) => ({ grade: i, ...practice.supermemo(initInput, i) }));

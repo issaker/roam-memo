@@ -35,10 +35,10 @@ import {
   Session,
   isFixedAlgorithm,
   isLBLReviewMode,
-  DEFAULT_REVIEW_CONFIG,
   SchedulingAlgorithm,
   InteractionStyle,
   ALGORITHM_META,
+  getDefaultIntervalMultiplier,
 } from '~/models/session';
 import useLineByLineReview, { shouldReinsertLblCard } from '~/hooks/useLineByLineReview';
 export { shouldReinsertLblCard };
@@ -61,6 +61,7 @@ interface MainContextProps {
   lineByLineCurrentIndex: number;
   lineByLineTotal: number;
   cardMeta: import('~/models/session').CardMeta | undefined;
+  baseCardData: Session | undefined;
 }
 
 export const MainContext = React.createContext<MainContextProps>({} as MainContextProps);
@@ -80,14 +81,12 @@ const PracticeOverlay = ({
     practiceData,
     today,
     selectedTag,
-    tagsList,
     isCramming,
     setIsCramming,
     handlePracticeClick,
     handleMemoTagChange,
     fetchPracticeData,
     dataPageTitle,
-    setRenderMode,
     updateSetting,
   } = sessionContext;
 
@@ -139,16 +138,19 @@ const PracticeOverlay = ({
   const totalCardsCount = (todaySelectedTag?.new || 0) + (todaySelectedTag?.due || 0);
   const hasCards = totalCardsCount > 0;
 
-  const newFixedSessionDefaults = React.useMemo(
-    () => generateNewSession({ algorithm: DEFAULT_REVIEW_CONFIG.algorithm, interaction: DEFAULT_REVIEW_CONFIG.interaction }),
-    []
-  );
-
   const [intervalMultiplier, setIntervalMultiplier] = React.useState<number>(
-    currentCardData?.fixed_multiplier || (newFixedSessionDefaults.fixed_multiplier as number)
+    currentCardData?.fixed_multiplier || currentCardData?.progressive_interval || getDefaultIntervalMultiplier(algorithm)
   );
 
   const isDone = todaySelectedTag?.status === CompletionStatus.Finished || !currentCardData;
+
+  const baseCardData = React.useMemo(() => {
+    if (!currentCardRefUid) return currentCardData;
+    if (baseSessionDataMap.current[currentCardRefUid]) {
+      return { ...generateNewSession(), ...baseSessionDataMap.current[currentCardRefUid] };
+    }
+    return practiceData[currentCardRefUid] || currentCardData;
+  }, [currentCardRefUid, practiceData, currentCardData]);
 
   // Track previous card UID so the interval state is only initialised
   // when the card changes — not on every polling update that touches
@@ -171,12 +173,16 @@ const PracticeOverlay = ({
 
     if (!cardChanged) return;
 
-    if (isFixedAlgorithm(latestSession.algorithm as SchedulingAlgorithm | undefined)) {
-      setIntervalMultiplier(latestSession.fixed_multiplier as number);
+    const algo = latestSession.algorithm as SchedulingAlgorithm | undefined;
+
+    if (algo === SchedulingAlgorithm.PROGRESSIVE) {
+      setIntervalMultiplier(latestSession.progressive_interval || getDefaultIntervalMultiplier(algo));
+    } else if (isFixedAlgorithm(algo)) {
+      setIntervalMultiplier(latestSession.fixed_multiplier || getDefaultIntervalMultiplier(algo));
     } else {
-      setIntervalMultiplier(newFixedSessionDefaults.fixed_multiplier as number);
+      setIntervalMultiplier(getDefaultIntervalMultiplier(algo));
     }
-  }, [latestSession, currentCardRefUid, newFixedSessionDefaults]);
+  }, [latestSession, currentCardRefUid]);
 
   const hasNextDueDate = currentCardData && 'nextDueDate' in currentCardData;
   const isNew = currentCardData && 'isNew' in currentCardData && currentCardData.isNew;
@@ -464,44 +470,6 @@ const PracticeOverlay = ({
     };
   }, [isOpen]);
 
-  const onSelectReviewMode = React.useCallback(
-    async (newAlgorithm: SchedulingAlgorithm, newInteraction: InteractionStyle) => {
-      if (!currentCardRefUid) return;
-
-      setSessionOverrides((prev) => ({
-        ...prev,
-        [currentCardRefUid]: {
-          ...currentCardData,
-          algorithm: newAlgorithm,
-          interaction: newInteraction,
-        },
-      }));
-
-      applyOptimisticCardMeta({
-        ...cardMeta,
-        algorithm: newAlgorithm,
-        interaction: newInteraction,
-      });
-
-      await updateReviewConfig({
-        refUid: currentCardRefUid,
-        dataPageTitle,
-        algorithm: newAlgorithm,
-        interaction: newInteraction,
-      });
-
-      fetchPracticeData();
-    },
-    [
-      currentCardRefUid,
-      dataPageTitle,
-      cardMeta,
-      currentCardData,
-      applyOptimisticCardMeta,
-      fetchPracticeData,
-    ]
-  );
-
   const onSelectAlgorithm = React.useCallback(
     async (newAlgorithm: SchedulingAlgorithm) => {
       if (!currentCardRefUid) return;
@@ -609,6 +577,7 @@ const PracticeOverlay = ({
         lineByLineCurrentIndex: isLineByLineActive ? lineByLineCurrentChildIndex + 1 : 0,
         lineByLineTotal: isLineByLineActive ? childUidsList.length : 0,
         cardMeta,
+        baseCardData,
       }}
     >
       <style>{mobileOverlayStyles()}</style>
@@ -688,7 +657,7 @@ const PracticeOverlay = ({
           )}
         </DialogBody>
         {showOverwriteReminder && (
-          <OverwriteReminder>今日已评分，此次打分将覆盖今日数据</OverwriteReminder>
+          <OverwriteReminder>今日已学习，此次学习将覆盖今日数据</OverwriteReminder>
         )}
         <Footer
           refUid={currentCardRefUid}

@@ -34,7 +34,7 @@ const Footer = ({
   currentCardData,
   onStartCrammingClick,
 }) => {
-  const { intervalMultiplier } = React.useContext(MainContext);
+  const { intervalMultiplier, baseCardData } = React.useContext(MainContext);
   const { algorithm: algorithmFromSession, interaction: interactionFromSession } = usePracticeSession();
 
   const [isIntervalEditorOpen, setIsIntervalEditorOpen] = React.useState(false);
@@ -162,14 +162,15 @@ const Footer = ({
   const { handleKeyDown, handleKeyUp } = Blueprint.useHotkeys(hotkeys);
 
   const intervalEstimates: IntervalEstimates = React.useMemo(() => {
-    if (!currentCardData) return;
+    const dataForEstimates = baseCardData || currentCardData;
+    if (!dataForEstimates) return;
 
     if (!algorithmFromSession) {
       console.error('Algorithm not set');
       return;
     }
     const grades = [0, 1, 2, 3, 4, 5];
-    const { sm2_interval, sm2_repetitions, sm2_eFactor, progressive_repetitions, progressive_interval, fixed_multiplier } = currentCardData;
+    const { sm2_interval, sm2_repetitions, sm2_eFactor, progressive_repetitions, progressive_interval } = dataForEstimates;
     const estimates = {};
 
     const iterateCount = isFixedAlgorithm(algorithmFromSession) ? 1 : grades.length;
@@ -190,7 +191,7 @@ const Footer = ({
       estimates[grade] = practiceResultData;
     }
     return estimates;
-  }, [currentCardData, intervalMultiplier, algorithmFromSession]);
+  }, [baseCardData, currentCardData, intervalMultiplier, algorithmFromSession]);
 
   return (
     <FooterWrapper
@@ -282,7 +283,6 @@ const GradingControlsWrapper = ({
   toggleIntervalEditorOpen,
   onPrevClick,
 }) => {
-  const { cardMeta } = React.useContext(MainContext);
   const { algorithm, interaction, onSelectAlgorithm, onSelectInteraction } = usePracticeSession();
 
   const isFixedModeActive = isFixedAlgorithm(algorithm);

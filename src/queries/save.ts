@@ -22,7 +22,7 @@
  */
 import * as stringUtils from '~/utils/string';
 import * as dateUtils from '~/utils/date';
-import { LineByLineProgressMap, SchedulingAlgorithm, InteractionStyle } from '~/models/session';
+import { LineByLineProgressMap, SchedulingAlgorithm, InteractionStyle, isFixedAlgorithm } from '~/models/session';
 import {
   createChildBlock,
   getChildBlock,
@@ -32,7 +32,20 @@ import {
 } from '~/queries/utils';
 import { SESSION_SNAPSHOT_KEYS } from '~/queries/data';
 
-const getEmojiFromGrade = (grade) => {
+const NUMERIC_SESSION_KEYS = [
+  'sm2_grade',
+  'sm2_interval',
+  'sm2_repetitions',
+  'sm2_eFactor',
+  'progressive_repetitions',
+  'progressive_interval',
+  'fixed_multiplier',
+];
+
+const getEmojiFromGrade = (grade, algorithm?: string) => {
+  if (grade === undefined && isFixedAlgorithm(algorithm as SchedulingAlgorithm)) {
+    return '🟢';
+  }
   switch (grade) {
     case 5:
       return '🟢';
@@ -128,7 +141,7 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
 
   const referenceDate = dateCreated || new Date();
   const dateCreatedRoamDateString = stringUtils.dateToRoamDateString(referenceDate);
-  const emoji = getEmojiFromGrade(data.sm2_grade);
+  const emoji = getEmojiFromGrade(data.sm2_grade, data.algorithm);
   const sessionBlockTitle = `[[${dateCreatedRoamDateString}]] ${emoji}`;
 
   const existingCardChildren = await window.roamAlphaAPI.q(
@@ -165,7 +178,12 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
       }
       for (const key of Object.keys(existingFields)) {
         if (data[key] === undefined) {
-          data[key] = existingFields[key];
+          let value = existingFields[key];
+          if (NUMERIC_SESSION_KEYS.includes(key) && typeof value === 'string') {
+            const num = Number(value);
+            if (!isNaN(num)) value = num;
+          }
+          data[key] = value;
         }
       }
 

@@ -292,10 +292,18 @@ export const generateNewSession = ({
     };
   }
 
+  if (effectiveAlgorithm === SchedulingAlgorithm.PROGRESSIVE) {
+    return {
+      ...baseSession,
+      progressive_interval: 2,
+      progressive_repetitions: 0,
+      isNew,
+    };
+  }
+
   return {
     ...baseSession,
-    progressive_interval: 2,
-    progressive_repetitions: 0,
+    fixed_multiplier: 3,
     isNew,
   };
 };

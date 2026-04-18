@@ -140,6 +140,12 @@ export const isSpacedAlgorithm = (algorithm: SchedulingAlgorithm | undefined): b
 export const isLBLReviewMode = (interaction?: InteractionStyle): boolean =>
   interaction === InteractionStyle.LBL;
 
+export const getDefaultIntervalMultiplier = (algorithm: SchedulingAlgorithm | undefined): number => {
+  if (algorithm === SchedulingAlgorithm.PROGRESSIVE) return 2;
+  if (isFixedAlgorithm(algorithm)) return 3;
+  return 3;
+};
+
 /**
  * 解析算法和交互配置。无效值回退到默认（SM2 + NORMAL）。
  * 不再做 READ→LBL 的运行时兼容映射，由 Data Migration 负责数据转换。
