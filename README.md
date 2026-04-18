@@ -61,7 +61,16 @@ This is a modified and upgraded version of the original Memo plugin. It cannot b
 
 ### Multi Deck Support
 
-Enter a comma-separated list of tags in "Tag Pages" in settings to create multiple decks. Supports quoted tags containing commas (e.g., `"french exam, fun facts"`).
+Enter a comma-separated list of tags in "Tag Pages" in settings to create multiple decks. Supports quoted tags containing commas (e.g., `"french exam, fun facts"`). A special "DailyNote" deck is available (enabled by default) that aggregates all top-level blocks from your daily journal pages.
+
+### DailyNote Deck
+
+A special deck that aggregates all top-level blocks from your Roam Research DailyNote pages (daily journal entries) into a single review deck. Each first-level block on any DailyNote page becomes a review card.
+
+- Enabled by default; can be toggled off in Settings via "Enable DailyNote Deck"
+- Appears at the bottom of the deck selector with a calendar icon
+- Cards follow the same urgency-based sorting as regular decks
+- Cards that overlap with regular decks share the same session data
 
 ### Text Masking (Cloze)
 
@@ -291,15 +300,17 @@ Settings use a **single-source-of-truth** design with `extensionAPI.settings` as
 
 | Layer | Role | Persistence | When Written |
 |-------|------|-------------|-------------|
-| `extensionAPI.settings` | **Primary** | Roam Depot: persistent · roam/js: in-memory | Immediately on every change |
+| `extensionAPI.settings` | **Primary** | Roam Depot: persistent · roam/js: in-memory | On "Apply & Close" |
 | Roam data page (`roam/memo`) | **Backup** | Persistent (blocks) | Debounced 5s after last change |
 
 **Key design decisions:**
 
-1. **extensionAPI first**: Every setting change writes to `extensionAPI.settings` before anything else
-2. **Page as backup, not source**: The data page is only read at startup when `extensionAPI.settings` is empty (roam/js cold start)
-3. **5-second debounced page sync**: Coalesces rapid changes into a single write, reducing Roam sync indicator load
-4. **Unmount flush**: Pending debounced syncs are flushed immediately when the overlay closes
+1. **Explicit save**: Settings are only saved when the user clicks "Apply & Close" in the Settings dialog. This prevents queue errors and risks from immediate setting application
+2. **Apply & Close**: Saves all settings, closes the Settings dialog and the Practice Overlay. The user must manually reopen the plugin window for new settings to take full effect
+3. **Close (discard)**: Closes the Settings dialog without saving any changes made in the current session
+4. **Page as backup, not source**: The data page is only read at startup when `extensionAPI.settings` is empty (roam/js cold start)
+5. **5-second debounced page sync**: Coalesces rapid changes into a single write, reducing Roam sync indicator load
+6. **Unmount flush**: Pending debounced syncs are flushed immediately when the overlay closes
 
 In **roam/js mode**, an in-memory overlay wraps `extensionAPI.settings` to provide working `getAll/set/get` methods. Settings are lost on page reload, which is why the data page backup exists.
 
@@ -416,7 +427,7 @@ src/
 ├── extension.tsx          # Plugin entry point (onload/onunload)
 ├── app.tsx                # Root React component, orchestrates review workflow
 ├── practice.ts            # SM2 algorithm + Fixed Interval algorithm
-├── constants.ts           # Shared constants
+├── constants.ts           # Shared constants (including DAILYNOTE_DECK_KEY)
 ├── models/
 │   ├── session.ts         # Session & CardMeta models, SchedulingAlgorithm, InteractionStyle, ALGORITHM_META, INTERACTION_META
 │   └── practice.ts        # Today's review status model

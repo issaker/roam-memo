@@ -6,6 +6,7 @@
  * First tag is auto-selected as the default deck.
  */
 import * as React from 'react';
+import { DAILYNOTE_DECK_KEY } from '~/constants';
 
 const splitStringByCommas = (str: string) => {
   const result: string[] = [];
@@ -28,15 +29,25 @@ const splitStringByCommas = (str: string) => {
   return result;
 };
 
-const useTags = ({ tagsListString }: { tagsListString: string }) => {
-  const [tagsList, setTagsList] = React.useState<string[]>(splitStringByCommas(tagsListString));
+const useTags = ({ tagsListString, dailynoteEnabled }: { tagsListString: string; dailynoteEnabled: boolean }) => {
+  const buildTagsList = React.useCallback((str: string, enabled: boolean) => {
+    const parsed = splitStringByCommas(str);
+    if (enabled) {
+      return [...parsed, DAILYNOTE_DECK_KEY];
+    }
+    return parsed;
+  }, []);
+
+  const [tagsList, setTagsList] = React.useState<string[]>(buildTagsList(tagsListString, dailynoteEnabled));
   const [selectedTag, setSelectedTag] = React.useState<string>(tagsList[0]);
 
   React.useEffect(() => {
-    const tagsList = splitStringByCommas(tagsListString);
-    setTagsList(tagsList);
-    setSelectedTag(tagsList[0]);
-  }, [tagsListString, setTagsList]);
+    const newList = buildTagsList(tagsListString, dailynoteEnabled);
+    setTagsList(newList);
+    if (!newList.includes(selectedTag)) {
+      setSelectedTag(newList[0]);
+    }
+  }, [tagsListString, dailynoteEnabled, buildTagsList]);
 
   return {
     selectedTag,

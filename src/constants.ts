@@ -7,5 +7,6 @@
  * record alongside algorithm-specific fields (grade, interval, eFactor, etc.).
  */
 
+export const DAILYNOTE_DECK_KEY = 'DailyNote';
 
 

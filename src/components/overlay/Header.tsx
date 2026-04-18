@@ -59,6 +59,7 @@ const TagSelector = ({ tagsList, selectedTag, onTagChange }) => {
     >
       <Blueprint.Button
         text={selectedTag}
+        icon={selectedTag === 'DailyNote' ? 'calendar' : undefined}
         rightIcon="caret-down"
         minimal
         data-testid="tag-selector-cta"
@@ -157,7 +158,10 @@ const TagSelectorItem = ({ text, onClick, active, tagsList }) => {
       className="flex-col"
     >
       <div className="flex">
-        <div className="flex items-center">{text}</div>
+        <div className="flex items-center">
+          {text === 'DailyNote' && <Blueprint.Icon icon="calendar" size={11} style={{ marginRight: '4px' }} />}
+          {text}
+        </div>
         <div className="ml-2">
           {dueCount > 0 && (
             <Tooltip content="Due" placement={placement}>

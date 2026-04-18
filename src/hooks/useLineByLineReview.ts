@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { LineByLineProgressMap, SchedulingAlgorithm } from '~/models/session';
+import { LineByLineProgressMap, SchedulingAlgorithm, isFixedAlgorithm } from '~/models/session';
 import { updateLineByLineProgress } from '~/queries';
 import { progressiveInterval, supermemo } from '~/practice';
 import * as dateUtils from '~/utils/date';
@@ -14,10 +14,30 @@ export const shouldReinsertReadCard = ({
   readReinsertOffset: number;
 }) => readReinsertOffset > 0 && currentChildIndex < totalChildren - 1;
 
+const LEGACY_LBL_CHILD_KEY_MAP: Record<string, string> = {
+  interval: 'sm2_interval',
+  repetitions: 'sm2_repetitions',
+  eFactor: 'sm2_eFactor',
+  progressiveRepetitions: 'progressive_repetitions',
+};
+
+const migrateLblChildData = (data: any): any => {
+  const result: any = {};
+  for (const [key, value] of Object.entries(data)) {
+    result[LEGACY_LBL_CHILD_KEY_MAP[key] || key] = value;
+  }
+  return result;
+};
+
 const parseLineByLineProgress = (progressStr?: string): LineByLineProgressMap => {
   if (!progressStr) return {};
   try {
-    return JSON.parse(progressStr);
+    const parsed = JSON.parse(progressStr);
+    const migrated: LineByLineProgressMap = {};
+    for (const [uid, data] of Object.entries(parsed)) {
+      migrated[uid] = migrateLblChildData(data);
+    }
+    return migrated;
   } catch {
     return {};
   }
@@ -27,7 +47,6 @@ interface UseLineByLineReviewInput {
   currentCardRefUid: string | undefined;
   childUidsList: string[];
   isLineByLineUI: boolean;
-  isIncrementalRead: boolean;
   isLBLReview: boolean;
   dataPageTitle: string;
   readReinsertOffset: number;
@@ -55,7 +74,6 @@ export default function useLineByLineReview({
   currentCardRefUid,
   childUidsList,
   isLineByLineUI,
-  isIncrementalRead,
   isLBLReview,
   dataPageTitle,
   readReinsertOffset,
@@ -69,6 +87,7 @@ export default function useLineByLineReview({
   setCardQueue,
   lineByLineProgressStr,
 }: UseLineByLineReviewInput): UseLineByLineReviewOutput {
+  const isLblNext = isFixedAlgorithm(algorithm);
   const lineByLineProgress = React.useMemo(
     () => parseLineByLineProgress(lineByLineProgressStr),
     [lineByLineProgressStr]
@@ -99,12 +118,12 @@ export default function useLineByLineReview({
       }
     }
     setLineByLineCurrentChildIndex(firstDueIndex);
-    if (isIncrementalRead) {
+    if (isLblNext) {
       setLineByLineRevealedCount(firstDueIndex + 1);
     } else {
       setLineByLineRevealedCount(firstDueIndex);
     }
-  }, [isLineByLineUI, isIncrementalRead, currentCardRefUid, childUidsList, lineByLineProgress]);
+  }, [isLineByLineUI, isLblNext, currentCardRefUid, childUidsList, lineByLineProgress]);
 
   const lineByLineIsCardComplete =
     isLineByLineUI && lineByLineCurrentChildIndex >= childUidsList.length;
@@ -115,9 +134,9 @@ export default function useLineByLineReview({
 
       const childUid = childUidsList[lineByLineCurrentChildIndex];
 
-      if (isIncrementalRead) {
+      if (isLblNext) {
         const existingData = lineByLineProgress[childUid];
-        const progReps = existingData?.progressiveRepetitions || 0;
+        const progReps = existingData?.progressive_repetitions || 0;
         const nextInterval = progressiveInterval(progReps);
 
         const now = new Date();
@@ -127,10 +146,10 @@ export default function useLineByLineReview({
           ...lineByLineProgress,
           [childUid]: {
             nextDueDate: childNextDueDate.toISOString(),
-            interval: nextInterval,
-            repetitions: (existingData?.repetitions || 0) + 1,
-            eFactor: existingData?.eFactor || 2.5,
-            progressiveRepetitions: progReps + 1,
+            sm2_interval: nextInterval,
+            sm2_repetitions: (existingData?.sm2_repetitions || 0) + 1,
+            sm2_eFactor: existingData?.sm2_eFactor || 2.5,
+            progressive_repetitions: progReps + 1,
           },
         };
 
@@ -149,7 +168,7 @@ export default function useLineByLineReview({
             ...currentCardData,
             algorithm,
             dateCreated: now,
-            lineByLineProgress: JSON.stringify(updatedProgress),
+            lbl_progress: JSON.stringify(updatedProgress),
             nextDueDate: hasUnreadChildren ? now : childNextDueDate,
           },
         }));
@@ -180,22 +199,22 @@ export default function useLineByLineReview({
       const existingData = lineByLineProgress[childUid];
 
       const sm2Input = {
-        interval: existingData?.interval || 0,
-        repetition: existingData?.repetitions || 0,
-        efactor: existingData?.eFactor || 2.5,
+        sm2_interval: existingData?.sm2_interval || 0,
+        sm2_repetitions: existingData?.sm2_repetitions || 0,
+        sm2_eFactor: existingData?.sm2_eFactor || 2.5,
       };
       const sm2Result = supermemo(sm2Input, grade);
 
       const now = new Date();
-      const childNextDueDate = dateUtils.addDays(now, sm2Result.interval);
+      const childNextDueDate = dateUtils.addDays(now, sm2Result.sm2_interval);
 
       const updatedProgress: LineByLineProgressMap = {
         ...lineByLineProgress,
         [childUid]: {
           nextDueDate: childNextDueDate.toISOString(),
-          interval: sm2Result.interval,
-          repetitions: sm2Result.repetition,
-          eFactor: sm2Result.efactor,
+          sm2_interval: sm2Result.sm2_interval,
+          sm2_repetitions: sm2Result.sm2_repetitions,
+          sm2_eFactor: sm2Result.sm2_eFactor,
         },
       };
 
@@ -214,7 +233,7 @@ export default function useLineByLineReview({
           ...currentCardData,
           algorithm,
           dateCreated: now,
-          lineByLineProgress: JSON.stringify(updatedProgress),
+          lbl_progress: JSON.stringify(updatedProgress),
           nextDueDate: hasUnreadChildren ? now : childNextDueDate,
         },
       }));
@@ -251,7 +270,7 @@ export default function useLineByLineReview({
       lineByLineProgress,
       dataPageTitle,
       setCurrentIndex,
-      isIncrementalRead,
+      isLblNext,
       currentCardData,
       algorithm,
       readReinsertOffset,

@@ -46,7 +46,7 @@ describe('getPluginPageData', () => {
                       children: [
                         { string: 'algorithm:: SM2' },
                         { string: 'interaction:: NORMAL' },
-                        { string: 'lineByLineProgress:: {"child-1":{"interval":6}}' },
+                        { string: 'lbl_progress:: {"child-1":{"sm2_interval":6}}' },
                         { string: 'nextDueDate:: [[April 20th, 2026]]' },
                       ],
                     },
@@ -76,7 +76,7 @@ describe('getPluginPageData', () => {
     expect(result['card-1']).toMatchObject({
       algorithm: 'SM2',
       interaction: 'NORMAL',
-      lineByLineProgress: '{"child-1":{"interval":6}}',
+      lbl_progress: '{"child-1":{"sm2_interval":6}}',
     });
     const cardData = result['card-1'] as any;
     expect(cardData.nextDueDate).toEqual(new Date('2026-04-20T00:00:00.000Z'));
@@ -98,9 +98,9 @@ describe('getPluginPageData', () => {
                       children: [
                         { string: 'algorithm:: SM2' },
                         { string: 'interaction:: NORMAL' },
-                        { string: 'repetitions:: 3' },
-                        { string: 'interval:: 12' },
-                        { string: 'eFactor:: 2.4' },
+                        { string: 'sm2_repetitions:: 3' },
+                        { string: 'sm2_interval:: 12' },
+                        { string: 'sm2_eFactor:: 2.4' },
                         { string: 'nextDueDate:: [[April 20th, 2026]]' },
                       ],
                     },
@@ -125,9 +125,9 @@ describe('getPluginPageData', () => {
     expect(result['card-spaced']).toMatchObject({
       algorithm: 'SM2',
       interaction: 'NORMAL',
-      repetitions: 3,
-      interval: 12,
-      eFactor: 2.4,
+      sm2_repetitions: 3,
+      sm2_interval: 12,
+      sm2_eFactor: 2.4,
     });
   });
 
@@ -147,9 +147,9 @@ describe('getPluginPageData', () => {
                       children: [
                         { string: 'algorithm:: SM2' },
                         { string: 'interaction:: NORMAL' },
-                        { string: 'repetitions:: 3' },
-                        { string: 'interval:: 12' },
-                        { string: 'eFactor:: 2.4' },
+                        { string: 'sm2_repetitions:: 3' },
+                        { string: 'sm2_interval:: 12' },
+                        { string: 'sm2_eFactor:: 2.4' },
                       ],
                     },
                     {
@@ -158,8 +158,8 @@ describe('getPluginPageData', () => {
                       children: [
                         { string: 'algorithm:: PROGRESSIVE' },
                         { string: 'interaction:: NORMAL' },
-                        { string: 'progressiveRepetitions:: 1' },
-                        { string: 'intervalMultiplier:: 6' },
+                        { string: 'progressive_repetitions:: 1' },
+                        { string: 'progressive_interval:: 6' },
                         { string: 'nextDueDate:: [[April 20th, 2026]]' },
                       ],
                     },
@@ -184,11 +184,11 @@ describe('getPluginPageData', () => {
     expect(result['card-switching']).toMatchObject({
       algorithm: 'PROGRESSIVE',
       interaction: 'NORMAL',
-      progressiveRepetitions: 1,
-      intervalMultiplier: 6,
-      repetitions: 3,
-      interval: 12,
-      eFactor: 2.4,
+      progressive_repetitions: 1,
+      progressive_interval: 6,
+      sm2_repetitions: 3,
+      sm2_interval: 12,
+      sm2_eFactor: 2.4,
     });
   });
 
@@ -230,6 +230,62 @@ describe('getPluginPageData', () => {
       nextDueDate: new Date('2026-04-20T00:00:00.000Z'),
       algorithm: 'SM2',
       interaction: 'NORMAL',
+    });
+  });
+
+  it('maps legacy field names to new field names', async () => {
+    Object.defineProperty(window, 'roamAlphaAPI', {
+      value: {
+        q: jest.fn(() => [
+          [
+            {
+              children: [
+                {
+                  string: '((card-legacy))',
+                  children: [
+                    {
+                      string: '[[April 14th, 2026]] 🟢',
+                      order: 0,
+                      children: [
+                        { string: 'algorithm:: SM2' },
+                        { string: 'interaction:: NORMAL' },
+                        { string: 'repetitions:: 5' },
+                        { string: 'interval:: 30' },
+                        { string: 'eFactor:: 2.6' },
+                        { string: 'grade:: 4' },
+                        { string: 'progressiveRepetitions:: 2' },
+                        { string: 'intervalMultiplier:: 12' },
+                        { string: 'lineByLineProgress:: {"c1":{"interval":6}}' },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        ]),
+        util: {
+          pageTitleToDate: jest.fn((value: string) => parseMockRoamDate(value)),
+        },
+      },
+      writable: true,
+    });
+
+    const result = await getPluginPageData({
+      dataPageTitle: 'roam/memo',
+      limitToLatest: true,
+    });
+
+    expect(result['card-legacy']).toMatchObject({
+      algorithm: 'SM2',
+      interaction: 'NORMAL',
+      sm2_repetitions: 5,
+      sm2_interval: 30,
+      sm2_eFactor: 2.6,
+      sm2_grade: 4,
+      progressive_repetitions: 2,
+      fixed_multiplier: 12,
+      lbl_progress: '{"c1":{"interval":6}}',
     });
   });
 });

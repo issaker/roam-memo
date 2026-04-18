@@ -45,7 +45,7 @@ const App = () => {
     dailyLimit,
     shuffleCards,
   } = settings;
-  const { selectedTag, setSelectedTag, tagsList } = useTags({ tagsListString });
+  const { selectedTag, setSelectedTag, tagsList } = useTags({ tagsListString, dailynoteEnabled: settings.dailynoteEnabled });
 
   const { fetchCacheData, saveCacheData, data: cachedData } = useCachedData({ dataPageTitle });
 

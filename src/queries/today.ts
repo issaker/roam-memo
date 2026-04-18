@@ -201,15 +201,15 @@ export const getDueCardUids = (currentTagSessionData: CompleteRecords, isCrammin
     }
 
     // Level 2: Material difficulty — lower eFactor = faster forgetting = higher urgency
-    const aEfactor = aLatestSession?.eFactor ?? 2.5;
-    const bEfactor = bLatestSession?.eFactor ?? 2.5;
+    const aEfactor = aLatestSession?.sm2_eFactor ?? 2.5;
+    const bEfactor = bLatestSession?.sm2_eFactor ?? 2.5;
     if (aEfactor !== bEfactor) {
       return aEfactor - bEfactor;
     }
 
     // Level 3: Memory maturity — fewer repetitions = less stable = higher urgency
-    const aReps = aLatestSession?.repetitions ?? 0;
-    const bReps = bLatestSession?.repetitions ?? 0;
+    const aReps = aLatestSession?.sm2_repetitions ?? 0;
+    const bReps = bLatestSession?.sm2_repetitions ?? 0;
     return aReps - bReps;
   });
 

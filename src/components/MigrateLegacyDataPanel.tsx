@@ -23,13 +23,13 @@ const LEGACY_MODE_TO_CONFIG: Record<string, { algorithm: SchedulingAlgorithm; in
   SPACED_INTERVAL: { algorithm: SchedulingAlgorithm.SM2, interaction: InteractionStyle.NORMAL },
   SPACED_INTERVAL_LBL: { algorithm: SchedulingAlgorithm.SM2, interaction: InteractionStyle.LBL },
   FIXED_PROGRESSIVE: { algorithm: SchedulingAlgorithm.PROGRESSIVE, interaction: InteractionStyle.NORMAL },
-  FIXED_PROGRESSIVE_LBL: { algorithm: SchedulingAlgorithm.PROGRESSIVE, interaction: InteractionStyle.READ },
+  FIXED_PROGRESSIVE_LBL: { algorithm: SchedulingAlgorithm.PROGRESSIVE, interaction: InteractionStyle.LBL },
   FIXED_DAYS: { algorithm: SchedulingAlgorithm.FIXED_DAYS, interaction: InteractionStyle.NORMAL },
   FIXED_WEEKS: { algorithm: SchedulingAlgorithm.FIXED_WEEKS, interaction: InteractionStyle.NORMAL },
   FIXED_MONTHS: { algorithm: SchedulingAlgorithm.FIXED_MONTHS, interaction: InteractionStyle.NORMAL },
   FIXED_YEARS: { algorithm: SchedulingAlgorithm.FIXED_YEARS, interaction: InteractionStyle.NORMAL },
 };
-import { updateReviewConfig } from '~/queries';
+import { updateReviewConfig, deduplicateSessionFields } from '~/queries';
 import { getPluginPageData } from '~/queries/data';
 import { getStringBetween, parseConfigString } from '~/utils/string';
 
@@ -689,6 +689,118 @@ const MigrateLegacyDataPanel = ({ dataPageTitle }: { dataPageTitle: string }) =>
         phase1: { migrated, errors, skipped },
         phase2: { sessionBlocksCleaned: allSessionUids.length },
         phase3: { converted: phase3Converted, skipped: phase3Skipped, errors: phase3Errors },
+      });
+
+      setProgress({
+        total,
+        migrated,
+        skipped,
+        phase: 'Phase 4: Deduplicating fields & renaming fields',
+      });
+
+      try {
+        const dedupResult = await deduplicateSessionFields({ dataPageTitle });
+        console.log(`[Memo] Phase 4 dedup: cleaned=${dedupResult.cleaned}, errors=${dedupResult.errors}`);
+      } catch (err) {
+        console.error('[Memo] Phase 4 dedup error:', err);
+        errMsgs.push(`Phase 4 dedup: ${err instanceof Error ? err.message : String(err)}`);
+      }
+
+      const FIELD_RENAME_MAP: Record<string, string> = {
+        repetitions: 'sm2_repetitions',
+        interval: 'sm2_interval',
+        eFactor: 'sm2_eFactor',
+        grade: 'sm2_grade',
+        progressiveRepetitions: 'progressive_repetitions',
+        intervalMultiplier: 'fixed_multiplier',
+        lineByLineProgress: 'lbl_progress',
+      };
+
+      const FIELDS_TO_DELETE = ['intervalMultiplierType'];
+
+      setProgress({
+        total,
+        migrated,
+        skipped,
+        phase: 'Phase 4: Renaming fields & converting READ → LBL',
+      });
+
+      const renameQuery = `[
+        :find (pull ?pluginPageChildren [
+          :block/string
+          :block/children
+          :block/order
+          :block/uid
+          {:block/children ...}])
+        :in $ ?pageTitle ?dataBlockName
+        :where
+        [?page :node/title ?pageTitle]
+        [?page :block/children ?pluginPageChildren]
+        [?pluginPageChildren :block/string ?dataBlockName]
+      ]`;
+
+      const renameQueryResults = await window.roamAlphaAPI.q(renameQuery, dataPageTitle, 'data');
+      const renameDataChildren = renameQueryResults.map((arr) => arr[0])[0]?.children || [];
+
+      let phase4Renamed = 0;
+      let phase4Deleted = 0;
+      let phase4ReadConverted = 0;
+      let phase4Errors = 0;
+
+      for (const cardChild of renameDataChildren) {
+        if (!cardChild?.children) continue;
+
+        for (const sessionBlock of cardChild.children) {
+          if (!sessionBlock?.children) continue;
+
+          for (const field of sessionBlock.children) {
+            if (!field?.string || !field.uid) continue;
+            const [key, value] = parseConfigString(field.string);
+
+            if (FIELDS_TO_DELETE.includes(key)) {
+              try {
+                await window.roamAlphaAPI.deleteBlock({ block: { uid: field.uid } });
+                phase4Deleted++;
+              } catch (err) {
+                console.error(`[Memo] Phase 4 delete error for ${key}:`, err);
+                phase4Errors++;
+              }
+              continue;
+            }
+
+            if (key === 'interaction' && value === 'READ') {
+              try {
+                await window.roamAlphaAPI.updateBlock({
+                  block: { uid: field.uid, string: 'interaction:: LBL' },
+                });
+                phase4ReadConverted++;
+              } catch (err) {
+                console.error(`[Memo] Phase 4 READ→LBL error:`, err);
+                phase4Errors++;
+              }
+              continue;
+            }
+
+            if (FIELD_RENAME_MAP[key]) {
+              try {
+                await window.roamAlphaAPI.updateBlock({
+                  block: { uid: field.uid, string: `${FIELD_RENAME_MAP[key]}:: ${value}` },
+                });
+                phase4Renamed++;
+              } catch (err) {
+                console.error(`[Memo] Phase 4 rename error for ${key}:`, err);
+                phase4Errors++;
+              }
+            }
+          }
+        }
+      }
+
+      console.log(`[Memo] Phase 4 summary:`, {
+        renamed: phase4Renamed,
+        deleted: phase4Deleted,
+        readConverted: phase4ReadConverted,
+        errors: phase4Errors,
       });
 
       setProgress({ total, migrated, skipped, phase: 'Done' });

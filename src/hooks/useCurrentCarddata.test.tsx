@@ -109,7 +109,7 @@ describe('useCurrentCardData', () => {
         })
         .withCard({ uid: currentCardRefUid_1 })
         .withSession(currentCardRefUid_1, {
-          grade: 2,
+          sm2_grade: 2,
           algorithm: SchedulingAlgorithm.PROGRESSIVE,
           interaction: InteractionStyle.NORMAL,
         });
@@ -147,12 +147,12 @@ describe('useCurrentCardData', () => {
       const mockBuilder = new testUtils.MockDataBuilder()
         .withCard({ uid: currentCardRefUid })
         .withSession(currentCardRefUid, {
-          grade: 1,
+          sm2_grade: 1,
           algorithm: SchedulingAlgorithm.SM2,
           interaction: InteractionStyle.NORMAL,
         })
         .withSession(currentCardRefUid, {
-          grade: 2,
+          sm2_grade: 2,
           algorithm: SchedulingAlgorithm.PROGRESSIVE,
           interaction: InteractionStyle.NORMAL,
         });
@@ -212,7 +212,7 @@ describe('useCurrentCardData', () => {
         result.current.applyOptimisticCardMeta({
           algorithm: SchedulingAlgorithm.SM2,
           interaction: InteractionStyle.NORMAL,
-          lineByLineProgress: undefined,
+          lbl_progress: undefined,
         });
       });
 

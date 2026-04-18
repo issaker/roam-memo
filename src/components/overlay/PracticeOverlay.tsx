@@ -35,7 +35,6 @@ import {
   Session,
   isFixedMode,
   isLBLReviewMode,
-  isIncrementalReadMode,
   DEFAULT_REVIEW_CONFIG,
   SchedulingAlgorithm,
   InteractionStyle,
@@ -142,7 +141,7 @@ const PracticeOverlay = ({
   );
 
   const [intervalMultiplier, setIntervalMultiplier] = React.useState<number>(
-    currentCardData?.intervalMultiplier || (newFixedSessionDefaults.intervalMultiplier as number)
+    currentCardData?.fixed_multiplier || (newFixedSessionDefaults.fixed_multiplier as number)
   );
 
   const isDone = todaySelectedTag?.status === CompletionStatus.Finished || !currentCardData;
@@ -169,9 +168,9 @@ const PracticeOverlay = ({
     if (!cardChanged) return;
 
     if (isFixedMode(latestSession.algorithm as SchedulingAlgorithm | undefined)) {
-      setIntervalMultiplier(latestSession.intervalMultiplier as number);
+      setIntervalMultiplier(latestSession.fixed_multiplier as number);
     } else {
-      setIntervalMultiplier(newFixedSessionDefaults.intervalMultiplier as number);
+      setIntervalMultiplier(newFixedSessionDefaults.fixed_multiplier as number);
     }
   }, [latestSession, currentCardRefUid, newFixedSessionDefaults]);
 
@@ -200,9 +199,7 @@ const PracticeOverlay = ({
 
   const isLBLReview = isLBLReviewMode(interaction) && hasBlockChildrenUids;
 
-  const isIncrementalRead = isIncrementalReadMode(interaction) && hasBlockChildrenUids;
-
-  const isLineByLineUI = isLBLReview || isIncrementalRead;
+  const isLineByLineActive = isLBLReview;
 
   const childUidsList = React.useMemo(() => blockInfo.childrenUids || [], [blockInfo.childrenUids]);
 
@@ -216,8 +213,7 @@ const PracticeOverlay = ({
   } = useLineByLineReview({
     currentCardRefUid,
     childUidsList,
-    isLineByLineUI,
-    isIncrementalRead,
+    isLineByLineUI: isLineByLineActive,
     isLBLReview,
     dataPageTitle,
     readReinsertOffset,
@@ -229,20 +225,18 @@ const PracticeOverlay = ({
     setCurrentIndex,
     setShowAnswers,
     setCardQueue,
-    lineByLineProgressStr: currentCardData?.lineByLineProgress,
+    lineByLineProgressStr: currentCardData?.lbl_progress,
   });
 
-  // Reset showAnswers state when card changes or mode updates
-  // Uses latestSession?.reviewMode to avoid stale cardMeta during card transitions
   React.useEffect(() => {
     const effectiveInteraction = (latestSession?.interaction || interaction) as InteractionStyle | undefined;
     const effectiveAlgorithm = (latestSession?.algorithm || algorithm) as SchedulingAlgorithm | undefined;
-    const effectiveIsIncrementalRead = isIncrementalReadMode(effectiveInteraction) && hasBlockChildrenUids;
-    const effectiveIsLBLReview = isLBLReviewMode(effectiveInteraction) && hasBlockChildrenUids;
+    const effectiveIsLBL = isLBLReviewMode(effectiveInteraction) && hasBlockChildrenUids;
+    const effectiveIsLblNext = effectiveIsLBL && isFixedMode(effectiveAlgorithm);
 
-    if (effectiveIsIncrementalRead) {
+    if (effectiveIsLblNext) {
       setShowAnswers(true);
-    } else if (effectiveIsLBLReview) {
+    } else if (effectiveIsLBL) {
       setShowAnswers(false);
     } else if (isFixedMode(effectiveAlgorithm)) {
       setShowAnswers(true);
@@ -288,8 +282,8 @@ const PracticeOverlay = ({
     (gradeData) => {
       if (isDone) return;
 
-      if (isLineByLineUI && !lineByLineIsCardComplete) {
-        onLineByLineGrade(gradeData.grade);
+      if (isLineByLineActive && !lineByLineIsCardComplete) {
+        onLineByLineGrade(gradeData.sm2_grade);
         return;
       }
 
@@ -321,7 +315,7 @@ const PracticeOverlay = ({
       handlePracticeClick(practiceProps);
       setShowAnswers(false);
 
-      const isForgot = gradeData.grade === 0;
+      const isForgot = gradeData.sm2_grade === 0;
       const insertIndex = currentIndex + 1 + forgotReinsertOffset;
 
       if (isForgot && forgotReinsertOffset > 0 && currentCardRefUid) {
@@ -345,7 +339,7 @@ const PracticeOverlay = ({
       currentCardRefUid,
       forgotReinsertOffset,
       isCramming,
-      isLineByLineUI,
+      isLineByLineActive,
       lineByLineIsCardComplete,
       onLineByLineGrade,
     ]
@@ -383,6 +377,14 @@ const PracticeOverlay = ({
   const toggleBreadcrumbs = React.useCallback(() => {
     updateSetting('showBreadcrumbs', !showBreadcrumbs);
   }, [showBreadcrumbs, updateSetting]);
+
+  const handleApplyAndClose = React.useCallback((formSettings: import('~/components/SettingsForm').SettingsFormSettings) => {
+    (Object.keys(formSettings) as (keyof import('~/components/SettingsForm').SettingsFormSettings)[]).forEach((key) => {
+      updateSetting(key, formSettings[key]);
+    });
+    setShowSettings(false);
+    onCloseCallback();
+  }, [updateSetting, onCloseCallback]);
 
   const hotkeys = React.useMemo(
     () => [
@@ -577,9 +579,9 @@ const PracticeOverlay = ({
         onPracticeClick,
         currentIndex,
         renderMode,
-        isLineByLine: isLineByLineUI,
-        lineByLineCurrentIndex: isLineByLineUI ? lineByLineCurrentChildIndex + 1 : 0,
-        lineByLineTotal: isLineByLineUI ? childUidsList.length : 0,
+        isLineByLine: isLineByLineActive,
+        lineByLineCurrentIndex: isLineByLineActive ? lineByLineCurrentChildIndex + 1 : 0,
+        lineByLineTotal: isLineByLineActive ? childUidsList.length : 0,
         cardMeta,
       }}
     >
@@ -610,7 +612,7 @@ const PracticeOverlay = ({
         >
           {currentCardRefUid ? (
             <>
-              {isLineByLineUI && !lineByLineIsCardComplete ? (
+              {isLineByLineActive && !lineByLineIsCardComplete ? (
                 <LineByLineView
                   currentCardRefUid={currentCardRefUid}
                   childUidsList={childUidsList}
@@ -665,10 +667,10 @@ const PracticeOverlay = ({
           onSkipClick={onSkipClick}
           onPrevClick={onPrevClick}
           setShowAnswers={
-            isLineByLineUI && !lineByLineIsCardComplete ? onLineByLineShowAnswer : setShowAnswers
+            isLineByLineActive && !lineByLineIsCardComplete ? onLineByLineShowAnswer : setShowAnswers
           }
           showAnswers={
-            isLineByLineUI ? lineByLineRevealedCount > lineByLineCurrentChildIndex : showAnswers
+            isLineByLineActive ? lineByLineRevealedCount > lineByLineCurrentChildIndex : showAnswers
           }
           isDone={isDone || lineByLineIsCardComplete}
           hasCards={hasCards}
@@ -682,7 +684,7 @@ const PracticeOverlay = ({
         isOpen={showSettings}
         onClose={() => setShowSettings(false)}
         settings={settings}
-        updateSetting={updateSetting}
+        onApplyAndClose={handleApplyAndClose}
         dataPageTitle={dataPageTitle}
       />
     </MainContext.Provider>

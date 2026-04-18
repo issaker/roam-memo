@@ -5,12 +5,21 @@
  *   All card data is stored in session blocks — no separate meta block.
  *   The latest session block is the single source of truth.
  *
+ *   Field naming convention: {owner}_{purpose}
+ *   - sm2_*:      SM2 algorithm fields
+ *   - progressive_*: Progressive algorithm fields
+ *   - fixed_*:    Fixed interval algorithm fields
+ *   - lbl_*:      Line by Line interaction fields
+ *   - (no prefix): Universal/config fields
+ *
  *   Session block fields:
  *   - algorithm:          Scheduling algorithm (SM2, PROGRESSIVE, FIXED_DAYS, etc.)
- *   - interaction:        Interaction style (NORMAL, LBL, READ)
+ *   - interaction:        Interaction style (NORMAL, LBL)
  *   - nextDueDate:        Next due date for the card.
- *   - lineByLineProgress: JSON string tracking per-child progress for LBL cards.
- *   - grade, interval, repetitions, eFactor, etc.: Algorithm-specific parameters.
+ *   - lbl_progress:       JSON string tracking per-child progress for LBL cards.
+ *   - sm2_grade, sm2_interval, sm2_repetitions, sm2_eFactor: SM2-specific parameters.
+ *   - progressive_repetitions, progressive_interval: Progressive-specific parameters.
+ *   - fixed_multiplier:   Fixed interval user-configured multiplier.
  */
 
 interface SessionCommon {
@@ -22,23 +31,24 @@ interface SessionCommon {
 export type Session = {
   algorithm: SchedulingAlgorithm;
   interaction: InteractionStyle;
-  repetitions?: number;
-  interval?: number;
-  eFactor?: number;
-  grade?: number;
-  intervalMultiplier?: number;
-  progressiveRepetitions?: number;
-  lineByLineProgress?: string;
+  sm2_repetitions?: number;
+  sm2_interval?: number;
+  sm2_eFactor?: number;
+  sm2_grade?: number;
+  progressive_repetitions?: number;
+  progressive_interval?: number;
+  fixed_multiplier?: number;
+  lbl_progress?: string;
 } & SessionCommon;
 
 export interface CardMeta {
   algorithm: SchedulingAlgorithm;
   interaction: InteractionStyle;
-  lineByLineProgress?: string;
+  lbl_progress?: string;
   nextDueDate?: Date;
 }
 
-export interface NewSession extends Omit<Session, 'nextDueDate' | 'grade'> {
+export interface NewSession extends Omit<Session, 'nextDueDate' | 'sm2_grade'> {
   isNew: boolean;
 }
 
@@ -58,10 +68,10 @@ export interface CompleteRecords {
 
 export interface LineByLineChildData {
   nextDueDate: string;
-  interval: number;
-  repetitions: number;
-  eFactor: number;
-  progressiveRepetitions?: number;
+  sm2_interval: number;
+  sm2_repetitions: number;
+  sm2_eFactor: number;
+  progressive_repetitions?: number;
 }
 
 export type LineByLineProgressMap = Record<string, LineByLineChildData>;
@@ -78,7 +88,6 @@ export enum SchedulingAlgorithm {
 export enum InteractionStyle {
   NORMAL = 'NORMAL',
   LBL = 'LBL',
-  READ = 'READ',
 }
 
 export type ReviewConfig = {
@@ -115,7 +124,6 @@ export const ALGORITHM_META: Record<SchedulingAlgorithm, AlgorithmMeta> = {
 export const INTERACTION_META: Record<InteractionStyle, InteractionMeta> = {
   [InteractionStyle.NORMAL]: { label: 'Normal', icon: 'layers' },
   [InteractionStyle.LBL]: { label: 'Line by Line', icon: 'list' },
-  [InteractionStyle.READ]: { label: 'Incremental Read', icon: 'book' },
 };
 
 export const isFixedAlgorithm = (algorithm: SchedulingAlgorithm): boolean => {
@@ -139,17 +147,15 @@ export const isSpacedMode = (mode: SchedulingAlgorithm | undefined): boolean => 
 export const isLBLReviewMode = (interaction?: InteractionStyle): boolean =>
   interaction === InteractionStyle.LBL;
 
-export const isIncrementalReadMode = (interaction?: InteractionStyle): boolean =>
-  interaction === InteractionStyle.READ;
-
 export const isLineByLineUI = (interaction?: InteractionStyle): boolean =>
-  isLBLReviewMode(interaction) || isIncrementalReadMode(interaction);
+  interaction === InteractionStyle.LBL;
 
 export const resolveReviewConfig = (
   rawAlgorithm?: string,
   rawInteraction?: string
 ): ReviewConfig => {
+  const normalizedInteraction = rawInteraction === 'READ' ? 'LBL' : rawInteraction;
   const algorithm = Object.values(SchedulingAlgorithm).find(a => a === rawAlgorithm) || DEFAULT_REVIEW_CONFIG.algorithm;
-  const interaction = Object.values(InteractionStyle).find(i => i === rawInteraction) || DEFAULT_REVIEW_CONFIG.interaction;
+  const interaction = Object.values(InteractionStyle).find(i => i === normalizedInteraction) || DEFAULT_REVIEW_CONFIG.interaction;
   return { algorithm, interaction };
 };

@@ -7,17 +7,17 @@ import * as asyncUtils from '~/utils/async';
 import { generatePracticeData } from '~/practice';
 import Tooltip from '~/components/Tooltip';
 import ButtonTags from '~/components/ButtonTags';
-import { isFixedMode, isIncrementalReadMode, SchedulingAlgorithm, InteractionStyle, ALGORITHM_META, INTERACTION_META } from '~/models/session';
+import { isFixedMode, isLineByLineUI, SchedulingAlgorithm, InteractionStyle, ALGORITHM_META, INTERACTION_META } from '~/models/session';
 import { MainContext } from '~/components/overlay/PracticeOverlay';
 import { usePracticeSession } from '~/contexts/PracticeSessionContext';
 import { getIntentColor, colors } from '~/theme';
 
 interface IntervalEstimate {
   algorithm: SchedulingAlgorithm;
-  grade: number;
-  repetitions: number;
-  interval: number;
-  eFactor: number;
+  sm2_grade: number;
+  sm2_repetitions: number;
+  sm2_interval: number;
+  sm2_eFactor: number;
   dateCreated: string;
   nextDueDate: string;
   nextDueDateFromNow: string;
@@ -176,22 +176,23 @@ const Footer = ({
       return;
     }
     const grades = [0, 1, 2, 3, 4, 5];
-    const { interval, repetitions, eFactor, progressiveRepetitions } = currentCardData;
+    const { sm2_interval, sm2_repetitions, sm2_eFactor, progressive_repetitions, progressive_interval, fixed_multiplier } = currentCardData;
     const estimates = {};
 
     const iterateCount = isFixedMode(algorithmFromSession) ? 1 : grades.length;
     for (let i = 0; i < iterateCount; i++) {
       const grade = grades[i];
       const practiceResultData = generatePracticeData({
-        grade,
-        interval,
-        repetitions,
-        eFactor,
+        sm2_grade: grade,
+        sm2_interval,
+        sm2_repetitions,
+        sm2_eFactor,
         dateCreated: new Date(),
         algorithm: algorithmFromSession,
         interaction: interactionFromSession || InteractionStyle.NORMAL,
-        intervalMultiplier,
-        progressiveRepetitions,
+        fixed_multiplier: intervalMultiplier,
+        progressive_repetitions,
+        progressive_interval,
       });
       estimates[grade] = practiceResultData;
     }
@@ -292,7 +293,7 @@ const GradingControlsWrapper = ({
   const { algorithm, interaction, onSelectAlgorithm, onSelectInteraction } = usePracticeSession();
 
   const isFixedModeActive = isFixedMode(algorithm);
-  const isIncrementalReadActive = isIncrementalReadMode(interaction);
+  const isLblNextActive = isLineByLineUI(interaction) && isFixedMode(algorithm);
   return (
     <div className="flex items-center flex-wrap justify-evenly gap-3 w-full">
       <button
@@ -337,7 +338,7 @@ const GradingControlsWrapper = ({
       >
         ▶
       </button>
-      {isIncrementalReadActive ? (
+      {isLblNextActive ? (
         <IncrementalReadControls
           activeButtonKey={activeButtonKey}
           intervalPractice={intervalPractice}
@@ -576,7 +577,7 @@ const SpacedIntervalModeControls = ({
   intervalEstimates,
 }: {
   activeButtonKey: string;
-  gradeFn: (grade: number) => void;
+  gradeFn: (sm2_grade: number) => void;
   intervalEstimates: IntervalEstimates;
 }): JSX.Element => {
   if (!intervalEstimates) {
@@ -721,7 +722,6 @@ const INTERACTION_OPTIONS: InteractionOption[] = Object.values(InteractionStyle)
   label: INTERACTION_META[style].label,
   icon: (INTERACTION_META[style].icon as IconName) || 'layers',
 }));
-
 const AlgorithmSelect = BlueprintSelect.Select.ofType<AlgorithmOption>();
 const InteractionSelect = BlueprintSelect.Select.ofType<InteractionOption>();
 

@@ -4,7 +4,7 @@ import {
   isFixedMode,
   isSpacedMode,
   isLBLReviewMode,
-  isIncrementalReadMode,
+  isLineByLineUI,
   ALGORITHM_META,
   INTERACTION_META,
 } from '~/models/session';
@@ -31,20 +31,18 @@ describe('mode classification functions', () => {
   it('isLBLReviewMode returns true only for LBL interaction', () => {
     expect(isLBLReviewMode(InteractionStyle.LBL)).toBe(true);
     expect(isLBLReviewMode(InteractionStyle.NORMAL)).toBe(false);
-    expect(isLBLReviewMode(InteractionStyle.READ)).toBe(false);
   });
 
-  it('isIncrementalReadMode returns true only for READ interaction', () => {
-    expect(isIncrementalReadMode(InteractionStyle.READ)).toBe(true);
-    expect(isIncrementalReadMode(InteractionStyle.NORMAL)).toBe(false);
-    expect(isIncrementalReadMode(InteractionStyle.LBL)).toBe(false);
+  it('isLineByLineUI returns true only for LBL interaction', () => {
+    expect(isLineByLineUI(InteractionStyle.LBL)).toBe(true);
+    expect(isLineByLineUI(InteractionStyle.NORMAL)).toBe(false);
   });
 
   it('all classification functions return false for undefined', () => {
     expect(isFixedMode(undefined)).toBe(false);
     expect(isSpacedMode(undefined)).toBe(false);
     expect(isLBLReviewMode(undefined)).toBe(false);
-    expect(isIncrementalReadMode(undefined)).toBe(false);
+    expect(isLineByLineUI(undefined)).toBe(false);
   });
 });
 

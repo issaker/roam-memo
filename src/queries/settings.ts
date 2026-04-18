@@ -47,6 +47,7 @@ export const saveSettingsToPage = async (dataPageTitle: string, settings: Settin
       readReinsertOffset: settings.readReinsertOffset.toString(),
       showBreadcrumbs: settings.showBreadcrumbs.toString(),
       showModeBorders: settings.showModeBorders.toString(),
+      dailynoteEnabled: settings.dailynoteEnabled.toString(),
     };
 
     for (const [key, value] of Object.entries(settingsToSave)) {
@@ -159,6 +160,9 @@ export const loadSettingsFromPage = async (dataPageTitle: string): Promise<Setti
               break;
             case 'showModeBorders':
               loadedSettings.showModeBorders = value === 'true';
+              break;
+            case 'dailynoteEnabled':
+              loadedSettings.dailynoteEnabled = value === 'true';
               break;
           }
         }

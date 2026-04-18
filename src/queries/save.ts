@@ -9,9 +9,9 @@
  *   │   ├── algorithm:: SM2
  *   │   ├── interaction:: NORMAL
  *   │   ├── nextDueDate:: [[Date]]
- *   │   ├── lineByLineProgress:: {...}
- *   │   ├── grade:: 5
- *   │   ├── eFactor:: 2.5
+ *   │   ├── lbl_progress:: {...}
+ *   │   ├── sm2_grade:: 5
+ *   │   ├── sm2_eFactor:: 2.5
  *   │   └── ...
  *   └── [[Date]] 🔴            ← older session block
  *       └── ...
@@ -24,6 +24,7 @@
 import * as stringUtils from '~/utils/string';
 import * as dateUtils from '~/utils/date';
 import { LineByLineProgressMap, SchedulingAlgorithm, InteractionStyle } from '~/models/session';
+import { parseConfigString } from '~/utils/string';
 import {
   createChildBlock,
   getChildBlock,
@@ -120,7 +121,7 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
 
   const referenceDate = dateCreated || new Date();
   const dateCreatedRoamDateString = stringUtils.dateToRoamDateString(referenceDate);
-  const emoji = getEmojiFromGrade(data.grade);
+  const emoji = getEmojiFromGrade(data.sm2_grade);
   const newDataBlockId = await createChildBlock(
     cardDataBlockUid,
     `[[${dateCreatedRoamDateString}]] ${emoji}`,
@@ -128,17 +129,19 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
     { open: false }
   );
 
-  const nextDueDate = data.nextDueDate || dateUtils.addDays(referenceDate, data.interval);
+  const nextDueDate = data.nextDueDate || dateUtils.addDays(referenceDate, data.sm2_interval);
 
   for (const key of Object.keys(data)) {
     if (data[key] === undefined) continue;
     if (key === 'reviewMode') continue;
+    if (key === 'algorithm') continue;
+    if (key === 'interaction') continue;
 
     let value = data[key];
     if (key === 'nextDueDate') {
       value = `[[${stringUtils.dateToRoamDateString(nextDueDate)}]]`;
     }
-    if (key === 'lineByLineProgress') {
+    if (key === 'lbl_progress') {
       value = JSON.stringify(data[key]);
     }
 
@@ -183,7 +186,7 @@ export const updateLineByLineProgress = async ({
   const progressString = JSON.stringify(progress);
   await upsertLatestSessionField({
     cardDataBlockUid,
-    key: 'lineByLineProgress',
+    key: 'lbl_progress',
     value: progressString,
   });
 
@@ -246,4 +249,70 @@ export const updateReviewConfig = async ({
   if (interaction) {
     await upsertLatestSessionField({ cardDataBlockUid, key: 'interaction', value: interaction });
   }
+};
+
+const DEDUP_FIELD_KEYS = ['algorithm', 'interaction', 'intervalMultiplierType'];
+
+export const deduplicateSessionFields = async ({
+  dataPageTitle,
+}: {
+  dataPageTitle: string;
+}): Promise<{ cleaned: number; errors: number }> => {
+  const query = `[
+    :find (pull ?pluginPageChildren [
+      :block/string
+      :block/children
+      :block/order
+      :block/uid
+      {:block/children ...}])
+    :in $ ?pageTitle ?dataBlockName
+    :where
+    [?page :node/title ?pageTitle]
+    [?page :block/children ?pluginPageChildren]
+    [?pluginPageChildren :block/string ?dataBlockName]
+  ]`;
+
+  const queryResultsData = await window.roamAlphaAPI.q(query, dataPageTitle, 'data');
+  const dataChildren = queryResultsData.map((arr) => arr[0])[0]?.children || [];
+
+  let cleaned = 0;
+  let errors = 0;
+
+  for (const cardChild of dataChildren) {
+    if (!cardChild?.children) continue;
+
+    for (const sessionBlock of cardChild.children) {
+      if (!sessionBlock?.children) continue;
+
+      const keyBlocks: Record<string, { uid: string; string: string }[]> = {};
+
+      for (const field of sessionBlock.children) {
+        if (!field?.string || !field.uid) continue;
+        const [key] = parseConfigString(field.string);
+        if (DEDUP_FIELD_KEYS.includes(key)) {
+          if (!keyBlocks[key]) keyBlocks[key] = [];
+          keyBlocks[key].push({ uid: field.uid, string: field.string });
+        }
+      }
+
+      for (const key of Object.keys(keyBlocks)) {
+        const blocks = keyBlocks[key];
+        if (blocks.length <= 1) continue;
+
+        const keepBlock = blocks[blocks.length - 1];
+        for (const block of blocks) {
+          if (block.uid === keepBlock.uid) continue;
+          try {
+            await window.roamAlphaAPI.deleteBlock({ block: { uid: block.uid } });
+            cleaned++;
+          } catch (err) {
+            console.error(`[Memo] Dedup error deleting ${key} block ${block.uid}:`, err);
+            errors++;
+          }
+        }
+      }
+    }
+  }
+
+  return { cleaned, errors };
 };

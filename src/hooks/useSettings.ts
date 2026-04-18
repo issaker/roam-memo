@@ -43,6 +43,7 @@ export type Settings = {
   readReinsertOffset: number;
   showBreadcrumbs: boolean;
   showModeBorders: boolean;
+  dailynoteEnabled: boolean;
 };
 
 export const defaultSettings: Settings = {
@@ -56,6 +57,7 @@ export const defaultSettings: Settings = {
   readReinsertOffset: 3,
   showBreadcrumbs: false,
   showModeBorders: true,
+  dailynoteEnabled: true,
 };
 
 const SETTING_TYPES = {
@@ -67,6 +69,7 @@ const SETTING_TYPES = {
   readReinsertOffset: 'number',
   showBreadcrumbs: 'boolean',
   showModeBorders: 'boolean',
+  dailynoteEnabled: 'boolean',
 } as const;
 
 const SETTING_KEYS = Object.keys(defaultSettings) as (keyof Settings)[];

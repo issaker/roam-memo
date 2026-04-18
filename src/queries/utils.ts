@@ -191,6 +191,21 @@ export const getChildBlocksOnPage = async (page) => {
   return queryResults;
 };
 
+export const dailyNoteBlockUidsQuery = `
+    [:find ?blockUid
+     :where
+     [?page :page/create-email]
+     [?page :block/children ?block]
+     [?block :block/uid ?blockUid]
+     [?block :block/string ?str]
+     [(not= ?str "")]]
+  `;
+
+export const getDailyNoteBlockUids = async (): Promise<string[]> => {
+  const results = window.roamAlphaAPI.q(dailyNoteBlockUidsQuery);
+  return results.map((arr) => arr[0]);
+};
+
 export const createChildBlock = async (parent_uid, block, order, blockProps = {}) => {
   if (!order) {
     order = 0;
@@ -246,17 +261,17 @@ export const generateNewSession = ({
   if (isSpaced) {
     return {
       ...baseSession,
-      eFactor: 2.5,
-      interval: 0,
-      repetitions: 0,
+      sm2_eFactor: 2.5,
+      sm2_interval: 0,
+      sm2_repetitions: 0,
       isNew,
     };
   }
 
   return {
     ...baseSession,
-    intervalMultiplier: 2,
-    progressiveRepetitions: 0,
+    progressive_interval: 2,
+    progressive_repetitions: 0,
     isNew,
   };
 };

@@ -1,9 +1,12 @@
+import * as React from 'react';
 import * as asyncUtils from '~/utils/async';
 import MigrateLegacyDataPanel from '~/components/MigrateLegacyDataPanel';
-import SettingsForm from '~/components/SettingsForm';
+import SettingsForm, { SettingsFormHandle, SettingsFormSettings } from '~/components/SettingsForm';
 import { defaultSettings } from './hooks/useSettings';
 
 const settingsPanelConfig = ({ settings, setSettings }) => {
+  const formRef = React.createRef<SettingsFormHandle>();
+
   const syncFn = async ({ key, value }: { key: string; value: any }) => {
     window.roamMemo.extensionAPI.settings.set(key, value);
     setSettings((currentSettings) => {
@@ -17,6 +20,15 @@ const settingsPanelConfig = ({ settings, setSettings }) => {
     processChange({ key, value });
   };
 
+  const handleApply = () => {
+    const formSettings = formRef.current?.getSettings();
+    if (formSettings) {
+      (Object.keys(formSettings) as (keyof SettingsFormSettings)[]).forEach((key) => {
+        updateSetting(key, formSettings[key]);
+      });
+    }
+  };
+
   return {
     tabTitle: 'Memo',
     settings: [
@@ -26,11 +38,21 @@ const settingsPanelConfig = ({ settings, setSettings }) => {
         action: {
           type: 'reactComponent',
           component: () => (
-            <SettingsForm
-              settings={settings}
-              updateSetting={updateSetting}
-              dataPageTitle={settings.dataPageTitle}
-            />
+            <div>
+              <SettingsForm
+                ref={formRef}
+                settings={settings}
+                dataPageTitle={settings.dataPageTitle}
+              />
+              <div style={{ marginTop: '15px', borderTop: '1px solid #394b59', paddingTop: '10px', textAlign: 'right' }}>
+                <button
+                  className="bp3-button bp3-intent-primary"
+                  onClick={handleApply}
+                >
+                  Apply
+                </button>
+              </div>
+            </div>
           ),
         },
       },

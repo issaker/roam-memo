@@ -11,10 +11,10 @@
  *   │   │   │   ├── algorithm:: SM2
  *   │   │   │   ├── interaction:: NORMAL
  *   │   │   │   ├── nextDueDate:: [[Date]]
- *   │   │   │   ├── lineByLineProgress:: {...}
- *   │   │   │   ├── grade:: 5
- *   │   │   │   ├── eFactor:: 2.5
- *   │   │   │   └── repetitions:: 3
+ *   │   │   │   ├── lbl_progress:: {...}
+ *   │   │   │   ├── sm2_grade:: 5
+ *   │   │   │   ├── sm2_eFactor:: 2.5
+ *   │   │   │   └── sm2_repetitions:: 3
  *   │   │   └── [[Date]] 🔴
  *   │   │       └── ...
  *   │   └── ((cardUid2))
@@ -49,7 +49,8 @@ import {
   calculateTodayStatus,
   initializeToday,
 } from '~/queries/today';
-import { generateNewSession, getChildBlocksOnPage } from './utils';
+import { generateNewSession, getChildBlocksOnPage, getDailyNoteBlockUids } from './utils';
+import { DAILYNOTE_DECK_KEY } from '~/constants';
 
 export const getPracticeData = async ({
   tagsList,
@@ -132,14 +133,25 @@ const SESSION_SNAPSHOT_KEYS = [
   'algorithm',
   'interaction',
   'nextDueDate',
-  'lineByLineProgress',
-  'repetitions',
-  'interval',
-  'eFactor',
-  'intervalMultiplier',
-  'intervalMultiplierType',
-  'progressiveRepetitions',
+  'lbl_progress',
+  'sm2_repetitions',
+  'sm2_interval',
+  'sm2_eFactor',
+  'sm2_grade',
+  'progressive_repetitions',
+  'progressive_interval',
+  'fixed_multiplier',
 ] as const;
+
+const LEGACY_FIELD_MAP: Record<string, string> = {
+  repetitions: 'sm2_repetitions',
+  interval: 'sm2_interval',
+  eFactor: 'sm2_eFactor',
+  grade: 'sm2_grade',
+  progressiveRepetitions: 'progressive_repetitions',
+  intervalMultiplier: 'fixed_multiplier',
+  lineByLineProgress: 'lbl_progress',
+};
 
 /**
  * Rebuild a full latest-session snapshot from sparse historical session blocks.
@@ -176,13 +188,16 @@ const mergeSessionSnapshot = (
 const parseFieldValuesFromChildren = (object, children) => {
   for (const field of children) {
     if (!field?.string) continue;
-    const [key, value] = parseConfigString(field.string);
+    const [rawKey, value] = parseConfigString(field.string);
 
-    if (key === 'reviewMode') continue;
+    if (rawKey === 'reviewMode') continue;
+    if (rawKey === 'intervalMultiplierType') continue;
+
+    const key = LEGACY_FIELD_MAP[rawKey] || rawKey;
 
     if (key === 'nextDueDate') {
       object[key] = parseRoamDateString(getStringBetween(value, '[[', ']]'));
-    } else if (key === 'lineByLineProgress') {
+    } else if (key === 'lbl_progress') {
       object[key] = value;
     } else if (key === 'algorithm') {
       object[key] = value;
@@ -326,9 +341,15 @@ export const getSessionData = async ({
   tag: string;
   dataPageTitle: string;
 }) => {
-  const tagReferencesIds = await getPageReferenceIds(tag, dataPageTitle);
-  const tagPageBlocksIds = await getSelectedTagPageBlocksIds(tag);
-  const allTagCardsUids = tagReferencesIds.concat(tagPageBlocksIds);
+  let allTagCardsUids: string[];
+
+  if (tag === DAILYNOTE_DECK_KEY) {
+    allTagCardsUids = await getDailyNoteBlockUids();
+  } else {
+    const tagReferencesIds = await getPageReferenceIds(tag, dataPageTitle);
+    const tagPageBlocksIds = await getSelectedTagPageBlocksIds(tag);
+    allTagCardsUids = tagReferencesIds.concat(tagPageBlocksIds);
+  }
 
   const allTagCardsUidsSet = new Set(allTagCardsUids);
 

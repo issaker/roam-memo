@@ -137,28 +137,29 @@ export const generateRecordsFromRoamSrData = async (
 
       let practiceInputData: PracticeProps = {
         refUid,
-        grade,
+        sm2_grade: grade,
         dataPageTitle,
         dateCreated,
         algorithm: SchedulingAlgorithm.PROGRESSIVE,
         interaction: InteractionStyle.NORMAL,
-        eFactor: undefined,
-        repetitions: undefined,
-        interval: undefined,
+        sm2_eFactor: undefined,
+        sm2_repetitions: undefined,
+        sm2_interval: undefined,
       };
 
       if (results[refUid]) {
         const lastPracticeResult = results[refUid][results[refUid].length - 1];
-        const { eFactor, repetitions, interval, algorithm, intervalMultiplier, progressiveRepetitions } =
+        const { sm2_eFactor, sm2_repetitions, sm2_interval, algorithm, progressive_interval, fixed_multiplier, progressive_repetitions } =
           lastPracticeResult;
         practiceInputData = {
           ...practiceInputData,
-          eFactor,
-          repetitions,
-          interval,
+          sm2_eFactor,
+          sm2_repetitions,
+          sm2_interval,
           algorithm,
-          intervalMultiplier,
-          progressiveRepetitions,
+          progressive_interval,
+          fixed_multiplier,
+          progressive_repetitions,
         };
       } else {
         const newCardData = generateNewSession({ isNew: false });
@@ -167,7 +168,7 @@ export const generateRecordsFromRoamSrData = async (
 
       const practiceResult = {
         ...(await practice(practiceInputData, true)),
-        grade,
+        sm2_grade: grade,
         dateCreated,
         isRoamSrOldPracticeRecord: !!isRoamSrOldPracticeRecord,
       };

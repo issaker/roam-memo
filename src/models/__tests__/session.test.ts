@@ -28,10 +28,10 @@ describe('resolveReviewConfig', () => {
       });
     });
 
-    it('resolves PROGRESSIVE + READ', () => {
+    it('resolves PROGRESSIVE + READ as PROGRESSIVE + LBL', () => {
       expect(resolveReviewConfig('PROGRESSIVE', 'READ')).toEqual({
         algorithm: SchedulingAlgorithm.PROGRESSIVE,
-        interaction: InteractionStyle.READ,
+        interaction: InteractionStyle.LBL,
       });
     });
 
