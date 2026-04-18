@@ -143,16 +143,6 @@ const SESSION_SNAPSHOT_KEYS = [
   'fixed_multiplier',
 ] as const;
 
-const LEGACY_FIELD_MAP: Record<string, string> = {
-  repetitions: 'sm2_repetitions',
-  interval: 'sm2_interval',
-  eFactor: 'sm2_eFactor',
-  grade: 'sm2_grade',
-  progressiveRepetitions: 'progressive_repetitions',
-  intervalMultiplier: 'fixed_multiplier',
-  lineByLineProgress: 'lbl_progress',
-};
-
 /**
  * Rebuild a full latest-session snapshot from sparse historical session blocks.
  *
@@ -188,12 +178,7 @@ const mergeSessionSnapshot = (
 const parseFieldValuesFromChildren = (object, children) => {
   for (const field of children) {
     if (!field?.string) continue;
-    const [rawKey, value] = parseConfigString(field.string);
-
-    if (rawKey === 'reviewMode') continue;
-    if (rawKey === 'intervalMultiplierType') continue;
-
-    const key = LEGACY_FIELD_MAP[rawKey] || rawKey;
+    const [key, value] = parseConfigString(field.string);
 
     if (key === 'nextDueDate') {
       object[key] = parseRoamDateString(getStringBetween(value, '[[', ']]'));

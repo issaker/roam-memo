@@ -221,6 +221,7 @@ const PracticeOverlay = ({
     currentIndex,
     currentCardData,
     algorithm,
+    interaction,
     setSessionOverrides,
     setCurrentIndex,
     setShowAnswers,

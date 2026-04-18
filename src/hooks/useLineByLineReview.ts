@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { LineByLineProgressMap, SchedulingAlgorithm, isFixedAlgorithm } from '~/models/session';
+import { LineByLineProgressMap, SchedulingAlgorithm, InteractionStyle, isFixedAlgorithm } from '~/models/session';
 import { updateLineByLineProgress } from '~/queries';
 import { progressiveInterval, supermemo } from '~/practice';
 import * as dateUtils from '~/utils/date';
@@ -14,30 +14,10 @@ export const shouldReinsertReadCard = ({
   readReinsertOffset: number;
 }) => readReinsertOffset > 0 && currentChildIndex < totalChildren - 1;
 
-const LEGACY_LBL_CHILD_KEY_MAP: Record<string, string> = {
-  interval: 'sm2_interval',
-  repetitions: 'sm2_repetitions',
-  eFactor: 'sm2_eFactor',
-  progressiveRepetitions: 'progressive_repetitions',
-};
-
-const migrateLblChildData = (data: any): any => {
-  const result: any = {};
-  for (const [key, value] of Object.entries(data)) {
-    result[LEGACY_LBL_CHILD_KEY_MAP[key] || key] = value;
-  }
-  return result;
-};
-
 const parseLineByLineProgress = (progressStr?: string): LineByLineProgressMap => {
   if (!progressStr) return {};
   try {
-    const parsed = JSON.parse(progressStr);
-    const migrated: LineByLineProgressMap = {};
-    for (const [uid, data] of Object.entries(parsed)) {
-      migrated[uid] = migrateLblChildData(data);
-    }
-    return migrated;
+    return JSON.parse(progressStr);
   } catch {
     return {};
   }
@@ -54,6 +34,7 @@ interface UseLineByLineReviewInput {
   currentIndex: number;
   currentCardData: any;
   algorithm: SchedulingAlgorithm;
+  interaction: InteractionStyle;
   setSessionOverrides: React.Dispatch<React.SetStateAction<Record<string, any>>>;
   setCurrentIndex: React.Dispatch<React.SetStateAction<number>>;
   setShowAnswers: React.Dispatch<React.SetStateAction<boolean>>;
@@ -81,6 +62,7 @@ export default function useLineByLineReview({
   currentIndex,
   currentCardData,
   algorithm,
+  interaction,
   setSessionOverrides,
   setCurrentIndex,
   setShowAnswers,
@@ -167,6 +149,7 @@ export default function useLineByLineReview({
           [currentCardRefUid]: {
             ...currentCardData,
             algorithm,
+            interaction,
             dateCreated: now,
             lbl_progress: JSON.stringify(updatedProgress),
             nextDueDate: hasUnreadChildren ? now : childNextDueDate,
@@ -232,6 +215,7 @@ export default function useLineByLineReview({
         [currentCardRefUid]: {
           ...currentCardData,
           algorithm,
+          interaction,
           dateCreated: now,
           lbl_progress: JSON.stringify(updatedProgress),
           nextDueDate: hasUnreadChildren ? now : childNextDueDate,
@@ -273,6 +257,7 @@ export default function useLineByLineReview({
       isLblNext,
       currentCardData,
       algorithm,
+      interaction,
       readReinsertOffset,
       forgotReinsertOffset,
       currentIndex,

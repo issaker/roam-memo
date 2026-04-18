@@ -122,18 +122,49 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
   const referenceDate = dateCreated || new Date();
   const dateCreatedRoamDateString = stringUtils.dateToRoamDateString(referenceDate);
   const emoji = getEmojiFromGrade(data.sm2_grade);
-  const newDataBlockId = await createChildBlock(
-    cardDataBlockUid,
-    `[[${dateCreatedRoamDateString}]] ${emoji}`,
-    0,
-    { open: false }
+  const sessionBlockTitle = `[[${dateCreatedRoamDateString}]] ${emoji}`;
+
+  const existingCardChildren = await window.roamAlphaAPI.q(
+    `[:find (pull ?card [:block/children :block/uid {:block/children [:block/uid :block/string :block/order {:block/children [:block/uid :block/string :block/order]}]}])
+         :in $ ?cardUid
+         :where [?card :block/uid ?cardUid]]`,
+    cardDataBlockUid
   );
+
+  const children = existingCardChildren?.[0]?.[0]?.children || [];
+  const todayBlock = children.find((c) => {
+    if (!c?.string) return false;
+    const dateStr = stringUtils.getStringBetween(c.string, '[[', ']]');
+    return dateStr === dateCreatedRoamDateString;
+  });
+
+  let sessionBlockUid: string;
+
+  if (todayBlock) {
+    sessionBlockUid = todayBlock.uid;
+    await window.roamAlphaAPI.updateBlock({
+      block: { uid: todayBlock.uid, string: sessionBlockTitle },
+    });
+    if (todayBlock.children) {
+      for (const child of todayBlock.children) {
+        if (child?.uid) {
+          await window.roamAlphaAPI.deleteBlock({ block: { uid: child.uid } });
+        }
+      }
+    }
+  } else {
+    sessionBlockUid = await createChildBlock(
+      cardDataBlockUid,
+      sessionBlockTitle,
+      0,
+      { open: false }
+    );
+  }
 
   const nextDueDate = data.nextDueDate || dateUtils.addDays(referenceDate, data.sm2_interval);
 
   for (const key of Object.keys(data)) {
     if (data[key] === undefined) continue;
-    if (key === 'reviewMode') continue;
     if (key === 'algorithm') continue;
     if (key === 'interaction') continue;
 
@@ -145,14 +176,14 @@ export const savePracticeData = async ({ refUid, dataPageTitle, dateCreated, ...
       value = JSON.stringify(data[key]);
     }
 
-    await createChildBlock(newDataBlockId, `${key}:: ${value}`, -1);
+    await createChildBlock(sessionBlockUid, `${key}:: ${value}`, -1);
   }
 
   if (data.algorithm) {
-    await createChildBlock(newDataBlockId, `algorithm:: ${data.algorithm}`, -1);
+    await createChildBlock(sessionBlockUid, `algorithm:: ${data.algorithm}`, -1);
   }
   if (data.interaction) {
-    await createChildBlock(newDataBlockId, `interaction:: ${data.interaction}`, -1);
+    await createChildBlock(sessionBlockUid, `interaction:: ${data.interaction}`, -1);
   }
 };
 
@@ -251,7 +282,7 @@ export const updateReviewConfig = async ({
   }
 };
 
-const DEDUP_FIELD_KEYS = ['algorithm', 'interaction', 'intervalMultiplierType'];
+const DEDUP_FIELD_KEYS = ['algorithm', 'interaction'];
 
 export const deduplicateSessionFields = async ({
   dataPageTitle,

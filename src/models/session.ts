@@ -25,7 +25,6 @@
 interface SessionCommon {
   nextDueDate?: Date;
   dateCreated?: Date;
-  isRoamSrOldPracticeRecord?: boolean;
 }
 
 export type Session = {
@@ -154,8 +153,7 @@ export const resolveReviewConfig = (
   rawAlgorithm?: string,
   rawInteraction?: string
 ): ReviewConfig => {
-  const normalizedInteraction = rawInteraction === 'READ' ? 'LBL' : rawInteraction;
   const algorithm = Object.values(SchedulingAlgorithm).find(a => a === rawAlgorithm) || DEFAULT_REVIEW_CONFIG.algorithm;
-  const interaction = Object.values(InteractionStyle).find(i => i === normalizedInteraction) || DEFAULT_REVIEW_CONFIG.interaction;
+  const interaction = Object.values(InteractionStyle).find(i => i === rawInteraction) || DEFAULT_REVIEW_CONFIG.interaction;
   return { algorithm, interaction };
 };

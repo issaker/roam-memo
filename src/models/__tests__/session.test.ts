@@ -28,13 +28,6 @@ describe('resolveReviewConfig', () => {
       });
     });
 
-    it('resolves PROGRESSIVE + READ as PROGRESSIVE + LBL', () => {
-      expect(resolveReviewConfig('PROGRESSIVE', 'READ')).toEqual({
-        algorithm: SchedulingAlgorithm.PROGRESSIVE,
-        interaction: InteractionStyle.LBL,
-      });
-    });
-
     it('resolves FIXED_DAYS + NORMAL', () => {
       expect(resolveReviewConfig('FIXED_DAYS', 'NORMAL')).toEqual({
         algorithm: SchedulingAlgorithm.FIXED_DAYS,
