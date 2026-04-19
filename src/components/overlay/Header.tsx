@@ -33,6 +33,12 @@ const HeaderWrapper = styled.div`
   margin: 0;
   min-height: 50px;
   border-bottom: 1px solid ${colors.borderSubtle};
+
+  @media (max-width: 768px) {
+    .mobile-hide {
+      display: none !important;
+    }
+  }
 `;
 
 const TagSelector = ({ tagsList, selectedTag, onTagChange }) => {
@@ -330,7 +336,7 @@ const Header = ({
       </div>
       <div className="flex items-center justify-end">
         {isLineByLine && !isDone && (
-          <Blueprint.Tag intent="none" minimal style={{ fontSize: '10px', marginRight: '4px' }}>
+          <Blueprint.Tag intent="none" minimal style={{ fontSize: '10px', marginRight: '4px' }} className="mobile-hide">
             L{lineByLineCurrentIndex}/{lineByLineTotal}
           </Blueprint.Tag>
         )}
@@ -352,8 +358,8 @@ const Header = ({
             <Blueprint.Icon icon="cog" />
           </Tooltip>
         </div>
-        <span data-testid="mode-badge">{!isDone && <ModeBadge algorithm={algorithm} interaction={interaction} />}</span>
-        <span data-testid="status-badge">
+        <span data-testid="mode-badge" className="mobile-hide">{!isDone && <ModeBadge algorithm={algorithm} interaction={interaction} />}</span>
+        <span data-testid="status-badge" className="mobile-hide">
           <StatusBadge
             status={status}
             nextDueDate={nextDueDate}

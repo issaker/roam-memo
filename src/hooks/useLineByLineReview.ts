@@ -248,6 +248,12 @@ export default function useLineByLineReview({
         });
       }
 
+      if (grade === 0) {
+        setCurrentIndex((prev) => prev + 1);
+        setShowAnswers(false);
+        return;
+      }
+
       const nextIndex = lineByLineCurrentChildIndex + 1;
       const isCardFinished = nextIndex >= childUidsList.length;
 

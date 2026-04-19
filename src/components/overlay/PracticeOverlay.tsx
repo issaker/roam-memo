@@ -146,7 +146,8 @@ const PracticeOverlay = ({
 
   const baseCardData = React.useMemo(() => {
     if (!currentCardRefUid) return currentCardData;
-    if (baseSessionDataMap.current[currentCardRefUid]) {
+    const isForgotReReview = currentCardData?.sm2_grade === 0;
+    if (baseSessionDataMap.current[currentCardRefUid] && !isForgotReReview) {
       return { ...generateNewSession(), ...baseSessionDataMap.current[currentCardRefUid] };
     }
     return practiceData[currentCardRefUid] || currentCardData;
@@ -308,7 +309,8 @@ const PracticeOverlay = ({
         return;
       }
 
-      const baseData = currentCardRefUid && baseSessionDataMap.current[currentCardRefUid]
+      const isForgotReReview = currentCardData?.sm2_grade === 0;
+      const baseData = (currentCardRefUid && baseSessionDataMap.current[currentCardRefUid] && !isForgotReReview)
         ? { ...generateNewSession(), ...baseSessionDataMap.current[currentCardRefUid] }
         : (currentCardRefUid ? practiceData[currentCardRefUid] : currentCardData) || currentCardData;
 
@@ -321,7 +323,8 @@ const PracticeOverlay = ({
       };
 
       const isReScoring = currentCardData?.dateCreated
-        && dateUtils.isSameDay(currentCardData.dateCreated, new Date());
+        && dateUtils.isSameDay(currentCardData.dateCreated, new Date())
+        && currentCardData.sm2_grade !== 0;
       if (isReScoring) {
         setShowOverwriteReminder(true);
       }
